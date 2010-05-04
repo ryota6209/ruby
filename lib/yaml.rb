@@ -1,43 +1,68 @@
 module YAML
-  class EngineManager # :nodoc:
-    attr_reader :yamler
+  class << self
+    def engine
+      ::Thread.current[:yamler] or
+        (ENGINE.yamler = ENGINE.default; ::Thread.current[:yamler])
+    end
 
-    def initialize
-      @yamler = nil
+    def const_defined?(name)
+      engine.const_defined?(name)
+    end
+
+    def const_get(name)
+      engine = self.engine
+      begin
+        engine.const_get(name)
+      rescue NameError => e
+        raise NameError, "uninitialized constant #{self}::#{name}", caller(2)
+      end
+    end
+
+    alias const_missing const_get
+
+    def method_missing(name, *args, &block)
+      engine.__send__(name, *args, &block)
+    end
+
+    def respond_to_missing?(name)
+      engine.respond_to?(name)
+    end
+
+  private
+
+    def extend_object(obj)
+      engine.__send__(:extend_object, obj)
+    end
+
+    def append_features(mod)
+      engine.__send__(:append_features, mod)
+    end
+  end
+
+  class << (ENGINE = Object.new) # :nodoc:
+    def default
+      !defined?(Syck) && defined?(Psych) ? 'psych' : 'syck'
+    end
+
+    def yamler
+      if engine = YAML.engine
+        engine.name.downcase
+      else
+        default
+      end
     end
 
     def syck?
-      'syck' == @yamler
+      'syck' == yamler
     end
 
     def yamler= engine
       raise(ArgumentError, "bad engine") unless %w{syck psych}.include?(engine)
-
       require engine
-
-      Object.class_eval <<-eorb, __FILE__, __LINE__ + 1
-        remove_const 'YAML'
-        YAML = #{engine.capitalize}
-        remove_method :to_yaml
-        alias :to_yaml :#{engine}_to_yaml
-      eorb
-
-      @yamler = engine
-      engine
+      engine = ::Object.const_get(engine.capitalize)
+      ::Thread.current[:yamler] = engine
     end
   end
 
-  ENGINE = YAML::EngineManager.new
+  ENGINE.freeze
 end
-
-engine = (!defined?(Syck) && defined?(Psych) ? 'psych' : 'syck')
-
-module Syck
-  ENGINE = YAML::ENGINE
-end
-
-module Psych
-  ENGINE = YAML::ENGINE
-end
-
-YAML::ENGINE.yamler = engine
