@@ -157,6 +157,7 @@ class Queue
     end
   end
   private :push_no_sync
+
   #
   # Pushes +obj+ to the queue.
   #
@@ -174,23 +175,26 @@ class Queue
   #
   alias enq push
 
+  def pop_no_sync(non_block) # :nodoc:
+    if non_block
+      raise ThreadError, "queue empty" if @que.empty?
+    else
+      while @que.empty?
+        @waiting[Thread.current] = true
+        @mutex.sleep
+      end
+    end
+    @que.shift
+  end
+  private :pop_no_sync
+
   #
   # Retrieves data from the queue.  If the queue is empty, the calling thread is
   # suspended until data is pushed onto the queue.  If +non_block+ is true, the
   # thread isn't suspended, and an exception is raised.
   #
   def pop(non_block=false)
-    @mutex.synchronize{
-      while true
-        if @que.empty?
-          raise ThreadError, "queue empty" if non_block
-          @waiting[Thread.current] = true
-          @mutex.sleep
-        else
-          return @que.shift
-        end
-      end
-    }
+    @mutex.synchronize {pop_no_sync(non_block)}
   end
 
   #
@@ -263,30 +267,26 @@ class SizedQueue < Queue
     @max
   end
 
+  def wakeup_queue_waiter # :nodoc:
+    t, _ = @queue_wait.shift
+    t.wakeup if t
+  rescue ThreadError
+    retry
+  end
+  private :wakeup_queue_waiter
+
   #
   # Sets the maximum size of the queue.
   #
   def max=(max)
     raise ArgumentError, "queue size must be positive" unless max > 0
-    diff = nil
     @mutex.synchronize {
-      if max <= @max
-        @max = max
-      else
-        diff = max - @max
-        @max = max
+      diff = max - @max
+      @max = max
+      if diff > 0
+        diff.times {wakeup_queue_waiter}
       end
     }
-    if diff
-      diff.times do
-        begin
-          t, _ = @queue_wait.shift
-          t.run if t
-        rescue ThreadError
-          retry
-        end
-      end
-    end
     max
   end
 
@@ -317,19 +317,12 @@ class SizedQueue < Queue
   #
   # Retrieves data from the queue and runs a waiting thread, if any.
   #
-  def pop(*args)
-    retval = super
+  def pop(non_block=false)
     @mutex.synchronize {
-      if @que.length < @max
-        begin
-          t, _ = @queue_wait.shift
-          t.wakeup if t
-        rescue ThreadError
-          retry
-        end
-      end
+      retval = pop_no_sync(non_block)
+      wakeup_queue_waiter if @que.length < @max
+      retval
     }
-    retval
   end
 
   #
