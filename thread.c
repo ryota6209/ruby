@@ -3589,6 +3589,9 @@ static VALUE
 rb_mutex_sleep_forever(VALUE time)
 {
     rb_thread_sleep_deadly();
+    if (rb_block_given_p()) {
+	rb_yield(Qnil);
+    }
     return Qnil;
 }
 
@@ -3597,6 +3600,9 @@ rb_mutex_wait_for(VALUE time)
 {
     const struct timeval *t = (struct timeval *)time;
     rb_thread_wait_for(*t);
+    if (rb_block_given_p()) {
+	rb_yield(Qnil);
+    }
     return Qnil;
 }
 
