@@ -3589,9 +3589,6 @@ static VALUE
 rb_mutex_sleep_forever(VALUE time)
 {
     rb_thread_sleep_deadly();
-    if (rb_block_given_p()) {
-	rb_yield(Qnil);
-    }
     return Qnil;
 }
 
@@ -3600,10 +3597,14 @@ rb_mutex_wait_for(VALUE time)
 {
     const struct timeval *t = (struct timeval *)time;
     rb_thread_wait_for(*t);
-    if (rb_block_given_p()) {
-	rb_yield(Qnil);
-    }
     return Qnil;
+}
+
+static VALUE
+rb_mutex_sleep_relock(VALUE self)
+{
+    rb_yield(Qundef);
+    return rb_mutex_lock(self);
 }
 
 VALUE
@@ -3611,6 +3612,9 @@ rb_mutex_sleep(VALUE self, VALUE timeout)
 {
     time_t beg, end;
     struct timeval t;
+    VALUE (*relock)(VALUE) = rb_mutex_lock;
+
+    if (rb_block_given_p()) relock = rb_mutex_sleep_relock;
 
     if (!NIL_P(timeout)) {
         t = rb_time_interval(timeout);
@@ -3618,10 +3622,10 @@ rb_mutex_sleep(VALUE self, VALUE timeout)
     rb_mutex_unlock(self);
     beg = time(0);
     if (NIL_P(timeout)) {
-	rb_ensure(rb_mutex_sleep_forever, Qnil, rb_mutex_lock, self);
+	rb_ensure(rb_mutex_sleep_forever, Qnil, relock, self);
     }
     else {
-	rb_ensure(rb_mutex_wait_for, (VALUE)&t, rb_mutex_lock, self);
+	rb_ensure(rb_mutex_wait_for, (VALUE)&t, relock, self);
     }
     end = time(0) - beg;
     return INT2FIX(end);
