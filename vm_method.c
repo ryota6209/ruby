@@ -902,6 +902,16 @@ rb_resolve_refined_method_callable(VALUE refinements, const rb_callable_method_e
     }
 }
 
+rb_method_entry_t *
+rb_method_entry_at(VALUE klass, ID id)
+{
+    st_data_t body;
+    if (!klass || !st_lookup(RCLASS_M_TBL(klass), id, &body)) {
+	return 0;
+    }
+    return (rb_method_entry_t *)body;
+}
+
 static void
 remove_method(VALUE klass, ID mid)
 {
@@ -1010,11 +1020,9 @@ rb_export_method(VALUE klass, ID name, rb_method_visibility_t visi)
 #define BOUND_PRIVATE  0x01
 #define BOUND_RESPONDS 0x02
 
-int
-rb_method_boundp(VALUE klass, ID id, int ex)
+static int
+method_accessible_p(const rb_method_entry_t *me, int ex)
 {
-    const rb_method_entry_t *me = rb_method_entry_without_refinements(klass, id);
-
     if (me != 0) {
 	if ((ex & ~BOUND_RESPONDS) &&
 	    ((METHOD_ENTRY_VISI(me) == METHOD_VISI_PRIVATE) ||
@@ -1065,6 +1073,29 @@ rb_scope_module_func_set(void)
     rb_scope_visibility_t *scope_visi = &rb_vm_cref()->scope_visi;
     scope_visi->method_visi = METHOD_VISI_PRIVATE;
     scope_visi->module_func = TRUE;
+}
+
+int
+rb_method_bound_at(VALUE klass, ID id, int ex)
+{
+    const rb_method_entry_t *me = rb_method_entry_at(klass, id);
+    return method_accessible_p(me, ex);
+}
+
+int
+rb_method_boundp(VALUE klass, ID id, int ex)
+{
+    const rb_method_entry_t *me = rb_method_entry_without_refinements(klass, id);
+    return method_accessible_p(me, ex);
+}
+
+static int
+method_boundp(VALUE klass, ID id, int ex, int inherited)
+{
+    if (inherited)
+	return rb_method_boundp(klass, id, ex);
+    else
+	return rb_method_bound_at(klass, id, ex);
 }
 
 void
@@ -1231,10 +1262,15 @@ rb_mod_undef_method(int argc, VALUE *argv, VALUE mod)
  */
 
 static VALUE
-rb_mod_method_defined(VALUE mod, VALUE mid)
+rb_mod_method_defined(int argc, VALUE *argv, VALUE mod)
 {
-    ID id = rb_check_id(&mid);
-    if (!id || !rb_method_boundp(mod, id, 1)) {
+    VALUE mid;
+    ID id;
+
+    rb_check_arity(argc, 1, 2);
+    mid = argv[0];
+    id = rb_check_id(&mid);
+    if (!id || !method_boundp(mod, id, 1, argc == 1 || RTEST(argv[1]))) {
 	return Qfalse;
     }
     return Qtrue;
@@ -1242,12 +1278,22 @@ rb_mod_method_defined(VALUE mod, VALUE mid)
 }
 
 static VALUE
-check_definition(VALUE mod, VALUE mid, rb_method_visibility_t visi)
+check_definition(VALUE mod, int argc, VALUE *argv, rb_method_flag_t noex)
 {
     const rb_method_entry_t *me;
-    ID id = rb_check_id(&mid);
+    VALUE mid;
+    ID id;
+
+    rb_check_arity(argc, 1, 2);
+    mid = argv[0];
+    id = rb_check_id(&mid);
     if (!id) return Qfalse;
-    me = rb_method_entry_without_refinements(mod, id);
+    if (argc == 1 || RTEST(argv[1])) {
+	me = rb_method_entry_without_refinements(mod, id);
+    }
+    else {
+	me = rb_method_entry_at(mod, id);
+    }
     if (me) {
 	if (METHOD_ENTRY_VISI(me) == visi) return Qtrue;
     }
@@ -1283,9 +1329,9 @@ check_definition(VALUE mod, VALUE mid, rb_method_visibility_t visi)
  */
 
 static VALUE
-rb_mod_public_method_defined(VALUE mod, VALUE mid)
+rb_mod_public_method_defined(int argc, VALUE *argv, VALUE mod)
 {
-    return check_definition(mod, mid, METHOD_VISI_PUBLIC);
+    return check_definition(mod, argc, argv, METHOD_VISI_PUBLIC);
 }
 
 /*
@@ -1317,9 +1363,9 @@ rb_mod_public_method_defined(VALUE mod, VALUE mid)
  */
 
 static VALUE
-rb_mod_private_method_defined(VALUE mod, VALUE mid)
+rb_mod_private_method_defined(int argc, VALUE *argv, VALUE mod)
 {
-    return check_definition(mod, mid, METHOD_VISI_PRIVATE);
+    return check_definition(mod, argc, argv, METHOD_VISI_PRIVATE);
 }
 
 /*
@@ -1351,9 +1397,9 @@ rb_mod_private_method_defined(VALUE mod, VALUE mid)
  */
 
 static VALUE
-rb_mod_protected_method_defined(VALUE mod, VALUE mid)
+rb_mod_protected_method_defined(int argc, VALUE *argv, VALUE mod)
 {
-    return check_definition(mod, mid, METHOD_VISI_PROTECTED);
+    return check_definition(mod, argc, argv, METHOD_VISI_PROTECTED);
 }
 
 int
@@ -2026,10 +2072,10 @@ Init_eval_method(void)
     rb_define_private_method(rb_cModule, "private", rb_mod_private, -1);
     rb_define_private_method(rb_cModule, "module_function", rb_mod_modfunc, -1);
 
-    rb_define_method(rb_cModule, "method_defined?", rb_mod_method_defined, 1);
-    rb_define_method(rb_cModule, "public_method_defined?", rb_mod_public_method_defined, 1);
-    rb_define_method(rb_cModule, "private_method_defined?", rb_mod_private_method_defined, 1);
-    rb_define_method(rb_cModule, "protected_method_defined?", rb_mod_protected_method_defined, 1);
+    rb_define_method(rb_cModule, "method_defined?", rb_mod_method_defined, -1);
+    rb_define_method(rb_cModule, "public_method_defined?", rb_mod_public_method_defined, -1);
+    rb_define_method(rb_cModule, "private_method_defined?", rb_mod_private_method_defined, -1);
+    rb_define_method(rb_cModule, "protected_method_defined?", rb_mod_protected_method_defined, -1);
     rb_define_method(rb_cModule, "public_class_method", rb_mod_public_method, -1);
     rb_define_method(rb_cModule, "private_class_method", rb_mod_private_method, -1);
 

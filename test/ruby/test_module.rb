@@ -11,7 +11,7 @@ class TestModule < Test::Unit::TestCase
   def assert_method_defined?(klass, mid, message="")
     message = build_message(message, "#{klass}\##{mid} expected to be defined.")
     _wrap_assertion do
-      klass.method_defined?(mid) or
+      klass.method_defined?(*mid) or
         raise Test::Unit::AssertionFailedError, message, caller(3)
     end
   end
@@ -19,7 +19,7 @@ class TestModule < Test::Unit::TestCase
   def assert_method_not_defined?(klass, mid, message="")
     message = build_message(message, "#{klass}\##{mid} expected to not be defined.")
     _wrap_assertion do
-      klass.method_defined?(mid) and
+      klass.method_defined?(*mid) and
         raise Test::Unit::AssertionFailedError, message, caller(3)
     end
   end
@@ -461,9 +461,9 @@ class TestModule < Test::Unit::TestCase
     assert_method_not_defined?(User, :wombat)
     assert_method_defined?(User, :user)
     assert_method_defined?(User, :mixin)
-    assert_method_not_defined?(User, :wombat)
-    assert_method_defined?(User, :user)
-    assert_method_defined?(User, :mixin)
+    assert_method_not_defined?(User, [:wombat, false])
+    assert_method_defined?(User, [:user, false])
+    assert_method_not_defined?(User, [:mixin, false])
   end
 
   def module_exec_aux
@@ -971,6 +971,44 @@ class TestModule < Test::Unit::TestCase
     assert_equal(false, c.private_method_defined?(:foo))
     assert_equal(false, c.private_method_defined?(:bar))
     assert_equal(true, c.private_method_defined?(:baz))
+
+    c = Class.new(c)
+
+    assert_equal(true, c.public_method_defined?(:foo))
+    assert_equal(false, c.public_method_defined?(:bar))
+    assert_equal(false, c.public_method_defined?(:baz))
+
+    assert_equal(false, c.protected_method_defined?(:foo))
+    assert_equal(true, c.protected_method_defined?(:bar))
+    assert_equal(false, c.protected_method_defined?(:baz))
+
+    assert_equal(false, c.private_method_defined?(:foo))
+    assert_equal(false, c.private_method_defined?(:bar))
+    assert_equal(true, c.private_method_defined?(:baz))
+
+    assert_equal(true, c.public_method_defined?(:foo, true))
+    assert_equal(false, c.public_method_defined?(:bar, true))
+    assert_equal(false, c.public_method_defined?(:baz, true))
+
+    assert_equal(false, c.protected_method_defined?(:foo, true))
+    assert_equal(true, c.protected_method_defined?(:bar, true))
+    assert_equal(false, c.protected_method_defined?(:baz, true))
+
+    assert_equal(false, c.private_method_defined?(:foo, true))
+    assert_equal(false, c.private_method_defined?(:bar, true))
+    assert_equal(true, c.private_method_defined?(:baz, true))
+
+    assert_equal(false, c.public_method_defined?(:foo, false))
+    assert_equal(false, c.public_method_defined?(:bar, false))
+    assert_equal(false, c.public_method_defined?(:baz, false))
+
+    assert_equal(false, c.protected_method_defined?(:foo, false))
+    assert_equal(false, c.protected_method_defined?(:bar, false))
+    assert_equal(false, c.protected_method_defined?(:baz, false))
+
+    assert_equal(false, c.private_method_defined?(:foo, false))
+    assert_equal(false, c.private_method_defined?(:bar, false))
+    assert_equal(false, c.private_method_defined?(:baz, false))
   end
 
   def test_top_public_private
