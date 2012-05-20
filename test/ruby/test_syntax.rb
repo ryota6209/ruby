@@ -603,6 +603,15 @@ eom
     end
   end
 
+  def test_keyword_not
+    assert_warning("") do
+      ['false || not(true)', 'not(true)', 'not (true)', 'not[]', 'not []'].each do |code|
+        assert_valid_syntax(code, __FILE__, verbose: true)
+        assert_valid_syntax("p(#{code})", __FILE__, verbose: true)
+      end
+    end
+  end
+
   private
 
   def not_label(x) @result = x; @not_label ||= nil end
