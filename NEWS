@@ -33,6 +33,7 @@ with all sufficient information, see the ChangeLog file.
 * File
 
   * File.mkfifo [Feature #11536]
+  * File.rootname is added which returns root part of file name.
 
 * Hash
 
