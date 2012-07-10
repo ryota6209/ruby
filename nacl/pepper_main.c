@@ -33,6 +33,8 @@
 #include "version.h"
 #include "gc.h"
 
+RUBY_GLOBAL_SETUP
+
 #ifdef HAVE_STRUCT_PPB_CORE
 typedef struct PPB_Core PPB_Core;
 #endif

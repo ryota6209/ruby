@@ -2476,6 +2476,15 @@ __extension__({ \
  * @{
  */
 
+/*! Opaque pointer to an inner data structure.
+ *
+ * You do not have to know what the actual data type this pointer points.
+ * It often changes for internal improvements.
+ */
+typedef void *ruby_opaque_t;
+
+#define RUBY_GLOBAL_SETUP	/* empty hook */
+
 /** @defgroup ruby1 ruby(1) implementation
  * A part of the implementation of ruby(1) command.
  * Other programs that embed Ruby interpreter do not always need to use these
