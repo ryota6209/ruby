@@ -2177,6 +2177,15 @@ ruby_prog_init(void)
 }
 
 void
+ruby_global_init(void)
+{
+#ifndef HAVE_SETPROCTITLE
+    ruby_init_setproctitle(origarg.argc, origarg.argv);
+#endif
+    ruby_install_signal_handler();
+}
+
+void
 ruby_set_argv(int argc, char **argv)
 {
     int i;
@@ -2208,10 +2217,6 @@ ruby_process_options(int argc, char **argv)
     rb_argv0 = rb_str_new4(rb_progname);
     rb_gc_register_mark_object(rb_argv0);
     iseq = process_options(argc, argv, cmdline_options_init(&opt));
-
-#ifndef HAVE_SETPROCTITLE
-    ruby_init_setproctitle(argc, argv);
-#endif
 
     return (void*)(struct RData*)iseq;
 }

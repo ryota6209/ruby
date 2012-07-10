@@ -1487,7 +1487,11 @@ Init_signal(void)
     rb_define_method(rb_eSignal, "signo", esignal_signo, 0);
     rb_alias(rb_eSignal, rb_intern_const("signm"), rb_intern_const("message"));
     rb_define_method(rb_eInterrupt, "initialize", interrupt_init, -1);
+}
 
+void
+ruby_install_signal_handler(void)
+{
     /* At this time, there is no subthread. Then sigmask guarantee atomics. */
     rb_disable_interrupt();
 
