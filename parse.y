@@ -7120,13 +7120,16 @@ parser_prepare(struct parser_params *parser)
 #define ambiguous_operator(op, syn) ( \
     rb_warning0("`"op"' after local variable or literal is interpreted as binary operator"), \
     rb_warning0("even though it seems like "syn""))
+#define space_after_unary(op) ((void)rb_warning0("space after unary `"op"' operator"))
 #else
 #define ambiguous_operator(op, syn) dispatch2(operator_ambiguous, ripper_intern(op), rb_str_new_cstr(syn))
+#define space_after_unary(op) dispatch1(space_after_unary, ripper_intern(op))
 #endif
 #define warn_balanced(op, syn) ((void) \
     (!IS_lex_state_for(last_state, EXPR_CLASS|EXPR_DOT|EXPR_FNAME|EXPR_ENDFN|EXPR_ENDARG) && \
      space_seen && !ISSPACE(c) && \
      (ambiguous_operator(op, syn), 0)))
+#define warn_unary_space(c, op) (void)(ISSPACE(c) && (space_after_unary(op), 0))
 
 static VALUE
 parse_rational(struct parser_params *parser, char *str, int len, int seen_point)
@@ -8242,6 +8245,7 @@ parser_yylex(struct parser_params *parser)
 	    if (c == '@') {
 		return tUPLUS;
 	    }
+	    warn_unary_space(c, "+");
 	    pushback(c);
 	    return '+';
 	}
@@ -8256,6 +8260,7 @@ parser_yylex(struct parser_params *parser)
 	    if (c != -1 && ISDIGIT(c)) {
 		return parse_numeric(parser, '+');
 	    }
+	    warn_unary_space(c, "+");
 	    return tUPLUS;
 	}
 	lex_state = EXPR_BEG;
@@ -8270,6 +8275,7 @@ parser_yylex(struct parser_params *parser)
 	    if (c == '@') {
 		return tUMINUS;
 	    }
+	    warn_unary_space(c, "-");
 	    pushback(c);
 	    return '-';
 	}
@@ -8288,6 +8294,7 @@ parser_yylex(struct parser_params *parser)
 	    if (c != -1 && ISDIGIT(c)) {
 		return tUMINUS_NUM;
 	    }
+	    warn_unary_space(c, "-");
 	    return tUMINUS;
 	}
 	lex_state = EXPR_BEG;
