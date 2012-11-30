@@ -220,8 +220,10 @@ find_i(RB_BLOCK_CALL_FUNC_ARGLIST(i, memop))
  *
  *  Passes each entry in <i>enum</i> to <em>block</em>. Returns the
  *  first for which <em>block</em> is not false.  If no
- *  object matches, calls <i>ifnone</i> and returns its result when it
- *  is specified, or returns <code>nil</code> otherwise.
+ *  object matches, and <i>ifnone</i> is callable, then it is called
+ *  and its result is returned.  If there are no matches, and
+ *  <i>ifnone</i> is not callable, then <i>ifnone</i> is returned.
+ *  Returns <code>nil</code> otherwise.
  *
  *  If no block is given, an enumerator is returned instead.
  *
@@ -244,7 +246,9 @@ enum_find(int argc, VALUE *argv, VALUE obj)
 	return memo->v1;
     }
     if (!NIL_P(if_none)) {
-	return rb_funcallv(if_none, id_call, 0, 0);
+	VALUE result = rb_check_funcall(if_none, id_call, 0, 0);
+	if (result == Qundef) result = if_none;
+	return result;
     }
     return Qnil;
 }

@@ -87,6 +87,7 @@ class TestEnumerable < Test::Unit::TestCase
     assert_equal(:foo, @obj.find(proc { :foo }) {|x| false })
     cond = ->(x, i) { x % 2 == 0 }
     assert_equal([2, 1], @obj.each_with_index.find(&cond))
+    assert_equal(:bar, @obj.find(:bar) {|x| false })
   end
 
   def test_find_index
