@@ -444,6 +444,9 @@ static NODE *match_op_gen(struct parser_params*,NODE*,NODE*);
 static ID  *local_tbl_gen(struct parser_params*);
 #define local_tbl() local_tbl_gen(parser)
 
+static SIGNED_VALUE hidden_top_var_gen(struct parser_params *);
+#define hidden_top_var() hidden_top_var_gen(parser)
+
 static void fixup_nodes(NODE **);
 
 static VALUE reg_compile_gen(struct parser_params*, VALUE, int);
@@ -9130,6 +9133,9 @@ cond0(struct parser_params *parser, NODE *node)
 	node->nd_end = range_op(parser, node->nd_end);
 	if (nd_type(node) == NODE_DOT2) nd_set_type(node,NODE_FLIP2);
 	else if (nd_type(node) == NODE_DOT3) nd_set_type(node, NODE_FLIP3);
+#ifndef RIPPER
+	node->nd_cval = (VALUE)hidden_top_var();
+#endif
 	if (!e_option_supplied(parser)) {
 	    int b = literal_node(node->nd_beg);
 	    int e = literal_node(node->nd_end);
@@ -9480,6 +9486,25 @@ local_tbl_gen(struct parser_params *parser)
     vtable_tblcpy(buf+vtable_size(lvtbl->args)+1, lvtbl->vars);
     buf[0] = cnt;
     return buf;
+}
+
+static SIGNED_VALUE
+hidden_top_var_gen(struct parser_params *parser)
+{
+    struct vtable *vars = lvtbl->vars;
+    int idx, level = 0;
+    ID mark = 0;
+
+#if 0
+    CONST_ID(mark, "$hidden");	/* for debug */
+#endif
+    while (vars && POINTER_P(vars->prev)) {
+	vars = vars->prev;
+	level++;
+    }
+    idx = vars->pos;
+    vtable_add(vars, mark);
+    return ((SIGNED_VALUE)idx << (CHAR_BIT * SIZEOF_VALUE / 2)) | level;
 }
 #endif
 

@@ -5051,14 +5051,16 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 	LABEL *lend = NEW_LABEL(nd_line(node));
 	LABEL *lfin = NEW_LABEL(nd_line(node));
 	LABEL *ltrue = NEW_LABEL(nd_line(node));
-	rb_iseq_t *local_iseq = iseq->local_iseq;
-	rb_num_t cnt;
-	VALUE key;
+	rb_iseq_t *local_iseq;
+	const int index_shift = (CHAR_BIT * SIZEOF_VALUE / 2);
+	int lv = node->nd_cval & ~(~(VALUE)0 << index_shift);
+	VALUE level = INT2FIX(lv), idx = node->nd_cval >> index_shift;
 
-	cnt = local_iseq->flip_cnt++ + DEFAULT_SPECIAL_VAR_COUNT;
-	key = INT2FIX(cnt);
+	for (local_iseq = iseq; lv > 0; --lv)
+	    local_iseq = local_iseq->parent_iseq;
+	idx = INT2FIX(local_iseq->local_size - idx);
 
-	ADD_INSN2(ret, nd_line(node), getspecial, key, INT2FIX(0));
+	ADD_INSN2(ret, nd_line(node), getlocal, idx, level);
 	ADD_INSNL(ret, nd_line(node), branchif, lend);
 
 	/* *flip == 0 */
@@ -5067,11 +5069,11 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 	ADD_INSNL(ret, nd_line(node), branchunless, lfin);
 	if (nd_type(node) == NODE_FLIP3) {
 	    ADD_INSN(ret, nd_line(node), dup);
-	    ADD_INSN1(ret, nd_line(node), setspecial, key);
+	    ADD_INSN2(ret, nd_line(node), setlocal, idx, level);
 	    ADD_INSNL(ret, nd_line(node), jump, lfin);
 	}
 	else {
-	    ADD_INSN1(ret, nd_line(node), setspecial, key);
+	    ADD_INSN2(ret, nd_line(node), setlocal, idx, level);
 	}
 
 	/* *flip == 1 */
@@ -5079,7 +5081,7 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 	COMPILE(ret, "flip2 end", node->nd_end);
 	ADD_INSNL(ret, nd_line(node), branchunless, ltrue);
 	ADD_INSN1(ret, nd_line(node), putobject, Qfalse);
-	ADD_INSN1(ret, nd_line(node), setspecial, key);
+	ADD_INSN2(ret, nd_line(node), setlocal, idx, level);
 
 	ADD_LABEL(ret, ltrue);
 	ADD_INSN1(ret, nd_line(node), putobject, Qtrue);
