@@ -1106,11 +1106,11 @@ rb_iseq_line_no(const rb_iseq_t *iseq, size_t pos)
 }
 
 static VALUE
-id_to_name(ID id, VALUE default_value)
+id_to_name(ID id, rb_num_t num)
 {
     VALUE str = rb_id2str(id);
     if (!str) {
-	str = default_value;
+	str = rb_sprintf("#%"PRIuVALUE, num);
     }
     else if (!rb_str_symname_p(str)) {
 	str = rb_str_inspect(str);
@@ -1145,7 +1145,8 @@ insn_operand_intern(rb_iseq_t *iseq,
 		for (i = 0; i < level; i++) {
 		    diseq = diseq->parent_iseq;
 		}
-		ret = id_to_name(diseq->local_table[diseq->local_size - op], INT2FIX('*'));
+		ret = id_to_name(diseq->local_table[diseq->local_size - op],
+				 diseq->local_size - op);
 	    }
 	    else {
 		ret = rb_sprintf("%"PRIuVALUE, op);
@@ -1399,7 +1400,7 @@ rb_iseq_disasm(VALUE self)
 
 	for (i = 0; i < iseqdat->local_table_size; i++) {
 	    long width;
-	    VALUE name = id_to_name(tbl[i], 0);
+	    VALUE name = id_to_name(tbl[i], i);
 	    char argi[0x100] = "";
 	    char opti[0x100] = "";
 
@@ -1422,10 +1423,7 @@ rb_iseq_disasm(VALUE self)
 
 	    rb_str_catf(str, "[%2d] ", iseqdat->local_size - i);
 	    width = RSTRING_LEN(str) + 11;
-	    if (name)
-		rb_str_append(str, name);
-	    else
-		rb_str_cat2(str, "?");
+	    rb_str_append(str, name);
 	    if (*argi) rb_str_catf(str, "<%s>", argi);
 	    if ((width -= RSTRING_LEN(str)) > 0) rb_str_catf(str, "%*s", (int)width, "");
 	}
