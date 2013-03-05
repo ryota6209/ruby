@@ -1598,12 +1598,15 @@ rb_obj_singleton_method(VALUE obj, VALUE vid)
  */
 
 static VALUE
-rb_mod_instance_method(VALUE mod, VALUE vid)
+rb_mod_instance_method(int argc, VALUE *argv, VALUE mod)
 {
+    VALUE vid = (rb_check_arity(argc, 1, 2), argv[0]);
+    int prepended = argc == 1 || RTEST(argv[1]);
     ID id = rb_check_id(&vid);
     if (!id) {
 	rb_method_name_error(mod, vid);
     }
+    if (!prepended) mod = RCLASS_ORIGIN(mod);
     return mnew(mod, Qundef, id, rb_cUnboundMethod, FALSE);
 }
 
@@ -1615,12 +1618,15 @@ rb_mod_instance_method(VALUE mod, VALUE vid)
  */
 
 static VALUE
-rb_mod_public_instance_method(VALUE mod, VALUE vid)
+rb_mod_public_instance_method(int argc, VALUE *argv, VALUE mod)
 {
+    VALUE vid = (rb_check_arity(argc, 1, 2), argv[0]);
+    int prepended = argc == 1 || RTEST(argv[1]);
     ID id = rb_check_id(&vid);
     if (!id) {
 	rb_method_name_error(mod, vid);
     }
+    if (!prepended) mod = RCLASS_ORIGIN(mod);
     return mnew(mod, Qundef, id, rb_cUnboundMethod, TRUE);
 }
 
@@ -2874,8 +2880,8 @@ Init_Proc(void)
     rb_define_method(rb_cUnboundMethod, "super_method", method_super_method, 0);
 
     /* Module#*_method */
-    rb_define_method(rb_cModule, "instance_method", rb_mod_instance_method, 1);
-    rb_define_method(rb_cModule, "public_instance_method", rb_mod_public_instance_method, 1);
+    rb_define_method(rb_cModule, "instance_method", rb_mod_instance_method, -1);
+    rb_define_method(rb_cModule, "public_instance_method", rb_mod_public_instance_method, -1);
     rb_define_private_method(rb_cModule, "define_method", rb_mod_define_method, -1);
 
     /* Kernel */
