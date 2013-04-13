@@ -672,37 +672,37 @@ Init_etc(void)
     rb_define_module_function(mEtc, "sysconfdir", etc_sysconfdir, 0);
     rb_define_module_function(mEtc, "systmpdir", etc_systmpdir, 0);
 
-    sPasswd =  rb_struct_define(NULL,
-				"name",
+    sPasswd =  rb_struct_define_under(mEtc, "Passwd",
+				      "name",
 #ifdef HAVE_STRUCT_PASSWD_PW_PASSWD
-				"passwd",
+				      "passwd",
 #endif
-				"uid",
-				"gid",
+				      "uid",
+				      "gid",
 #ifdef HAVE_STRUCT_PASSWD_PW_GECOS
-				"gecos",
+				      "gecos",
 #endif
-				"dir",
-				"shell",
+				      "dir",
+				      "shell",
 #ifdef HAVE_STRUCT_PASSWD_PW_CHANGE
-				"change",
+				      "change",
 #endif
 #ifdef HAVE_STRUCT_PASSWD_PW_QUOTA
-				"quota",
+				      "quota",
 #endif
 #ifdef HAVE_STRUCT_PASSWD_PW_AGE
-				"age",
+				      "age",
 #endif
 #ifdef HAVE_STRUCT_PASSWD_PW_CLASS
-				"uclass",
+				      "uclass",
 #endif
 #ifdef HAVE_STRUCT_PASSWD_PW_COMMENT
-				"comment",
+				      "comment",
 #endif
 #ifdef HAVE_STRUCT_PASSWD_PW_EXPIRE
-				"expire",
+				      "expire",
 #endif
-				NULL);
+				      NULL);
     /* Define-const: Passwd
      *
      * Passwd is a Struct that contains the following members:
@@ -742,18 +742,16 @@ Init_etc(void)
      * expire::
      *	    account expiration time(integer) must be compiled with +HAVE_STRUCT_PASSWD_PW_EXPIRE+
      */
-    rb_define_const(mEtc, "Passwd", sPasswd);
-    rb_set_class_path(sPasswd, mEtc, "Passwd");
     rb_define_const(rb_cStruct, "Passwd", sPasswd); /* deprecated name */
     rb_extend_object(sPasswd, rb_mEnumerable);
     rb_define_singleton_method(sPasswd, "each", etc_each_passwd, 0);
 
 #ifdef HAVE_GETGRENT
-    sGroup = rb_struct_define(NULL, "name",
+    sGroup = rb_struct_define_under(mEtc, "Group", "name",
 #ifdef HAVE_STRUCT_GROUP_GR_PASSWD
-			      "passwd",
+				    "passwd",
 #endif
-			      "gid", "mem", NULL);
+				    "gid", "mem", NULL);
 
     /* Define-const: Group
      *
@@ -776,8 +774,6 @@ Init_etc(void)
      *	    is an Array of Strings containing the short login names of the
      *	    members of the group.
      */
-    rb_define_const(mEtc, "Group", sGroup);
-    rb_set_class_path(sGroup, mEtc, "Group");
     rb_define_const(rb_cStruct, "Group", sGroup); /* deprecated name */
     rb_extend_object(sGroup, rb_mEnumerable);
     rb_define_singleton_method(sGroup, "each", etc_each_group, 0);
