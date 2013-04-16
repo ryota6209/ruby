@@ -341,5 +341,16 @@ class TestFiber < Test::Unit::TestCase
     assert_equal("inner", s2)
     assert_equal(s1, $_, bug7678)
   end
+
+  def test_fiber_local
+    feature8215 = '[ruby-core:53974] [Feature #8215]'
+    Thread.current[:key] = "outside"
+    fiber = Fiber.new do
+      Thread.current[:key] = "inside"
+      Fiber.yield
+    end
+    fiber.resume
+    assert_equal("inside", fiber[:key], feature8215)
+  end
 end
 

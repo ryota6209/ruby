@@ -1471,6 +1471,59 @@ rb_fiber_m_transfer(int argc, VALUE *argv, VALUE fibval)
     return rb_fiber_transfer(fibval, argc, argv);
 }
 
+static VALUE
+rb_fiber_aref(VALUE self, VALUE key)
+{
+    rb_thread_t *th;
+    rb_fiber_t *fib;
+    st_data_t val;
+    ID id = rb_check_id(&key);
+
+    GetFiberPtr(self, fib);
+    if (rb_safe_level() >= 4 && self != rb_fiber_current()) {
+	rb_raise(rb_eSecurityError, "Insecure: fiber locals");
+    }
+    if (!id) return Qnil;
+    th = &fib->cont.saved_thread;
+    if (!th->local_storage) {
+	return Qnil;
+    }
+    if (st_lookup(th->local_storage, id, &val)) {
+	return (VALUE)val;
+    }
+    return Qnil;
+}
+
+static VALUE
+rb_fiber_aset(VALUE self, VALUE key, VALUE val)
+{
+    rb_thread_t *th;
+    rb_fiber_t *fib;
+    ID id = rb_check_id(&key);
+
+    GetFiberPtr(self, fib);
+    if (rb_safe_level() >= 4 && self != rb_fiber_current()) {
+	rb_raise(rb_eSecurityError, "Insecure: can't modify thread locals");
+    }
+    if (OBJ_FROZEN(self)) {
+	rb_error_frozen("thread locals");
+    }
+    if (!id) return Qnil;
+    th = &fib->cont.saved_thread;
+    if (NIL_P(val)) {
+	if (th->local_storage) {
+	    st_data_t k = (st_data_t)id;
+	    st_delete(th->local_storage, &k, 0);
+	}
+	return Qnil;
+    }
+    if (!th->local_storage) {
+	th->local_storage = st_init_numtable();
+    }
+    st_insert(th->local_storage, id, val);
+    return val;
+}
+
 /*
  *  call-seq:
  *     Fiber.yield(args, ...) -> obj
@@ -1538,6 +1591,8 @@ Init_Cont(void)
     rb_define_singleton_method(rb_cFiber, "yield", rb_fiber_s_yield, -1);
     rb_define_method(rb_cFiber, "initialize", rb_fiber_init, 0);
     rb_define_method(rb_cFiber, "resume", rb_fiber_m_resume, -1);
+    rb_define_method(rb_cFiber, "[]", rb_fiber_aref, 1);
+    rb_define_method(rb_cFiber, "[]=", rb_fiber_aset, 2);
 }
 
 RUBY_SYMBOL_EXPORT_BEGIN
