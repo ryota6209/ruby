@@ -541,6 +541,20 @@ num_divmod(VALUE x, VALUE y)
 
 /*
  *  call-seq:
+ *     num.quo(numeric)  ->  real
+ *     num // numeric    ->  real
+ *
+ *  Returns most exact division (rational for integers, float for floats).
+ */
+
+static VALUE
+num_quo(VALUE x, VALUE y)
+{
+    return rb_funcall(rb_rational_raw1(x), '/', 1, y);
+}
+
+/*
+ *  call-seq:
  *     num.real?  ->  true or false
  *
  *  Returns +true+ if +num+ is a Real number. (i.e. not Complex).
@@ -4112,6 +4126,8 @@ Init_Numeric(void)
     rb_define_method(rb_cNumeric, "%", num_modulo, 1);
     rb_define_method(rb_cNumeric, "modulo", num_modulo, 1);
     rb_define_method(rb_cNumeric, "remainder", num_remainder, 1);
+    rb_define_method(rb_cNumeric, "quo", num_quo, 1);
+    rb_define_method(rb_cNumeric, "//", num_quo, 1);
     rb_define_method(rb_cNumeric, "abs", num_abs, 0);
     rb_define_method(rb_cNumeric, "magnitude", num_abs, 0);
     rb_define_method(rb_cNumeric, "to_int", num_to_int, 0);
@@ -4305,6 +4321,7 @@ Init_Numeric(void)
     rb_define_method(rb_cFloat, "*", flo_mul, 1);
     rb_define_method(rb_cFloat, "/", flo_div, 1);
     rb_define_method(rb_cFloat, "quo", flo_quo, 1);
+    rb_define_method(rb_cFloat, "//", flo_quo, 1);
     rb_define_method(rb_cFloat, "fdiv", flo_quo, 1);
     rb_define_method(rb_cFloat, "%", flo_mod, 1);
     rb_define_method(rb_cFloat, "modulo", flo_mod, 1);

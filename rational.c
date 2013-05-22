@@ -2546,6 +2546,7 @@ Init_Rational(void)
     rb_define_method(rb_cRational, "*", nurat_mul, 1);
     rb_define_method(rb_cRational, "/", nurat_div, 1);
     rb_define_method(rb_cRational, "quo", nurat_div, 1);
+    rb_define_method(rb_cRational, "//", nurat_div, 1);
     rb_define_method(rb_cRational, "fdiv", nurat_fdiv, 1);
     rb_define_method(rb_cRational, "**", nurat_expt, 1);
 

@@ -525,6 +525,8 @@ class TestRipper::ScannerEvents < Test::Unit::TestCase
                  scan('op', '1 % 1')
     assert_equal ['**'],
                  scan('op', '1 ** 1')
+    assert_equal ['//'],
+                 scan('op', '1 // 1')
     assert_equal ['~'],
                  scan('op', '~1')
     assert_equal ['-'],

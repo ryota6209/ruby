@@ -247,6 +247,7 @@ static const struct token_assoc {
     {tOP_ASGN,			O(op)},
     {tOROP,			O(op)},
     {tPOW,			O(op)},
+    {tQUO,			O(op)},
     {tQWORDS_BEG,		O(qwords_beg)},
     {tQSYMBOLS_BEG,		O(qsymbols_beg)},
     {tSYMBOLS_BEG,		O(symbols_beg)},

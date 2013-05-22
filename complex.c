@@ -2185,6 +2185,7 @@ Init_Complex(void)
     rb_define_method(rb_cComplex, "*", nucomp_mul, 1);
     rb_define_method(rb_cComplex, "/", nucomp_div, 1);
     rb_define_method(rb_cComplex, "quo", nucomp_quo, 1);
+    rb_define_method(rb_cComplex, "//", nucomp_quo, 1);
     rb_define_method(rb_cComplex, "fdiv", nucomp_fdiv, 1);
     rb_define_method(rb_cComplex, "**", nucomp_expt, 1);
 
