@@ -90,6 +90,9 @@ class TestNumeric < Test::Unit::TestCase
   def test_quo
     a = Numeric.new
     assert_raise(TypeError) {a.quo(1)}
+    assert_raise(ArgumentError) {DummyNumeric.new.quo(1)}
+    assert_equal(1, 1.quo(2) * 2)
+    assert_equal(1, eval("1 // 2") * 2)
   end
 
   def test_quo_ruby_core_41575
