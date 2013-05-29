@@ -58,6 +58,7 @@ static const struct {
     {tDOT2,	".."},
     {tDOT3,	"..."},
     {tPOW,	"**"},
+    {tQUO,	"//"},
     {tUPLUS,	"+@"},
     {tUMINUS,	"-@"},
     {tCMP,	"<=>"},
@@ -300,11 +301,15 @@ rb_enc_symname_type(const char *name, long len, rb_encoding *enc, unsigned int a
 	if (*++m == '*') ++m;
 	break;
 
+      case '/':
+	if (*++m == '/') ++m;
+	break;
+
       case '+': case '-':
 	if (*++m == '@') ++m;
 	break;
 
-      case '|': case '^': case '&': case '/': case '%': case '~': case '`':
+      case '|': case '^': case '&': case '%': case '~': case '`':
 	++m;
 	break;
 
