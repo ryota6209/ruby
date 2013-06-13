@@ -1536,6 +1536,10 @@ class TestFileUtils < Test::Unit::TestCase
     assert_file_not_exist(subdir)
     assert_file_not_exist('data/sub')
     assert_directory('data')
+    assert_raise(Errno::ENOENT) {
+      rmdir(subdir, parents: true)
+    }
+    assert_directory('data')
   end
 
   def test_rmtree
