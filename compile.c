@@ -1194,7 +1194,7 @@ iseq_set_arguments(rb_iseq_t *iseq, LINK_ANCHOR *optargs, NODE *node_args)
 		    if (!required) required = rb_ary_tmp_new(1);
 		    list = required;
 		}
-		rb_ary_push(list, INT2FIX(node->nd_body->nd_vid));
+		rb_ary_push(list, INT2FIX(node->nd_vid));
 		COMPILE_POPED(optargs, "kwarg", node); /* nd_type(node) == NODE_KW_ARG */
 		node = node->nd_next;
 		i += 1;
@@ -5224,14 +5224,15 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 	LABEL *default_label = NEW_LABEL(line);
 	LABEL *end_label = 0;
 	int idx, lv, ls;
+	ID tag = node->nd_tag;
 	ID id = node->nd_body->nd_vid;
 
 	ADD_INSN(ret, line, dup);
-	ADD_INSN1(ret, line, putobject, ID2SYM(id));
+	ADD_INSN1(ret, line, putobject, ID2SYM(tag));
 	ADD_SEND(ret, line, ID2SYM(rb_intern("key?")), INT2FIX(1));
 	ADD_INSNL(ret, line, branchunless, default_label);
 	ADD_INSN(ret, line, dup);
-	ADD_INSN1(ret, line, putobject, ID2SYM(id));
+	ADD_INSN1(ret, line, putobject, ID2SYM(tag));
 	ADD_SEND(ret, line, ID2SYM(rb_intern("delete")), INT2FIX(1));
 	switch (nd_type(node->nd_body)) {
 	  case NODE_LASGN:

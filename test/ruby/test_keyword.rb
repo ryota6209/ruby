@@ -396,4 +396,20 @@ class TestKeywordArguments < Test::Unit::TestCase
     assert_equal([{}, {}], a.new.foo({}))
     assert_equal([{}, {:bar=>"x"}], a.new.foo({}, bar: "x"))
   end
+
+  def test_argument_alias
+    c = assert_nothing_raised(SyntaxError) do
+      break Class.new do
+        eval("def foo(i = if: :default) i end")
+      end
+    end
+
+    o = c.new
+    assert_equal(:default, o.foo)
+    assert_equal(:x, o.foo(if: :x))
+
+    assert_syntax_error("def foo(if = i:) end", /unexpected keyword_if/)
+    assert_syntax_error("def foo(i, i = if:) end", /duplicated argument name/)
+    assert_valid_syntax("def foo(x, i = x:) end")
+  end
 end

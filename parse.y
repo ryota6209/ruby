@@ -129,6 +129,7 @@ struct local_vars {
     struct vtable *args;
     struct vtable *vars;
     struct vtable *used;
+    struct vtable *labels;
     struct local_vars *prev;
 };
 
@@ -353,6 +354,9 @@ static int yylex(void*, void*);
 #ifndef RIPPER
 #define yyparse ruby_yyparse
 
+typedef ID parser_id_t;
+typedef NODE *parser_node_t;
+
 static NODE* node_newnode(struct parser_params *, enum node_type, VALUE, VALUE, VALUE);
 #define rb_node_newnode(type, a1, a2, a3) node_newnode(parser, (type), (a1), (a2), (a3))
 
@@ -459,6 +463,9 @@ static NODE *reg_named_capture_assign_gen(struct parser_params* parser, VALUE re
 #define get_id(id) (id)
 #define get_value(val) (val)
 #else
+typedef VALUE parser_id_t;
+typedef VALUE parser_node_t;
+
 #define value_expr(node) ((void)(node))
 #define remove_begin(node) (node)
 #define rb_dvar_defined(id) 0
@@ -488,6 +495,11 @@ static ID shadowing_lvar_gen(struct parser_params*,ID);
 #define shadowing_lvar(name) shadowing_lvar_gen(parser, (name))
 static void new_bv_gen(struct parser_params*,ID);
 #define new_bv(id) new_bv_gen(parser, (id))
+
+static parser_node_t arg_label_gen(struct parser_params* parser, parser_id_t vid, parser_id_t aid);
+#define arg_label(vid, aid) arg_label_gen(parser, (vid), (aid))
+static void label_assign_gen(struct parser_params* parser, parser_node_t var, parser_node_t val);
+#define label_assign(var, val) label_assign_gen(parser, (var), (val))
 
 static void local_push_gen(struct parser_params*,int);
 #define local_push(top) local_push_gen(parser,(top))
@@ -770,7 +782,7 @@ static void token_info_pop(struct parser_params*, const char *token);
 %type <node> f_arglist f_args f_arg f_arg_item f_optarg f_marg f_marg_list f_margs
 %type <node> assoc_list assocs assoc undef_list backref string_dvar for_var
 %type <node> block_param opt_block_param block_param_def f_opt
-%type <node> f_kwarg f_kw f_block_kwarg f_block_kw
+%type <node> f_kwarg f_kw f_block_kwarg f_block_kw arg_label
 %type <node> bv_decls opt_bv_decl bvar
 %type <node> lambda f_larglist lambda_body
 %type <node> brace_block cmd_brace_block do_block lhs none fitem
@@ -4601,47 +4613,33 @@ f_arg		: f_arg_item
 		    }
 		;
 
-f_kw		: tLABEL arg_value
+arg_label	: tIDENTIFIER '=' tLABEL
 		    {
-			arg_var(formal_argument(get_id($1)));
-			$$ = assignable($1, $2);
-		    /*%%%*/
-			$$ = NEW_KW_ARG(0, $$);
-		    /*%
-			$$ = rb_assoc_new($$, $2);
-		    %*/
+			$$ = arg_label($1, $3);
 		    }
 		| tLABEL
 		    {
-			arg_var(formal_argument(get_id($1)));
-			$$ = assignable($1, (NODE *)-1);
-		    /*%%%*/
-			$$ = NEW_KW_ARG(0, $$);
-		    /*%
-			$$ = rb_assoc_new($$, 0);
-		    %*/
+			$$ = arg_label($1, $1);
 		    }
 		;
 
-f_block_kw	: tLABEL primary_value
+f_kw		: arg_label arg_value
 		    {
-			arg_var(formal_argument(get_id($1)));
-			$$ = assignable($1, $2);
-		    /*%%%*/
-			$$ = NEW_KW_ARG(0, $$);
-		    /*%
-			$$ = rb_assoc_new($$, $2);
-		    %*/
+			label_assign($$ = $1, $2);
 		    }
-		| tLABEL
+		| arg_label
 		    {
-			arg_var(formal_argument(get_id($1)));
-			$$ = assignable($1, (NODE *)-1);
-		    /*%%%*/
-			$$ = NEW_KW_ARG(0, $$);
-		    /*%
-			$$ = rb_assoc_new($$, 0);
-		    %*/
+			label_assign($$ = $1, (parser_node_t)-1);
+		    }
+		;
+
+f_block_kw	: arg_label primary_value
+		    {
+			label_assign($$ = $1, $2);
+		    }
+		| arg_label
+		    {
+			label_assign($$ = $1, (parser_node_t)-1);
 		    }
 		;
 
@@ -8674,6 +8672,36 @@ new_bv_gen(struct parser_params *parser, ID name)
     dyna_var(name);
 }
 
+static parser_node_t
+arg_label_gen(struct parser_params* parser, parser_id_t var, parser_id_t label)
+{
+    ID vid = get_id(var);
+    ID aid = get_id(label);
+    arg_var(formal_argument(vid));
+    if (!lvtbl->labels) {
+	lvtbl->labels = vtable_alloc(0);
+    }
+    else if (vtable_included(lvtbl->labels, aid)) {
+	yyerror("duplicated keyword argument label");
+    }
+    vtable_add(lvtbl->labels, aid);
+#ifndef RIPPER
+    return NEW_KW_ARG(aid, vid);
+#else
+    return rb_assoc_new(label, var);
+#endif
+}
+
+static void
+label_assign_gen(struct parser_params* parser, parser_node_t var, parser_node_t val)
+{
+#ifndef RIPPER
+    var->nd_body = assignable(var->nd_mid, val);
+#else
+    rb_ary_store(var, 1, assignable(rb_ary_entry(var, 1), val));
+#endif
+}
+
 #ifndef RIPPER
 static NODE *
 aryset_gen(struct parser_params *parser, NODE *recv, NODE *idx)
@@ -9516,6 +9544,7 @@ local_push_gen(struct parser_params *parser, int inherit_dvars)
     local->used = !(inherit_dvars &&
 		    (ifndef_ripper(compile_for_eval || e_option_supplied(parser))+0)) &&
 	RTEST(ruby_verbose) ? vtable_alloc(0) : 0;
+    local->labels = 0;
     lvtbl = local;
 }
 
@@ -9529,6 +9558,7 @@ local_pop_gen(struct parser_params *parser)
     }
     vtable_free(lvtbl->args);
     vtable_free(lvtbl->vars);
+    vtable_free(lvtbl->labels);
     xfree(lvtbl);
     lvtbl = local;
 }
@@ -9617,6 +9647,9 @@ dyna_push_gen(struct parser_params *parser)
     if (lvtbl->used) {
 	lvtbl->used = vtable_alloc(lvtbl->used);
     }
+    if (lvtbl->labels) {
+	lvtbl->labels = vtable_alloc(lvtbl->labels);
+    }
     return lvtbl->args;
 }
 
@@ -9628,6 +9661,10 @@ dyna_pop_1(struct parser_params *parser)
     if ((tmp = lvtbl->used) != 0) {
 	warn_unused_var(parser, lvtbl);
 	lvtbl->used = lvtbl->used->prev;
+	vtable_free(tmp);
+    }
+    if ((tmp = lvtbl->labels) != 0) {
+	lvtbl->labels = lvtbl->labels->prev;
 	vtable_free(tmp);
     }
     tmp = lvtbl->args;
