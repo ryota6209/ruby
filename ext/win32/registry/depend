@@ -1,0 +1,1 @@
+error.o registry.o: $(top_srcdir)/internal.h
