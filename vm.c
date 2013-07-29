@@ -604,6 +604,61 @@ rb_vm_make_proc(rb_thread_t *th, const rb_block_t *block, VALUE klass)
     return procval;
 }
 
+VALUE *
+rb_binding_add_dynavars(rb_binding_t *bind, int dyncount, const ID *dynvars)
+{
+    VALUE envval = bind->env, path = bind->path, iseqval;
+    rb_env_t *env;
+    rb_block_t *base_block;
+    rb_thread_t *th = GET_THREAD();
+    rb_iseq_t *base_iseq;
+
+    GetEnvPtr(envval, env);
+    if (dyncount <= 0) return env->env;
+
+    base_block = &env->block;
+    base_iseq = base_block->iseq;
+
+    if (base_iseq->type == ISEQ_TYPE_EVAL) {
+	int old_table_size = base_iseq->local_table_size;
+	int old_env_size = env->env_size;
+	int old_local_size = env->local_size;
+	REALLOC_N(base_iseq->local_table, ID, old_table_size + dyncount);
+	base_iseq->local_table_size += dyncount;
+	MEMCPY(base_iseq->local_table + old_table_size, dynvars, ID, dyncount);
+	REALLOC_N(env->env, ID, env->env_size + dyncount);
+	env->env_size += dyncount;
+	env->local_size += dyncount;
+	--old_local_size;
+	MEMMOVE(env->env + env->local_size - 1, env->env + old_local_size,
+		VALUE, old_env_size - old_local_size);
+	rb_mem_clear(env->env + old_local_size, dyncount);
+	vm_rewrite_ep_in_errinfo(th);
+	return env->env + old_local_size;
+    }
+    else {
+	NODE *node = 0;
+	ID minibuf[4], *dyns = minibuf;
+	VALUE idtmp = 0;
+
+	if (dyncount >= numberof(minibuf))
+	    dyns = ALLOCV_N(ID, idtmp, dyncount + 1);
+
+	dyns[0] = dyncount;
+	MEMCPY(dyns + 1, dynvars, ID, dyncount);
+	node = NEW_NODE(NODE_SCOPE, dyns, node, 0);
+
+	iseqval = rb_iseq_new(node, base_iseq->location.label, path, path,
+			      base_iseq->self, ISEQ_TYPE_EVAL);
+	ALLOCV_END(idtmp);
+	vm_set_eval_stack(th, iseqval, 0, base_block);
+	bind->env = rb_vm_make_env_object(th, th->cfp);
+	vm_pop_frame(th);
+	GetEnvPtr(bind->env, env);
+	return env->env;
+    }
+}
+
 /* C -> Ruby: block */
 
 static inline VALUE
