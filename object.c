@@ -3195,6 +3195,8 @@ rb_f_hash(VALUE obj, VALUE arg)
     return rb_Hash(arg);
 }
 
+extern VALUE rb_mod_source_location(VALUE klass);
+
 /*
  *  Document-class: Class
  *
@@ -3522,6 +3524,7 @@ InitVM_Object(void)
     rb_define_method(rb_cModule, "private_constant", rb_mod_private_constant, -1); /* in variable.c */
     rb_define_method(rb_cModule, "deprecate_constant", rb_mod_deprecate_constant, -1); /* in variable.c */
     rb_define_method(rb_cModule, "singleton_class?", rb_mod_singleton_p, 0);
+    rb_define_method(rb_cModule, "source_location", rb_mod_source_location, 0); /* in class.c */
 
     rb_define_method(rb_cClass, "allocate", rb_obj_alloc, 0);
     rb_define_method(rb_cClass, "new", rb_class_new_instance, -1);
