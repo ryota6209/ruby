@@ -493,48 +493,61 @@ size_t pthread_get_stacksize_np(pthread_t);
 #elif defined HAVE_PTHREAD_GETTHRDS_NP
 #define STACKADDR_AVAILABLE 1
 #elif defined __ia64 && defined _HPUX_SOURCE
-#define STACKADDR_AVAILABLE 1
 
-/*
- * Do not lower the thread's stack to PTHREAD_STACK_MIN,
- * otherwise one would receive a 'sendsig: useracc failed.'
- * and a coredump.
- */
-#undef PTHREAD_STACK_MIN
-
-#define HAVE_PTHREAD_ATTR_GET_NP 1
-#undef HAVE_PTHREAD_ATTR_GETSTACK
-
-/*
- * As the PTHREAD_STACK_MIN is undefined and
- * noone touches the default stacksize,
- * it is just fine to use the default.
- */
-#define pthread_attr_get_np(thid, attr) 0
-
-/*
- * Using value of sp is very rough... To make it more real,
- * addr would need to be aligned to vps_pagesize.
- * The vps_pagesize is 'Default user page size (kBytes)'
- * and could be retrieved by gettune().
- */
 static int
-hpux_attr_getstackaddr(const pthread_attr_t *attr, void *addr)
+get_stack_of(pthread_t thid, void **addr, size_t *size)
 {
-    static uint64_t pagesize;
-    size_t size;
+    _pthread_stack_info_t state;
+    int err;
 
-    if (!pagesize) {
-	if (gettune("vps_pagesize", &pagesize)) {
-	    pagesize = 16;
-	}
-	pagesize *= 1024;
+    if ((err = pthread_suspend(thid)) != 0) return err;
+    if ((err = _pthread_stack_info_np(thid, &state)) == 0) {
+	char *p = state.stk_stack_base;
+	size_t s = state.stk_stacksize;
+	*addr = p + STACK_DIR_UPPER(0, s);
+	*size = s;
     }
-    pthread_attr_getstacksize(attr, &size);
-    *addr = (void *)((size_t)((char *)_Asm_get_sp() - size) & ~(pagesize - 1));
-    return 0;
+    pthread_continue(thid);
+    return err;
 }
-#define pthread_attr_getstackaddr(attr, addr) hpux_attr_getstackaddr(attr, addr)
+
+#define get_stack_of(thid, addr, size) get_stack_of(thid, addr, size)
+
+struct main_stack_info {
+    pthread_t target;
+    void **addr;
+    size_t *size;
+    int error;
+};
+
+static void *
+get_main_stack_info(void *arg)
+{
+    struct main_stack_info *info = arg;
+    info->error = get_stack_of(info->target, info->addr, info->size);
+    return NULL;
+}
+
+static int
+get_main_stack(void **addr, size_t *size)
+{
+    int err;
+    struct main_stack_info info;
+    pthread_t th;
+    info.target = pthread_self();
+    info.addr = addr;
+    info.size = size;
+    info.error = 0;
+    err = pthread_create(&th, NULL, get_main_stack_info, &info);
+    if (err) return err;
+    err = pthread_join(th, NULL);
+    if (err) return err;
+    return info.error;
+}
+
+# define get_main_stack(addr, size) get_main_stack(addr, size)
+
+# define MAINSTACKADDR_AVAILABLE 1
 #endif
 
 #ifndef MAINSTACKADDR_AVAILABLE
