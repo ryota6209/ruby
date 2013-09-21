@@ -642,6 +642,7 @@ void rb_last_status_set(int status, rb_pid_t pid);
 VALUE rb_last_status_get(void);
 int rb_proc_exec(const char*);
 VALUE rb_f_exec(int, const VALUE*);
+VALUE rb_process_generation(void);
 rb_pid_t rb_waitpid(rb_pid_t pid, int *status, int flags);
 void rb_syswait(rb_pid_t pid);
 rb_pid_t rb_spawn(int, const VALUE*);

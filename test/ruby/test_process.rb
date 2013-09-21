@@ -2234,4 +2234,11 @@ EOS
       system(bin, "--disable=gems", "-w", "-e", "puts ARGV", *args)
     end;
   end
+
+  def test_process_generation
+    gen = Process.generation
+    assert_predicate(gen, :current?)
+    assert_equal("false", ngen = IO.popen("-") {|f| f ? f.read : print(gen.current?)})
+  rescue NotImplementedError, ArgumentError
+  end
 end

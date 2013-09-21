@@ -242,12 +242,12 @@ class Tempfile < DelegateClass(File)
 
   class Remover
     def initialize(tmpfile)
-      @pid = Process.pid
+      @generation = Process.generation
       @tmpfile = tmpfile
     end
 
     def call(*args)
-      return if @pid != Process.pid
+      return unless @generation.current?
 
       warn "removing #{@tmpfile.path}..." if $DEBUG
 
