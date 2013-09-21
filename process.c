@@ -3174,6 +3174,26 @@ rb_exec_atfork(void* arg, char *errmsg, size_t errmsg_buflen)
 {
     return rb_exec_async_signal_safe(arg, errmsg, errmsg_buflen); /* hopefully async-signal-safe */
 }
+
+static rb_serial_t process_generation;
+
+rb_serial_t
+rb_process_generation(void)
+{
+    return process_generation;
+}
+
+static VALUE
+rb_proc_generation(VALUE klass)
+{
+    return SERIALT2NUM(process_generation);
+}
+#else
+static VALUE
+rb_proc_generation(VALUE klass)
+{
+    return INT2FIX(0);
+}
 #endif
 
 #ifdef HAVE_WORKING_FORK
@@ -3615,6 +3635,7 @@ retry_fork_async_signal_safe(int *status, int *ep,
         if (pid == 0) {/* fork succeed, child process */
             int ret;
             close(ep[0]);
+	    process_generation++;
             ret = disable_child_handler_fork_child(&old, errmsg, errmsg_buflen); /* async-signal-safe */
             if (ret == 0) {
                 ret = chfunc(charg, errmsg, errmsg_buflen);
@@ -3676,8 +3697,10 @@ retry_fork_ruby(int *status)
         prefork();
         before_fork_ruby();
         pid = fork();
-        if (pid == 0) /* fork succeed, child process */
+	if (pid == 0) {/* fork succeed, child process */
+	    process_generation++;
             return pid;
+	}
         preserving_errno(after_fork_ruby());
         if (0 < pid) /* fork succeed, parent process */
             return pid;
@@ -7617,6 +7640,7 @@ InitVM_process(void)
     rb_define_singleton_method(rb_mProcess, "exit!", rb_f_exit_bang, -1);
     rb_define_singleton_method(rb_mProcess, "exit", rb_f_exit, -1);
     rb_define_singleton_method(rb_mProcess, "abort", rb_f_abort, -1);
+    rb_define_singleton_method(rb_mProcess, "generation", rb_proc_generation, 0);
 
     rb_define_module_function(rb_mProcess, "kill", rb_f_kill, -1); /* in signal.c */
     rb_define_module_function(rb_mProcess, "wait", proc_wait, -1);
