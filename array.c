@@ -18,6 +18,7 @@
 #include "internal.h"
 #include "probes.h"
 #include "id.h"
+#include "vm_core.h"
 
 #ifndef ARRAY_DEBUG
 # define NDEBUG
@@ -2350,7 +2351,13 @@ sort_2(const void *ap, const void *bp, void *dummy)
 	return rb_str_cmp(a, b);
     }
 
-    retval = rb_funcall(a, id_cmp, 1, b);
+    {
+	static rb_call_info_t ci;
+	ci.mid = id_cmp;
+	ci.argc = 1;
+	retval = rb_funcall_ci(&ci, a, &b);
+    }
+
     n = rb_cmpint(retval, a, b);
     sort_reentered(data->ary);
 
