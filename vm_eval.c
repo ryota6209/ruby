@@ -766,7 +766,13 @@ rb_funcall_ci(rb_call_info_t *ci, VALUE recv, const VALUE *argv)
 {
     rb_thread_t *th = GET_THREAD();
     ci->recv = recv;
+    int call_status;
+
     vm_search_method(ci, recv);
+    call_status = rb_method_call_status(th, ci->me, CALL_FCALL, recv);
+    if (call_status != NOEX_OK) {
+	return method_missing(recv, ci->mid, ci->argc, argv, call_status);
+    }
     return vm_call0_body(th, ci, argv);
 }
 
