@@ -3,11 +3,12 @@ require 'weakref'
 require_relative './ruby/envutil'
 
 class TestWeakRef < Test::Unit::TestCase
-  def make_weakref(level = 10)
+  def make_weakref(level = 10, queue: nil)
     obj = Object.new
     str = obj.to_s
+    obj = WeakRef.new(obj, queue)
     level.times {obj = WeakRef.new(obj)}
-    return WeakRef.new(obj), str
+    return obj, str
   end
 
   def test_ref
@@ -52,5 +53,20 @@ class TestWeakRef < Test::Unit::TestCase
         ObjectSpace.garbage_collect
       end
     }, bug7304
+  end
+
+  def test_queue
+    q = Object.new
+    def q.pushed; @pushed; end
+    def q.push(obj); p obj; @pushed = obj; end
+
+    ref, = make_weakref(queue: q)
+    assert_not_nil(ref.__getobj__)
+    assert_nil(q.pushed)
+
+    GC.start
+    assert_not_predicate(ref, :weakref_alive?)
+    GC.start
+    assert_equal(ref.object_id, q.pushed.object_id)
   end
 end
