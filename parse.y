@@ -280,6 +280,8 @@ struct parser_params {
     VALUE coverage;
     int nerr;
 
+    int parser_freeze_string;
+
     int parser_token_info_enabled;
     token_info *parser_token_info;
 #else
@@ -5350,6 +5352,7 @@ yycompile0(VALUE arg)
     deferred_nodes = 0;
 #ifndef RIPPER
     parser->parser_token_info_enabled = !compile_for_eval && RTEST(ruby_verbose);
+    parser->parser_freeze_string = 0;
 #endif
 #ifndef RIPPER
     if (RUBY_DTRACE_PARSE_BEGIN_ENABLED()) {
@@ -6727,10 +6730,8 @@ magic_comment_encoding(struct parser_params *parser, const char *name, const cha
 }
 
 static void
-parser_set_token_info(struct parser_params *parser, const char *name, const char *val)
+parser_set_boolean(struct parser_params *parser, const char *name, const char *val, int *p)
 {
-    int *p = &parser->parser_token_info_enabled;
-
     switch (*val) {
       case 't': case 'T':
 	if (strcasecmp(val, "true") == 0) {
@@ -6748,6 +6749,18 @@ parser_set_token_info(struct parser_params *parser, const char *name, const char
     rb_compile_warning(ruby_sourcefile, ruby_sourceline, "invalid value for %s: %s", name, val);
 }
 
+static void
+parser_set_token_info(struct parser_params *parser, const char *name, const char *val)
+{
+    parser_set_boolean(parser, name, val, &parser->parser_token_info_enabled);
+}
+
+static void
+parser_set_freeze_string(struct parser_params *parser, const char *name, const char *val)
+{
+    parser_set_boolean(parser, name, val, &parser->parser_freeze_string);
+}
+
 struct magic_comment {
     const char *name;
     rb_magic_comment_setter_t func;
@@ -6758,6 +6771,7 @@ static const struct magic_comment magic_comments[] = {
     {"coding", magic_comment_encoding, parser_encode_length},
     {"encoding", magic_comment_encoding, parser_encode_length},
     {"warn_indent", parser_set_token_info},
+    {"freeze_string", parser_set_freeze_string},
 };
 #endif
 
@@ -8553,6 +8567,9 @@ evstr2dstr_gen(struct parser_params *parser, NODE *node)
 static NODE *
 str_suffix_gen(struct parser_params *parser, NODE *node, long opt)
 {
+#if STR_OPTION_FROZEN
+    if (parser->parser_freeze_string) opt |= STR_OPTION_FROZEN;
+#endif
     if (nd_type(node) == NODE_STR) {
 #if STR_OPTION_BINARY
 	if (opt & STR_OPTION_BINARY) {
