@@ -61,8 +61,18 @@ module Test
       #    assert_raise NameError do
       #      puts x  #Raises NameError, so assertion succeeds
       #    end
-      def assert_raise(*args, &b)
-        assert_raises(*args, &b)
+      def assert_raise(*args, message: (assert = false), &b)
+        if assert.nil?
+          assert = assertion_for_message(message)
+        end
+
+        ex = assert_raises(*args, &b)
+        if assert
+          String === (msg = args.last) or msg = nil
+          msg = message(msg, "") {"Expected Exception(#{ex.class}) was raised, but the message doesn't match"}
+          __send__(assert, message, ex.message, msg)
+        end
+        ex
       end
 
       # :call-seq:
@@ -87,6 +97,15 @@ module Test
       #      raise "foo" #Raises RuntimeError with the message, so assertion succeeds
       #    end
       def assert_raise_with_message(exception, expected, msg = nil)
+        assert = assertion_for_message(expected)
+        ex = assert_raise(exception, msg) {yield}
+        msg = message(msg, "") {"Expected Exception(#{exception}) was raised, but the message doesn't match"}
+        __send__(assert, expected, ex.message, msg)
+        ex
+      end
+
+      private \
+      def assertion_for_message(expected) # :nodoc:
         case expected
         when String
           assert = :assert_equal
@@ -95,11 +114,7 @@ module Test
         else
           raise TypeError, "Expected #{expected.inspect} to be a kind of String or Regexp, not #{expected.class}"
         end
-
-        ex = assert_raise(exception, msg) {yield}
-        msg = message(msg, "") {"Expected Exception(#{exception}) was raised, but the message doesn't match"}
-        __send__(assert, expected, ex.message, msg)
-        ex
+        return assert
       end
 
       # :call-seq:
