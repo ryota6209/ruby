@@ -229,7 +229,6 @@ void xfree(void*);
 #endif
 
 #ifdef RUBY_EXPORT
-#undef RUBY_EXTERN
 
 #ifndef FALSE
 # define FALSE 0
@@ -248,8 +247,16 @@ void xfree(void*);
 #define RUBY_FUNC_EXPORTED
 #endif
 
+#ifndef RUBY_IMPORT
+#define RUBY_IMPORT extern
+#endif
+
 #ifndef RUBY_EXTERN
+# ifdef RUBY_EXTERN
+#define RUBY_EXTERN RUBY_IMPORT
+# else
 #define RUBY_EXTERN extern
+# endif
 #endif
 
 #ifndef EXTERN
