@@ -266,7 +266,7 @@ const rb_data_type_t ruby_binding_data_type = {
 	binding_free,
 	binding_memsize,
     },
-    0, 0, RUBY_TYPED_FREE_IMMEDIATELY
+    0, 0, RUBY_TYPED_FREE_IMMEDIATELY | RUBY_TYPED_WB_PROTECTED,
 };
 
 VALUE
@@ -286,8 +286,8 @@ binding_dup(VALUE self)
     rb_binding_t *src, *dst;
     GetBindingPtr(self, src);
     GetBindingPtr(bindval, dst);
-    dst->env = src->env;
-    dst->path = src->path;
+    OBJ_WRITE(bindval, &dst->env, src->env);
+    OBJ_WRITE(bindval, &dst->path, src->path);
     dst->first_lineno = src->first_lineno;
     return bindval;
 }
@@ -2551,7 +2551,7 @@ proc_binding(VALUE self)
 
     bindval = rb_binding_alloc(rb_cBinding);
     GetBindingPtr(bindval, bind);
-    bind->env = envval;
+    OBJ_WRITE(bindval, &bind->env, proc->envval);
 
     if (!RUBY_VM_NORMAL_ISEQ_P(iseq)) {
 	if (RUBY_VM_IFUNC_P(iseq) && IS_METHOD_PROC_ISEQ(iseq)) {
