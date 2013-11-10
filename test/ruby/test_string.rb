@@ -2201,7 +2201,6 @@ class TestString < Test::Unit::TestCase
       })
     end
     assert_equal "hello", str
-    assert_not_predicate str, :frozen?
   end
 
   def test_frozen_string
