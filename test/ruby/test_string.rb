@@ -2225,7 +2225,13 @@ class TestString < Test::Unit::TestCase
   end
 
   def test_frozen_string_cannot_be_adjacent
-    assert_raise(SyntaxError) do
+    assert_raises(SyntaxError) do
+      eval(%{
+        "hello"f "world"
+      })
+    end
+
+    assert_raises(SyntaxError) do
       eval(%{
         "hello"f "world"
       })
