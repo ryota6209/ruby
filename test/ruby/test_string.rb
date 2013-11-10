@@ -2203,41 +2203,6 @@ class TestString < Test::Unit::TestCase
     assert_equal "hello", str
   end
 
-  def test_frozen_string
-    assert_equal "hello", "hello"f
-
-    assert_predicate "hello"f, :frozen?
-
-    f = -> { "hello"f }
-
-    assert_equal f.call.object_id, f.call.object_id
-  end
-
-  def test_frozen_dstring
-    assert_equal "hello123", "hello#{123}"f
-
-    assert_predicate "hello#{123}"f, :frozen?
-
-    i = 0
-    f = -> { "#{i += 1}"f }
-    assert_equal "1", f.call
-    assert_equal "2", f.call
-  end
-
-  def test_frozen_string_cannot_be_adjacent
-    assert_raises(SyntaxError) do
-      eval(%{
-        "hello"f "world"
-      })
-    end
-
-    assert_raises(SyntaxError) do
-      eval(%{
-        "hello"f "world"
-      })
-    end
-  end
-
   def test_eq_tilde_can_be_overridden
     assert_separately([], <<-RUBY)
       class String
