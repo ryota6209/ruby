@@ -2250,13 +2250,6 @@ class TestString < Test::Unit::TestCase
     assert_equal a.object_id, b.object_id
   end
 
-  def test_frozen_strings_are_deduplicated_with_encoding
-    a = eval("# coding: utf-8\n'hello'f")
-    b = eval("# coding: ascii\n'hello'f")
-    assert_equal Encoding::UTF_8, a.encoding
-    assert_equal Encoding::US_ASCII, b.encoding
-  end
-
   def test_eq_tilde_can_be_overridden
     assert_separately([], <<-RUBY)
       class String
