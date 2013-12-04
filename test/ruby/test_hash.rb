@@ -1080,6 +1080,12 @@ class TestHash < Test::Unit::TestCase
     assert_not_equal([a,"hello"].hash, [b,"world"].hash, bug9151)
   end
 
+  def test_recursive_hash_value_through_arrays
+    h = {} ; rec = [h] ; h[:x] = rec
+    assert_equal(rec.hash, {x: rec}.hash)
+    assert_equal(rec.hash, {x: [h]}.hash)
+  end
+
   def test_exception_in_rehash
     bug9187 = '[ruby-core:58728] [Bug #9187]'
 
