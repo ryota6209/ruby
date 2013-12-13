@@ -228,10 +228,11 @@ rb_hash_iter_lev(VALUE h)
     return RHASH_ITER_LEV(h);
 }
 
-static const struct st_hash_type objhash = {
+const struct st_hash_type rb_hashtype_obj = {
     rb_any_cmp,
     rb_any_hash,
 };
+#define objhash rb_hashtype_obj
 
 #define rb_ident_cmp st_numcmp
 
