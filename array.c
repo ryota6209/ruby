@@ -3931,6 +3931,14 @@ ary_make_hash(VALUE ary)
     return ary_add_hash(hash, ary);
 }
 
+VALUE rb_hash_oraset(VALUE hash, VALUE key, VALUE (*func)(VALUE key, VALUE arg), VALUE arg);
+
+static VALUE
+ary_hash_add_if_none(VALUE key, VALUE val)
+{
+    return val;
+}
+
 static VALUE
 ary_add_hash_by(VALUE hash, VALUE ary)
 {
@@ -3938,9 +3946,7 @@ ary_add_hash_by(VALUE hash, VALUE ary)
 
     for (i = 0; i < RARRAY_LEN(ary); ++i) {
 	VALUE v = rb_ary_elt(ary, i), k = rb_yield(v);
-	if (rb_hash_lookup2(hash, k, Qundef) == Qundef) {
-	    rb_hash_aset(hash, k, v);
-	}
+	rb_hash_oraset(hash, k, ary_hash_add_if_none, v);
     }
     return hash;
 }

@@ -711,6 +711,54 @@ rb_hash_lookup(VALUE hash, VALUE key)
     return rb_hash_lookup2(hash, key, Qnil);
 }
 
+struct update_if_none_args {
+    VALUE (*func)(VALUE, VALUE);
+    VALUE arg;
+    VALUE val;
+};
+
+static int
+update_if_none_insert(st_data_t *key, st_data_t *val, st_data_t arg, int existing)
+{
+    struct update_if_none_args *u = (struct update_if_none_args *)arg;
+    if (!existing) {
+	*val = (st_data_t)(u->val = (*u->func)((VALUE)*key, u->arg));
+	return ST_CONTINUE;
+    }
+    u->val = (VALUE)*val;
+    return ST_STOP;
+}
+
+static int
+update_if_none_noinsert(st_data_t *key, st_data_t *val, st_data_t arg, int existing)
+{
+    struct update_if_none_args *u = (struct update_if_none_args *)arg;
+    if (!existing) no_new_key();
+    u->val = (VALUE)*val;
+    return ST_STOP;
+}
+
+VALUE
+rb_hash_oraset(VALUE hash, VALUE key, VALUE (*func)(VALUE key, VALUE arg), VALUE arg)
+{
+    st_table *tbl = RHASH(hash)->ntbl;
+
+    if (!tbl) {
+	VALUE val = (*func)(key, arg);
+	rb_hash_aset(hash, key, val);
+	return val;
+    }
+    else {
+	struct update_if_none_args upargs;
+	upargs.func = func;
+	upargs.arg = arg;
+	st_update(tbl, (st_data_t)key,
+		  UPDATE_CALLBACK(RHASH_ITER_LEV(hash), update_if_none),
+		  (st_data_t)&upargs);
+	return upargs.val;
+    }
+}
+
 /*
  *  call-seq:
  *     hsh.fetch(key [, default] )       -> obj
