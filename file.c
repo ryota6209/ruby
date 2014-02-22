@@ -2697,6 +2697,41 @@ rb_file_s_utime(int argc, VALUE *argv)
     return LONG2FIX(n);
 }
 
+#ifdef HAVE_FUTIMES
+/*
+ * call-seq:
+ *  file.utime(atime, mtime)
+ *
+ * Sets the access and modification times of _file_
+ * to the given times.
+ */
+
+static VALUE
+rb_io_utime(int argc, VALUE *argv, VALUE obj)
+{
+    rb_io_t *fptr;
+    struct timeval tvs[2], *tvp = NULL;
+    VALUE atime, mtime;
+
+    GetOpenFile(obj, fptr);
+    rb_scan_args(argc, argv, "02", &atime, &mtime);
+
+    if (!NIL_P(atime) || !NIL_P(mtime)) {
+	tvp = tvs;
+	tvs[0] = rb_time_timeval(atime);
+	if (atime == mtime)
+	    tvs[1] = tvs[0];
+	else
+	    tvs[1] = rb_time_timeval(mtime);
+    }
+    if (futimes(fptr->fd, tvp) < 0)
+	rb_sys_fail_path(fptr->pathv);
+    return obj;
+}
+#else
+#define rb_io_utime rb_f_notimplement
+#endif
+
 #ifdef RUBY_FUNCTION_NAME_STRING
 # define syserr_fail2(e, s1, s2) syserr_fail2_in(RUBY_FUNCTION_NAME_STRING, e, s1, s2)
 #else
@@ -5985,6 +6020,7 @@ Init_File(void)
     rb_define_const(rb_cFile, "PATH_SEPARATOR", rb_obj_freeze(rb_str_new2(PATH_SEP)));
 
     rb_define_method(rb_cIO, "stat",  rb_io_stat, 0); /* this is IO's method */
+    rb_define_method(rb_cIO, "utime",  rb_io_utime, -1); /* this is IO's method */
     rb_define_method(rb_cFile, "lstat",  rb_file_lstat, 0);
 
     rb_define_method(rb_cFile, "atime", rb_file_atime, 0);
