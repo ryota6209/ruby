@@ -321,12 +321,31 @@ enum_find_index(int argc, VALUE *argv, VALUE obj)
 }
 
 static VALUE
-find_all_i(RB_BLOCK_CALL_FUNC_ARGLIST(i, ary))
+find_all_iter_i(RB_BLOCK_CALL_FUNC_ARGLIST(i, ary))
 {
     ENUM_WANT_SVALUE();
 
     if (RTEST(rb_yield(i))) {
 	rb_ary_push(ary, i);
+    }
+    return Qnil;
+}
+
+static VALUE
+find_all_i(RB_BLOCK_CALL_FUNC_ARGLIST(i, args))
+{
+    NODE *memo = RNODE(args);
+    VALUE ary = memo->u1.value;
+    long n = memo->u2.argc;
+    const VALUE *v = (const VALUE *)memo->u3.value;
+    long j;
+    ENUM_WANT_SVALUE();
+
+    for (j = 0; j < n; j++) {
+	if (RTEST(rb_funcallv(v[j], id_eqq, 1, &i))) {
+	    rb_ary_push(ary, i);
+	    break;
+	}
     }
     return Qnil;
 }
@@ -361,14 +380,23 @@ enum_size_over_p(VALUE obj, long n)
  *  call-seq:
  *     enum.find_all { |obj| block } -> array
  *     enum.select   { |obj| block } -> array
+ *     enum.find_all(selector, ...)  -> array
+ *     enum.select(selector, ...)    -> array
  *     enum.find_all                 -> an_enumerator
  *     enum.select                   -> an_enumerator
  *
- *  Returns an array containing all elements of +enum+
- *  for which the given +block+ returns a true value.
+ *  If a list of selectors is given, returns an array containing all elements
+ *  of +enum+ for which <code>selector === enum</code> for one of the
+ *  selectors.
+ *
+ *  If no arguments are given, returns an array containing all elements of
+ *  +enum+ for which the given +block+ returns a true value.
  *
  *  If no block is given, an Enumerator is returned instead.
  *
+ *
+ *     ("aaa".."zzz").select(/ru[a-e]/, /[ie]rb/)
+ *       #=> ["erb", "irb", "rua", "rub", "ruc", "rud", "rue"]
  *
  *     (1..10).find_all { |i|  i % 3 == 0 }   #=> [3, 6, 9]
  *
@@ -378,14 +406,26 @@ enum_size_over_p(VALUE obj, long n)
  */
 
 static VALUE
-enum_find_all(VALUE obj)
+enum_find_all(int argc, VALUE *argv, VALUE obj)
 {
     VALUE ary;
+    NODE *memo;
 
-    RETURN_SIZED_ENUMERATOR(obj, 0, 0, enum_size);
+    if (argc == 0) {
+	RETURN_SIZED_ENUMERATOR(obj, argc, argv, enum_size);
 
-    ary = rb_ary_new();
-    rb_block_call(obj, id_each, 0, 0, find_all_i, ary);
+	ary = rb_ary_new();
+	rb_block_call(obj, id_each, 0, 0, find_all_iter_i, ary);
+    }
+    else {
+	if (rb_block_given_p()) {
+	    rb_warn("given block not used");
+	}
+
+	ary = rb_ary_new();
+	memo = NEW_MEMO(ary, argc, argv);
+	rb_block_call(obj, id_each, 0, 0, find_all_i, (VALUE)memo);
+    }
 
     return ary;
 }
@@ -3499,8 +3539,8 @@ Init_Enumerable(void)
     rb_define_method(rb_mEnumerable, "find", enum_find, -1);
     rb_define_method(rb_mEnumerable, "detect", enum_find, -1);
     rb_define_method(rb_mEnumerable, "find_index", enum_find_index, -1);
-    rb_define_method(rb_mEnumerable, "find_all", enum_find_all, 0);
-    rb_define_method(rb_mEnumerable, "select", enum_find_all, 0);
+    rb_define_method(rb_mEnumerable, "find_all", enum_find_all, -1);
+    rb_define_method(rb_mEnumerable, "select", enum_find_all, -1);
     rb_define_method(rb_mEnumerable, "reject", enum_reject, 0);
     rb_define_method(rb_mEnumerable, "collect", enum_collect, 0);
     rb_define_method(rb_mEnumerable, "map", enum_collect, 0);
