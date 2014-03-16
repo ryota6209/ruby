@@ -67,6 +67,7 @@ typedef struct rb_backtrace_location_struct {
 	    struct rb_backtrace_location_struct *prev_loc;
 	} cfunc;
     } body;
+    VALUE klass;
 } rb_backtrace_location_t;
 
 struct valued_frame_info {
@@ -94,6 +95,7 @@ location_mark_entry(rb_backtrace_location_t *fi)
       default:
 	break;
     }
+    rb_gc_mark(fi->klass);
 }
 
 static size_t
@@ -288,6 +290,20 @@ static VALUE
 location_absolute_path_m(VALUE self)
 {
     return location_absolute_path(location_ptr(self));
+}
+
+/*
+ * Returns the class where the method of this frame is defined.
+ */
+static VALUE
+location_class_m(VALUE self)
+{
+    VALUE klass = location_ptr(self)->klass;
+
+    if (BUILTIN_TYPE(klass) == T_ICLASS) {
+	klass = RBASIC_CLASS(klass);
+    }
+    return klass;
 }
 
 static VALUE
@@ -499,6 +515,7 @@ bt_iter_iseq(void *ptr, const rb_control_frame_t *cfp)
     loc->type = LOCATION_TYPE_ISEQ;
     loc->body.iseq.iseq = iseq;
     loc->body.iseq.lineno.pc = pc;
+    loc->klass = cfp->klass;
     arg->prev_loc = loc;
 }
 
@@ -510,6 +527,7 @@ bt_iter_cfunc(void *ptr, const rb_control_frame_t *cfp, ID mid)
     loc->type = LOCATION_TYPE_CFUNC;
     loc->body.cfunc.mid = mid;
     loc->body.cfunc.prev_loc = arg->prev_loc;
+    loc->klass = cfp->klass;
 }
 
 static VALUE
@@ -1046,6 +1064,7 @@ Init_vm_backtrace(void)
     rb_define_method(rb_cBacktraceLocation, "base_label", location_base_label_m, 0);
     rb_define_method(rb_cBacktraceLocation, "path", location_path_m, 0);
     rb_define_method(rb_cBacktraceLocation, "absolute_path", location_absolute_path_m, 0);
+    rb_define_method(rb_cBacktraceLocation, "class", location_class_m, 0);
     rb_define_method(rb_cBacktraceLocation, "to_s", location_to_str_m, 0);
     rb_define_method(rb_cBacktraceLocation, "inspect", location_inspect_m, 0);
 
