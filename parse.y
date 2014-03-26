@@ -831,7 +831,7 @@ static void token_info_pop(struct parser_params*, const char *token);
 %type <node> mlhs mlhs_head mlhs_basic mlhs_item mlhs_node mlhs_post mlhs_inner
 %type <id>   fsym keyword_variable user_variable sym symbol operation operation2 operation3
 %type <id>   cname fname op f_rest_arg f_block_arg opt_f_block_arg f_norm_arg f_bad_arg
-%type <id>   f_kwrest f_label f_arg_asgn
+%type <id>   f_kwrest f_label f_arg_asgn opt_inspect
 /*%%%*/
 /*%
 %type <val> program reswords then do dot_or_colon
@@ -4273,6 +4273,10 @@ regexp_contents: /* none */
 		    }
 		;
 
+opt_inspect	: '=' {$$ = 1;}
+		| /* none */ {$$ = 0;}
+		;
+
 string_content	: tSTRING_CONTENT
 		| tSTRING_DVAR
 		    {
@@ -4308,7 +4312,7 @@ string_content	: tSTRING_CONTENT
 			$<num>$ = brace_nest;
 			brace_nest = 0;
 		    }
-		  compstmt tSTRING_DEND
+		  opt_inspect compstmt tSTRING_DEND
 		    {
 			cond_stack = $<val>1;
 			cmdarg_stack = $<val>2;
@@ -4316,10 +4320,15 @@ string_content	: tSTRING_CONTENT
 			lex_state = $<num>4;
 			brace_nest = $<num>5;
 		    /*%%%*/
-			if ($6) $6->flags &= ~NODE_FL_NEWLINE;
-			$$ = new_evstr($6);
+			if ($7) $7->flags &= ~NODE_FL_NEWLINE;
+			if ($6) $7 = NEW_CALL($7, idInspect, 0);
+			$$ = new_evstr($7);
 		    /*%
-			$$ = dispatch1(string_embexpr, $6);
+			if ($6) {
+			    $7 = dispatch3(call, $7, ripper_id2sym('.'),
+					   ripper_id2sym(idInspect));
+			}
+			$$ = dispatch1(string_embexpr, $7);
 		    %*/
 		    }
 		;
