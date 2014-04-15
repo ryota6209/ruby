@@ -2263,6 +2263,25 @@ class TestString < Test::Unit::TestCase
       end
     end;
   end
+
+  def test_purge
+    s = "abcdefgh"*20
+    assert_same(s, s.purge)
+
+    IO.pipe {|r, w|
+      Thread.start {r.read(1000, s)}
+      sleep 0.01
+      assert_raise_with_message(RuntimeError, /temporarily locked/) {s.purge}
+    }
+
+    s = ("abcdefgh"*20).freeze
+    assert_raise(RuntimeError) {s.purge}
+
+    s = "abcdefgh"*20
+    s1 = s[1..-1]
+    assert_raise(SecurityError) {s.purge}
+    s1.clear
+  end
 end
 
 class TestString2 < TestString

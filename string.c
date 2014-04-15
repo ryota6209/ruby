@@ -8258,6 +8258,46 @@ str_scrub_bang(int argc, VALUE *argv, VALUE str)
     return str;
 }
 
+/*
+ *  call-seq:
+ *    str.purge -> str
+ *
+ *  Purges the content of _str_ in secure manner as possible, shrinks
+ *  it to 0 length, and returns it.
+ *
+ *  Raises a +SecurityError+ if _str_ is shared, or a +RuntimeError+
+ *  if _str_ is not modifiable.
+ */
+
+static VALUE
+str_purge(VALUE str)
+{
+    if (FL_TEST(str, STR_SHARED)) {
+	rb_raise(rb_eSecurityError, "can't purge shared string");
+    }
+    str_modifiable(str);
+    if (STR_EMBED_P(str)) {
+	volatile VALUE *const p = (VALUE *)&RSTRING(str)->as;
+	int i;
+	const int num = (RSTRING_EMBED_LEN_MAX+1) / sizeof(VALUE);
+	for (i = 0; i < num; p[i++] = 0);
+    }
+    else {
+	char *ptr = RSTRING(str)->as.heap.ptr;
+	long capa = RSTRING(str)->as.heap.aux.capa;
+#if defined HAVE_MEMSET_S
+	errno_t e = memset_s(ptr, capa, '\0', capa);
+	if (e) rb_syserr_fail((int)e, 0);
+#elif defined HAVE_SECUREZEROMEMORY
+	SecureZeroMemory(ptr, capa);
+#else
+	MEMZERO(ptr, char, capa);
+#endif
+    }
+    rb_str_resize(str, 0);
+    return str;
+}
+
 /**********************************************************************
  * Document-class: Symbol
  *
@@ -8857,6 +8897,8 @@ Init_String(void)
     rb_define_method(rb_cString, "b", rb_str_b, 0);
     rb_define_method(rb_cString, "valid_encoding?", rb_str_valid_encoding_p, 0);
     rb_define_method(rb_cString, "ascii_only?", rb_str_is_ascii_only_p, 0);
+
+    rb_define_method(rb_cString, "purge", str_purge, 0);
 
     id_to_s = rb_intern("to_s");
 

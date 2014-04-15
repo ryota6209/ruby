@@ -1952,6 +1952,7 @@ AC_CHECK_FUNCS(memalign)
 AC_CHECK_FUNCS(writev)
 AC_CHECK_FUNCS(memrchr)
 AC_CHECK_FUNCS(memmem)
+AC_CHECK_FUNCS(memset_s)
 AC_CHECK_FUNCS(mktime)
 AC_CHECK_FUNCS(pipe2)
 AC_CHECK_FUNCS(poll)
@@ -2001,6 +2002,7 @@ AC_CHECK_FUNCS(utimensat)
 AC_CHECK_FUNCS(utimes)
 AC_CHECK_FUNCS(wait4)
 AC_CHECK_FUNCS(waitpid)
+AC_CHECK_FUNCS(SecureZeroMemory)
 
 AC_DEFUN([RUBY_CHECK_BUILTIN_FUNC], [dnl
 AC_CACHE_CHECK([for $1], AS_TR_SH(rb_cv_builtin_$1),
