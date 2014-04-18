@@ -1304,16 +1304,28 @@ rb_mod_refine(VALUE module, VALUE klass)
     return refinement;
 }
 
+static void
+using_modules(NODE *cref, int argc, VALUE *argv)
+{
+    int i;
+    for (i = 0; i < argc; i++) {
+	Check_Type(argv[i], T_MODULE);
+    }
+    while (argc--) {
+	rb_using_module(cref, argv[argc]);
+    }
+}
+
 /*
  *  call-seq:
- *     using(module)    -> self
+ *     using(module, ...)    -> self
  *
  *  Import class refinements from <i>module</i> into the current class or
  *  module definition.
  */
 
 static VALUE
-mod_using(VALUE self, VALUE module)
+mod_using(int argc, VALUE *argv, VALUE self)
 {
     NODE *cref = rb_vm_cref();
     rb_control_frame_t *prev_cfp = previous_frame(GET_THREAD());
@@ -1325,7 +1337,7 @@ mod_using(VALUE self, VALUE module)
     if (prev_cfp && prev_cfp->self != self) {
 	rb_raise(rb_eRuntimeError, "Module#using is not called on self");
     }
-    rb_using_module(cref, module);
+    using_modules(cref, argc, argv);
     return self;
 }
 
@@ -1443,14 +1455,14 @@ top_include(int argc, VALUE *argv, VALUE self)
 
 /*
  *  call-seq:
- *     using(module)    -> self
+ *     using(module, ...)    -> self
  *
  *  Import class refinements from <i>module</i> into the scope where
  *  <code>using</code> is called.
  */
 
 static VALUE
-top_using(VALUE self, VALUE module)
+top_using(int argc, VALUE *argv, VALUE self)
 {
     NODE *cref = rb_vm_cref();
     rb_control_frame_t *prev_cfp = previous_frame(GET_THREAD());
@@ -1459,7 +1471,7 @@ top_using(VALUE self, VALUE module)
 	rb_raise(rb_eRuntimeError,
 		 "main.using is permitted only at toplevel");
     }
-    rb_using_module(cref, module);
+    using_modules(cref, argc, argv);
     return self;
 }
 
@@ -1660,7 +1672,7 @@ Init_eval(void)
     rb_define_private_method(rb_cModule, "extend_object", rb_mod_extend_object, 1);
     rb_define_private_method(rb_cModule, "prepend_features", rb_mod_prepend_features, 1);
     rb_define_private_method(rb_cModule, "refine", rb_mod_refine, 1);
-    rb_define_private_method(rb_cModule, "using", mod_using, 1);
+    rb_define_private_method(rb_cModule, "using", mod_using, -1);
     rb_undef_method(rb_cClass, "refine");
 
     rb_undef_method(rb_cClass, "module_function");
@@ -1674,7 +1686,7 @@ Init_eval(void)
     rb_define_private_method(rb_singleton_class(rb_vm_top_self()),
 			     "include", top_include, -1);
     rb_define_private_method(rb_singleton_class(rb_vm_top_self()),
-			     "using", top_using, 1);
+			     "using", top_using, -1);
 
     rb_define_method(rb_mKernel, "extend", rb_obj_extend, -1);
 
