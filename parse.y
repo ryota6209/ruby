@@ -45,6 +45,7 @@ static ID register_static_symid(ID, const char *, long, rb_encoding *);
 static ID register_static_symid_str(ID, VALUE);
 #define REGISTER_SYMID(id, name) register_static_symid((id), (name), strlen(name), enc)
 #include "id.c"
+static inline VALUE symbol_literal(VALUE str);
 #endif
 
 static inline int id_type(ID);
@@ -4115,7 +4116,7 @@ qsym_list	: /* none */
 		    /*%%%*/
 			VALUE lit;
 			lit = $2->nd_lit;
-			$2->nd_lit = ID2SYM(rb_intern_str(lit));
+			$2->nd_lit = symbol_literal(lit);
 			nd_set_type($2, NODE_LIT);
 			$$ = list_append($1, $2);
 		    /*%
@@ -9570,7 +9571,7 @@ dsym_node_gen(struct parser_params *parser, NODE *node)
 	break;
       case NODE_STR:
 	lit = node->nd_lit;
-	node->nd_lit = ID2SYM(rb_intern_str(lit));
+	node->nd_lit = symbol_literal(lit);
 	nd_set_type(node, NODE_LIT);
 	break;
       default:
@@ -10753,6 +10754,12 @@ rb_str_dynamic_intern(VALUE str)
 #else
     return rb_str_intern(str);
 #endif
+}
+
+static inline VALUE
+symbol_literal(VALUE str)
+{
+    return ID2SYM(rb_intern_str(str));
 }
 
 static int
