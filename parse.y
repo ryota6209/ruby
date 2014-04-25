@@ -10759,7 +10759,7 @@ rb_str_dynamic_intern(VALUE str)
 static inline VALUE
 symbol_literal(VALUE str)
 {
-    return ID2SYM(rb_intern_str(str));
+    return rb_str_dynamic_intern(str);
 }
 
 static int
