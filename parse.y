@@ -10464,10 +10464,20 @@ setup_fake_str(struct RString *fake_str, const char *name, long len)
 
 #define ID_DYNAMIC_SYM_P(id) (!(id&ID_STATIC_SYM)&&id>tLAST_TOKEN)
 
+/* because of lazy sweep, dynamic symbol may be unmarked already and
+ * swept at next time */
+static VALUE
+resurrect_symbol(VALUE sym)
+{
+    rb_gc_resurrect(sym);
+    rb_gc_resurrect(RSYMBOL(sym)->fstr);
+    return sym;
+}
+
 ID
 rb_pin_dynamic_symbol(VALUE sym)
 {
-    rb_gc_resurrect(sym);
+    resurrect_symbol(sym);
     /* stick dynamic symbol */
     if (!st_insert(global_symbols.pinned_dsym, sym, (st_data_t)sym)) {
 	global_symbols.pinned_dsym_minor_marked = 0;
@@ -10715,9 +10725,7 @@ rb_str_dynamic_intern(VALUE str)
     if (st_lookup(global_symbols.sym_id, str, &id)) {
 	VALUE sym = ID2SYM(id);
 	if (ID_DYNAMIC_SYM_P(id)) {
-	    /* because of lazy sweep, dynamic symbol may be unmarked already and swept
-	     * at next time */
-	    rb_gc_resurrect(sym);
+	    resurrect_symbol(sym);
 	}
 	return sym;
     }
@@ -10766,8 +10774,7 @@ static int
 lookup_id_str(ID id, st_data_t *data)
 {
     if (ID_DYNAMIC_SYM_P(id)) {
-	rb_gc_resurrect((VALUE)id);
-	rb_gc_resurrect(RSYMBOL(id)->fstr);
+	resurrect_symbol((VALUE)id);
 	*data = RSYMBOL(id)->fstr;
 	return TRUE;
     }
