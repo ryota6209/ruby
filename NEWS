@@ -98,6 +98,9 @@ with all sufficient information, see the ChangeLog file.
 
 === Stdlib updates (outstanding ones only)
 
+* IPAddr
+  * IPAddr#unmasked_addr returns a string represents unmasked address.
+
 * Socket
   * Socket#connect_nonblock, Socket#accept_nonblock,
     TCPServer#accept_nonblock, UNIXServer#accept_nonblock,

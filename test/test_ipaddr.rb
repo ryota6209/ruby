@@ -154,6 +154,11 @@ class TC_IPAddr < Test::Unit::TestCase
     assert_equal("3ffe:0505:0002:0000:0000:0000:0000:0001", IPAddr.new("3ffe:505:2::1").to_string)
     assert_equal("3ffe:505:2::1", IPAddr.new("3ffe:505:2::1").to_s)
   end
+
+  def test_unmasked_addr
+    feature = '[GH-599]'
+    assert_equal('192.168.1.100', IPAddr.new('192.168.1.100/24').unmasked_addr, feature)
+  end
 end
 
 class TC_Operator < Test::Unit::TestCase
