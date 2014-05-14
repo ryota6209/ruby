@@ -166,6 +166,7 @@ End
   in_temporary_working_directory(dir) {
     exec_test pathes
   }
+  test_results
 end
 
 def erase(e = true)
@@ -206,19 +207,22 @@ def exec_test(pathes)
     $stderr.puts unless @quiet and @tty and @error == error
   end
   $stderr.print(erase) if @quiet
+end
+
+def test_results
   if @error == 0
     if @count == 0
       $stderr.puts "No tests, no problem"
     else
       $stderr.puts "#{@passed}PASS#{@reset} all #{@count} tests"
     end
-    exit true
+    true
   else
     @errbuf.each do |msg|
       $stderr.puts msg
     end
     $stderr.puts "#{@failed}FAIL#{@reset} #{@error}/#{@count} tests failed"
-    exit false
+    false
   end
 end
 
@@ -508,4 +512,4 @@ def check_coredump
   end
 end
 
-main
+exit main
