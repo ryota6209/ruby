@@ -1662,6 +1662,28 @@ class TestModule < Test::Unit::TestCase
     assert_include(im, mixin, bug8025)
   end
 
+  def test_include_prepended_module
+    bug7844 = '[ruby-core:52208] [Bug #7844]'
+    p = labeled_module("P") {
+    }
+    q = labeled_module("Q") {
+      include p
+    }
+    r = labeled_module("R") {
+      prepend q
+    }
+    s = labeled_module("S") {
+      include r
+    }
+    a = labeled_class("A") {
+      prepend p
+      include s
+    }
+    ans = a.ancestors[0, 5]
+    # assert_operator(ans.index(q), :<, ans.index(p), "Q < P")
+    assert_equal([q, p, a, s, r], ans, bug7844)
+  end
+
   def test_prepend_super_in_alias
     bug7842 = '[Bug #7842]'
 
