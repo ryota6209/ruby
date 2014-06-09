@@ -1801,6 +1801,32 @@ iseq_peephole_optimize(rb_iseq_t *iseq, LINK_ELEMENT *list, const int do_tailcal
 	}
     }
 
+    if (iobj->insn_id == BIN(send)) {
+	INSN *piobj;
+	CALL_INFO ci = (CALL_INFO)iobj->operands[0];
+	/* simple send only */
+	if (ci && !ci->blockiseq && ci->flag == VM_CALL_ARGS_SKIP_SETUP &&
+	    (piobj = (INSN *)get_prev_insn(iobj)) &&
+	    (piobj->insn_id == BIN(putstring) ||
+	     piobj->insn_id == BIN(opt_str_freeze) ||
+	     0)) {
+	    int arity = ci->orig_argc;
+	    VALUE str = piobj->operands[0];
+	    VALUE *operands = iobj->operands;
+
+	    switch (ci->mid) {
+	      case idFreeze:
+		if (arity == 0) {
+		    /* "literal".freeze -> opt_str_freeze("literal") */
+		    iobj->insn_id = BIN(opt_str_freeze);
+		    operands[0] = str;
+		    REMOVE_ELEM((LINK_ELEMENT *)piobj);
+		}
+		break;
+	    }
+	}
+    }
+
     if (do_tailcallopt && iobj->insn_id == BIN(leave)) {
 	/*
 	 *  send ...
@@ -4238,20 +4264,6 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 	break;
       }
       case NODE_CALL:
-	/* optimization shortcut
-	 *   "literal".freeze -> opt_str_freeze("literal")
-	 */
-	if (node->nd_recv && nd_type(node->nd_recv) == NODE_STR &&
-	    node->nd_mid == idFreeze && node->nd_args == NULL)
-	{
-	    VALUE str = rb_fstring(node->nd_recv->nd_lit);
-	    iseq_add_mark_object(iseq, str);
-	    ADD_INSN1(ret, line, opt_str_freeze, str);
-	    if (poped) {
-		ADD_INSN(ret, line, pop);
-	    }
-	    break;
-	}
 	/* optimization shortcut
 	 *   obj["literal"] -> opt_aref_with(obj, "literal")
 	 */
