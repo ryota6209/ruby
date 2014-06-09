@@ -1823,6 +1823,19 @@ iseq_peephole_optimize(rb_iseq_t *iseq, LINK_ELEMENT *list, const int do_tailcal
 		    REMOVE_ELEM((LINK_ELEMENT *)piobj);
 		}
 		break;
+
+	      case idAREF:
+		if (arity == 1) {
+		    /* obj["literal"] -> opt_aref_with(obj, "literal") */
+		    iobj->insn_id = BIN(opt_aref_with);
+		    iobj->operand_size = 2;
+		    operands = (VALUE *)compile_data_alloc(iseq, sizeof(VALUE) * 2);
+		    operands[0] = (VALUE)ci;
+		    operands[1] = str;
+		    iobj->operands = operands;
+		    REMOVE_ELEM((LINK_ELEMENT *)piobj);
+		}
+		break;
 	    }
 	}
     }
@@ -4264,23 +4277,6 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 	break;
       }
       case NODE_CALL:
-	/* optimization shortcut
-	 *   obj["literal"] -> opt_aref_with(obj, "literal")
-	 */
-	if (node->nd_mid == idAREF && !private_recv_p(node) && node->nd_args &&
-	    nd_type(node->nd_args) == NODE_ARRAY && node->nd_args->nd_alen == 1 &&
-	    nd_type(node->nd_args->nd_head) == NODE_STR)
-	{
-	    VALUE str = rb_fstring(node->nd_args->nd_head->nd_lit);
-	    node->nd_args->nd_head->nd_lit = str;
-	    COMPILE(ret, "recv", node->nd_recv);
-	    ADD_INSN2(ret, line, opt_aref_with,
-		      new_callinfo(iseq, idAREF, 1, 0, 0), str);
-	    if (poped) {
-		ADD_INSN(ret, line, pop);
-	    }
-	    break;
-	}
       case NODE_FCALL:
       case NODE_VCALL:{		/* VCALL: variable or call */
 	/*
