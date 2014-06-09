@@ -1806,36 +1806,55 @@ iseq_peephole_optimize(rb_iseq_t *iseq, LINK_ELEMENT *list, const int do_tailcal
 	CALL_INFO ci = (CALL_INFO)iobj->operands[0];
 	/* simple send only */
 	if (ci && !ci->blockiseq && ci->flag == VM_CALL_ARGS_SKIP_SETUP &&
-	    (piobj = (INSN *)get_prev_insn(iobj)) &&
-	    (piobj->insn_id == BIN(putstring) ||
-	     piobj->insn_id == BIN(opt_str_freeze) ||
-	     0)) {
+	    (piobj = (INSN *)get_prev_insn(iobj))) {
 	    int arity = ci->orig_argc;
-	    VALUE str = piobj->operands[0];
 	    VALUE *operands = iobj->operands;
+	    VALUE str;
+	    if ((piobj->insn_id == BIN(putstring) ||
+		 piobj->insn_id == BIN(opt_str_freeze) ||
+		 0)) {
+		str = piobj->operands[0];
 
-	    switch (ci->mid) {
-	      case idFreeze:
-		if (arity == 0) {
-		    /* "literal".freeze -> opt_str_freeze("literal") */
-		    iobj->insn_id = BIN(opt_str_freeze);
-		    operands[0] = str;
-		    REMOVE_ELEM((LINK_ELEMENT *)piobj);
-		}
-		break;
+		switch (ci->mid) {
+		  case idFreeze:
+		    if (arity == 0) {
+			/* "literal".freeze -> opt_str_freeze("literal") */
+			iobj->insn_id = BIN(opt_str_freeze);
+			operands[0] = str;
+			REMOVE_ELEM((LINK_ELEMENT *)piobj);
+		    }
+		    break;
 
-	      case idAREF:
-		if (arity == 1) {
-		    /* obj["literal"] -> opt_aref_with(obj, "literal") */
-		    iobj->insn_id = BIN(opt_aref_with);
-		    iobj->operand_size = 2;
-		    operands = (VALUE *)compile_data_alloc(iseq, sizeof(VALUE) * 2);
-		    operands[0] = (VALUE)ci;
-		    operands[1] = str;
-		    iobj->operands = operands;
-		    REMOVE_ELEM((LINK_ELEMENT *)piobj);
+		  case idAREF:
+		    if (arity == 1) {
+			/* obj["literal"] -> opt_aref_with(obj, "literal") */
+			iobj->insn_id = BIN(opt_aref_with);
+		      aref_with:
+			iobj->operand_size = 2;
+			operands = (VALUE *)compile_data_alloc(iseq, sizeof(VALUE) * 2);
+			operands[0] = (VALUE)ci;
+			operands[1] = str;
+			iobj->operands = operands;
+			REMOVE_ELEM((LINK_ELEMENT *)piobj);
+		    }
+		    break;
 		}
-		break;
+	    }
+	    else if ((piobj = (INSN *)get_prev_insn(piobj)) != 0 &&
+		     (piobj->insn_id == BIN(putstring) ||
+		      piobj->insn_id == BIN(opt_str_freeze) ||
+		      0)) {
+		str = piobj->operands[0];
+
+		switch (ci->mid) {
+		  case idASET:
+		    if (arity == 2) {
+			/* obj["literal"] = value -> opt_aset_with(obj, "literal", value) */
+			iobj->insn_id = BIN(opt_aset_with);
+			goto aref_with;
+		    }
+		    break;
+		}
 	    }
 	}
     }
