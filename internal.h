@@ -768,6 +768,7 @@ void rb_gc_free_dsymbol(VALUE);
 VALUE rb_str_dynamic_intern(VALUE);
 ID rb_check_id_without_pindown(VALUE *);
 ID rb_sym2id_without_pindown(VALUE);
+ID rb_to_dynamic_id(VALUE name); /* maybe public */
 #ifdef RUBY_ENCODING_H
 ID rb_check_id_cstr_without_pindown(const char *, long, rb_encoding *);
 #endif

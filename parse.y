@@ -11069,6 +11069,17 @@ rb_to_sym(VALUE name)
     return ID2SYM(id);
 }
 
+ID
+rb_to_dynamic_id(VALUE name)
+{
+    ID id = rb_check_id_without_pindown(&name);
+    if (!id) {
+	VALUE sym = rb_str_dynamic_intern(name);
+	id = rb_sym2id_without_pindown(sym);
+    }
+    return id;
+}
+
 static ID
 attrsetname_to_attr(VALUE name)
 {
