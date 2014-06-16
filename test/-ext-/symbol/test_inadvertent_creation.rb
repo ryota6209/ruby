@@ -262,5 +262,16 @@ module Test_Symbol
       assert_raise(NameError) {mod.module_eval {attr_accessor(name)}}
       assert_not_interned(name)
     end
+
+    def test_to_sym
+      name = noninterned_name("_")
+      tap do
+        sym = Bug::Symbol.to_sym(name)
+        assert_kind_of(Symbol, sym)
+        assert_equal(name, sym.to_s)
+      end
+      GC.start
+      assert_not_interned(name)
+    end
   end
 end

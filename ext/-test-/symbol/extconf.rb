@@ -4,4 +4,5 @@ inits.delete("init")
 inits.map! {|s|"X(#{s})"}
 $defs << "-DTEST_INIT_FUNCS(X)=\"#{inits.join(' ')}\""
 have_func("rb_pin_dynamic_symbol")
+have_func("rb_to_sym")
 create_makefile("-test-/symbol")

@@ -11059,6 +11059,16 @@ rb_check_id_without_pindown(VALUE *namep)
     return (ID)0;
 }
 
+VALUE
+rb_to_sym(VALUE name)
+{
+    ID id = rb_check_id_without_pindown(&name);
+    if (!id) {
+	return rb_str_dynamic_intern(name);
+    }
+    return ID2SYM(id);
+}
+
 static ID
 attrsetname_to_attr(VALUE name)
 {
