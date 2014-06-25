@@ -76,6 +76,18 @@ set_backtrace(VALUE info, VALUE bt)
     rb_funcall(info, rb_intern("set_backtrace"), 1, bt);
 }
 
+static VALUE
+setup_fake_str(struct RString *fake_str, const char *name, long len, rb_encoding *enc)
+{
+    fake_str->basic.flags = T_STRING|RSTRING_NOEMBED;
+    RBASIC_SET_CLASS((VALUE)fake_str, rb_cString);
+    fake_str->as.heap.len = len;
+    fake_str->as.heap.ptr = (char *)name;
+    fake_str->as.heap.aux.capa = len;
+    rb_enc_associate((VALUE)fake_str, enc);
+    return (VALUE)fake_str;
+}
+
 static void
 error_print(void)
 {
@@ -86,6 +98,7 @@ error_print(void)
     volatile VALUE eclass = Qundef, e = Qundef;
     const char *volatile einfo;
     volatile long elen;
+    rb_encoding *enc = 0;
 
     if (NIL_P(errinfo))
 	return;
@@ -133,6 +146,7 @@ error_print(void)
 	(RB_TYPE_P(e, T_STRING) || !NIL_P(e = rb_check_string_type(e)))) {
 	einfo = RSTRING_PTR(e);
 	elen = RSTRING_LEN(e);
+	enc = rb_enc_get(e);
     }
     else {
       no_message:
@@ -154,22 +168,28 @@ error_print(void)
 	else {
 	    char *tail = 0;
 	    long len = elen;
+	    struct RString fake;
 
 	    if (RSTRING_PTR(epath)[0] == '#')
 		epath = 0;
+	    warn_print(": ");
 	    if ((tail = memchr(einfo, '\n', elen)) != 0) {
 		len = tail - einfo;
 		tail++;		/* skip newline */
+		if (len) {
+		    warn_print_str(setup_fake_str(&fake, einfo, len, enc));
+		}
 	    }
-	    warn_print(": ");
-	    warn_print2(einfo, len);
+	    else if (len) {
+		warn_print_str(e);
+	    }
 	    if (epath) {
 		warn_print(" (");
 		warn_print_str(epath);
 		warn_print(")\n");
 	    }
 	    if (tail) {
-		warn_print2(tail, elen - len - 1);
+		warn_print_str(setup_fake_str(&fake, tail, elen - len - 1, enc));
 	    }
 	    if (tail ? einfo[elen-1] != '\n' : !epath) warn_print2("\n", 1);
 	}
