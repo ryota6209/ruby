@@ -1989,11 +1989,51 @@ stop_result(VALUE self)
     return rb_attr_get(self, id_result);
 }
 
+static VALUE
+enumerable_method(int argc, const VALUE *argv, VALUE obj)
+{
+    RETURN_ENUMERATOR(obj, argc, argv);
+    return rb_call_super(argc, argv);
+}
+
+/*
+ * call-seq:
+ *   enumerable name
+ *
+ * Lets the method named as +name+ return an enumerator if no block is
+ * given.
+ *
+ *   class N
+ *     enumerable def numbers
+ *       yield 1
+ *       yield 2
+ *       yield 3
+ *     end
+ *   end
+ *   N.new.numbers.to_a            #=> [1, 2, 3]
+ */
+
+static VALUE
+mod_enumerablize(int argc, const VALUE *argv, VALUE klass)
+{
+    if (argc > 0) {
+	int i;
+	const VALUE prep = rb_module_new();
+	rb_prepend_module(klass, prep);
+	for (i = 0; i < argc; ++i) {
+	    rb_define_method_id(prep, rb_to_id(argv[i]), enumerable_method, -1);
+	}
+    }
+    return klass;
+}
+
 void
 InitVM_Enumerator(void)
 {
     rb_define_method(rb_mKernel, "to_enum", obj_to_enum, -1);
     rb_define_method(rb_mKernel, "enum_for", obj_to_enum, -1);
+
+    rb_define_method(rb_cModule, "enumerable", mod_enumerablize, -1);
 
     rb_cEnumerator = rb_define_class("Enumerator", rb_cObject);
     rb_include_module(rb_cEnumerator, rb_mEnumerable);

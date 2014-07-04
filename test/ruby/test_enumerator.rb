@@ -625,5 +625,18 @@ class TestEnumerator < Test::Unit::TestCase
     e.next
     assert_raise(StopIteration) { e.peek }
   end
+
+  def test_module_enumerable
+    n = Class.new do
+      def numbers
+        yield 1
+        yield 2
+        yield 3
+      end
+    end
+    assert_raise(LocalJumpError) {n.new.numbers}
+    n.enumerable :numbers
+    assert_equal([1, 2, 3], n.new.numbers.to_a)
+  end
 end
 
