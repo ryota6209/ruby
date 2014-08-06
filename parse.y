@@ -312,7 +312,7 @@ struct parser_params {
 };
 
 #ifdef RIPPER
-#define intern_cstr(n,l,en) rb_intern3(n,l,en)
+#define intern_cstr(n,l,en) rb_cstr2sym(n,l,en)
 #else
 #define intern_cstr(n,l,en) rb_intern3(n,l,en)
 #endif
