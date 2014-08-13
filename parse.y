@@ -113,7 +113,7 @@ typedef VALUE stack_type;
 #define CMDARG_P()	BITSTACK_SET_P(cmdarg_stack)
 
 struct vtable {
-    ID *tbl;
+    VALUE *tbl;
     int pos;
     int capa;
     struct vtable *prev;
@@ -154,7 +154,7 @@ vtable_alloc(struct vtable *prev)
     struct vtable *tbl = ALLOC(struct vtable);
     tbl->pos = 0;
     tbl->capa = 8;
-    tbl->tbl = ALLOC_N(ID, tbl->capa);
+    tbl->tbl = ALLOC_N(VALUE, tbl->capa);
     tbl->prev = prev;
     if (VTBL_DEBUG) printf("vtable_alloc: %p\n", (void *)tbl);
     return tbl;
@@ -173,16 +173,16 @@ vtable_free(struct vtable *tbl)
 }
 
 static void
-vtable_add(struct vtable *tbl, ID id)
+vtable_add(struct vtable *tbl, VALUE id)
 {
     if (!POINTER_P(tbl)) {
         rb_bug("vtable_add: vtable is not allocated (%p)", (void *)tbl);
     }
-    if (VTBL_DEBUG) printf("vtable_add: %p, %"PRIsVALUE"\n", (void *)tbl, rb_id2str(id));
+    if (VTBL_DEBUG) printf("vtable_add: %p, %"PRIsVALUE"\n", (void *)tbl, rb_sym2str(id));
 
     if (tbl->pos == tbl->capa) {
         tbl->capa = tbl->capa * 2;
-        REALLOC_N(tbl->tbl, ID, tbl->capa);
+        REALLOC_N(tbl->tbl, VALUE, tbl->capa);
     }
     tbl->tbl[tbl->pos++] = id;
 }
@@ -197,7 +197,7 @@ vtable_pop(struct vtable *tbl, int n)
 #endif
 
 static int
-vtable_included(const struct vtable * tbl, ID id)
+vtable_included(const struct vtable * tbl, VALUE id)
 {
     int i;
 
@@ -311,11 +311,7 @@ struct parser_params {
 #endif
 };
 
-#ifdef RIPPER
 #define intern_cstr(n,l,en) rb_cstr2sym(n,l,en)
-#else
-#define intern_cstr(n,l,en) rb_intern3(n,l,en)
-#endif
 
 #define STR_NEW(p,n) rb_enc_str_new((p),(n),current_enc)
 #define STR_NEW0() rb_enc_str_new(0,0,current_enc)
@@ -523,24 +519,24 @@ static VALUE new_attr_op_assign_gen(struct parser_params *parser, VALUE lhs, VAL
 
 RUBY_FUNC_EXPORTED VALUE rb_parser_reg_compile(struct parser_params* parser, VALUE str, int options, VALUE *errmsg);
 
-static ID formal_argument_gen(struct parser_params*, ID);
+static VALUE formal_argument_gen(struct parser_params*, VALUE);
 #define formal_argument(id) formal_argument_gen(parser, (id))
-static ID shadowing_lvar_gen(struct parser_params*,ID);
+static VALUE shadowing_lvar_gen(struct parser_params*, VALUE);
 #define shadowing_lvar(name) shadowing_lvar_gen(parser, (name))
-static void new_bv_gen(struct parser_params*,ID);
+static void new_bv_gen(struct parser_params*, VALUE);
 #define new_bv(id) new_bv_gen(parser, (id))
 
 static void local_push_gen(struct parser_params*,int);
 #define local_push(top) local_push_gen(parser,(top))
 static void local_pop_gen(struct parser_params*);
 #define local_pop() local_pop_gen(parser)
-static void local_var_gen(struct parser_params*, ID);
+static void local_var_gen(struct parser_params*, VALUE);
 #define local_var(id) local_var_gen(parser, (id))
-static void arg_var_gen(struct parser_params*, ID);
+static void arg_var_gen(struct parser_params*, VALUE);
 #define arg_var(id) arg_var_gen(parser, (id))
-static int  local_id_gen(struct parser_params*, ID);
+static int  local_id_gen(struct parser_params*, VALUE);
 #define local_id(id) local_id_gen(parser, (id))
-static ID   internal_id_gen(struct parser_params*);
+static VALUE internal_id_gen(struct parser_params*);
 #define internal_id() internal_id_gen(parser)
 
 static const struct vtable *dyna_push_gen(struct parser_params *);
@@ -550,13 +546,13 @@ static void dyna_pop_gen(struct parser_params*, const struct vtable *);
 static int dyna_in_block_gen(struct parser_params*);
 #define dyna_in_block() dyna_in_block_gen(parser)
 #define dyna_var(id) local_var(id)
-static int dvar_defined_gen(struct parser_params*,ID,int);
+static int dvar_defined_gen(struct parser_params*,VALUE,int);
 #define dvar_defined(id) dvar_defined_gen(parser, (id), 0)
 #define dvar_defined_get(id) dvar_defined_gen(parser, (id), 1)
-static int dvar_curr_gen(struct parser_params*,ID);
+static int dvar_curr_gen(struct parser_params*, VALUE);
 #define dvar_curr(id) dvar_curr_gen(parser, (id))
 
-static int lvar_defined_gen(struct parser_params*, ID);
+static int lvar_defined_gen(struct parser_params*, VALUE);
 #define lvar_defined(id) lvar_defined_gen(parser, (id))
 
 #define RE_OPTION_ONCE (1<<16)
@@ -570,13 +566,13 @@ static int lvar_defined_gen(struct parser_params*, ID);
 #define NODE_STRTERM NODE_ZARRAY	/* nothing to gc */
 #define NODE_HEREDOC NODE_ARRAY 	/* 1, 3 to gc */
 #define SIGN_EXTEND(x,n) (((1<<(n)-1)^((x)&~(~0<<(n))))-(1<<(n)-1))
-#define nd_func u1.id
+#define nd_func u1.name
 #if SIZEOF_SHORT == 2
-#define nd_term(node) ((signed short)(node)->u2.id)
+#define nd_term(node) ((signed short)(node)->u2.value)
 #else
-#define nd_term(node) SIGN_EXTEND((node)->u2.id, CHAR_BIT*2)
+#define nd_term(node) SIGN_EXTEND((node)->u2.value, CHAR_BIT*2)
 #endif
-#define nd_paren(node) (char)((node)->u2.id >> CHAR_BIT*2)
+#define nd_paren(node) (char)((node)->u2.value >> CHAR_BIT*2)
 #define nd_nest u3.cnt
 
 /****** Ripper *******/
@@ -589,13 +585,13 @@ static inline VALUE intern_sym(const char *name);
 #include "eventids1.c"
 #include "eventids2.c"
 
-static VALUE ripper_dispatch0(struct parser_params*,ID);
-static VALUE ripper_dispatch1(struct parser_params*,ID,VALUE);
-static VALUE ripper_dispatch2(struct parser_params*,ID,VALUE,VALUE);
-static VALUE ripper_dispatch3(struct parser_params*,ID,VALUE,VALUE,VALUE);
-static VALUE ripper_dispatch4(struct parser_params*,ID,VALUE,VALUE,VALUE,VALUE);
-static VALUE ripper_dispatch5(struct parser_params*,ID,VALUE,VALUE,VALUE,VALUE,VALUE);
-static VALUE ripper_dispatch7(struct parser_params*,ID,VALUE,VALUE,VALUE,VALUE,VALUE,VALUE,VALUE);
+static VALUE ripper_dispatch0(struct parser_params*,VALUE);
+static VALUE ripper_dispatch1(struct parser_params*,VALUE,VALUE);
+static VALUE ripper_dispatch2(struct parser_params*,VALUE,VALUE,VALUE);
+static VALUE ripper_dispatch3(struct parser_params*,VALUE,VALUE,VALUE,VALUE);
+static VALUE ripper_dispatch4(struct parser_params*,VALUE,VALUE,VALUE,VALUE,VALUE);
+static VALUE ripper_dispatch5(struct parser_params*,VALUE,VALUE,VALUE,VALUE,VALUE,VALUE);
+static VALUE ripper_dispatch7(struct parser_params*,VALUE,VALUE,VALUE,VALUE,VALUE,VALUE,VALUE,VALUE);
 static void ripper_error_gen(struct parser_params *parser);
 #define ripper_error() ripper_error_gen(parser)
 
@@ -5183,7 +5179,7 @@ static int parser_here_document(struct parser_params*,NODE*);
 static inline VALUE
 ripper_yylval_id(ID x)
 {
-    return ripper_new_yylval(x, ID2SYM(x), 0);
+    return ripper_new_yylval(x, x, 0);
 }
 # define set_yylval_str(x) (yylval.val = (x))
 # define set_yylval_num(x) (yylval.val = ripper_new_yylval((x), 0, 0))
@@ -9783,7 +9779,7 @@ arg_blk_pass(NODE *node1, NODE *node2)
 
 
 static NODE*
-new_args_gen(struct parser_params *parser, NODE *m, NODE *o, ID r, NODE *p, NODE *tail)
+new_args_gen(struct parser_params *parser, NODE *m, NODE *o, VALUE r, NODE *p, NODE *tail)
 {
     int saved_line = ruby_sourceline;
     struct rb_args_info *args = tail->nd_ainfo;
@@ -9805,7 +9801,7 @@ new_args_gen(struct parser_params *parser, NODE *m, NODE *o, ID r, NODE *p, NODE
 }
 
 static NODE*
-new_args_tail_gen(struct parser_params *parser, NODE *k, ID kr, ID b)
+new_args_tail_gen(struct parser_params *parser, NODE *k, VALUE kr, VALUE b)
 {
     int saved_line = ruby_sourceline;
     struct rb_args_info *args;
@@ -10115,9 +10111,9 @@ local_tbl_gen(struct parser_params *parser)
     MEMCPY(buf+1, lvtbl->args->tbl, ID, cnt_args);
     /* remove IDs duplicated to warn shadowing */
     for (i = 0, j = cnt_args+1; i < cnt_vars; ++i) {
-	ID id = lvtbl->vars->tbl[i];
+	VALUE id = lvtbl->vars->tbl[i];
 	if (!vtable_included(lvtbl->args, id)) {
-	    buf[j++] = id;
+	    buf[j++] = SYM2ID(id);
 	}
     }
     if (--j < cnt) REALLOC_N(buf, ID, (cnt = j) + 1);
@@ -10127,13 +10123,13 @@ local_tbl_gen(struct parser_params *parser)
 #endif
 
 static void
-arg_var_gen(struct parser_params *parser, ID id)
+arg_var_gen(struct parser_params *parser, VALUE id)
 {
     vtable_add(lvtbl->args, id);
 }
 
 static void
-local_var_gen(struct parser_params *parser, ID id)
+local_var_gen(struct parser_params *parser, VALUE id)
 {
     vtable_add(lvtbl->vars, id);
     if (lvtbl->used) {
@@ -10230,7 +10226,7 @@ dyna_in_block_gen(struct parser_params *parser)
 }
 
 static int
-dvar_defined_gen(struct parser_params *parser, ID id, int get)
+dvar_defined_gen(struct parser_params *parser, VALUE id, int get)
 {
     struct vtable *vars, *args, *used;
     int i;
@@ -10338,7 +10334,7 @@ reg_named_capture_assign_iter(const OnigUChar *name, const OnigUChar *name_end,
     rb_encoding *enc = arg->enc;
     long len = name_end - name;
     const char *s = (const char *)name;
-    ID var;
+    VALUE var;
 
     arg->num++;
 
@@ -10527,12 +10523,14 @@ rb_init_parse(void)
 }
 #endif /* !RIPPER */
 
-static ID
+static VALUE
 internal_id_gen(struct parser_params *parser)
 {
     ID id = (ID)vtable_size(lvtbl->args) + (ID)vtable_size(lvtbl->vars);
     id += ((tLAST_TOKEN - ID_INTERNAL) >> ID_SCOPE_SHIFT) + 1;
-    return ID_STATIC_SYM | ID_INTERNAL | (id << ID_SCOPE_SHIFT);
+    id <<= ID_SCOPE_SHIFT;
+    id |= ID_STATIC_SYM | ID_INTERNAL;
+    return ID2SYM(id);
 }
 
 static void

@@ -66,13 +66,13 @@ add_indent(VALUE buf, VALUE indent)
 }
 
 static void
-add_id(VALUE buf, ID id)
+add_id(VALUE buf, VALUE id)
 {
     if (id == 0) {
 	A("(null)");
     }
     else {
-	VALUE str = rb_id2str(id);
+	VALUE str = rb_sym2str(id);
 	if (str) {
 	    A(":"); AR(str);
 	}

@@ -235,20 +235,20 @@ typedef struct RNode {
     VALUE nd_reserved;		/* ex nd_file */
     union {
 	struct RNode *node;
-	ID id;
+	VALUE name;
 	VALUE value;
 	VALUE (*cfunc)(ANYARGS);
 	ID *tbl;
     } u1;
     union {
 	struct RNode *node;
-	ID id;
+	VALUE name;
 	long argc;
 	VALUE value;
     } u2;
     union {
 	struct RNode *node;
-	ID id;
+	VALUE name;
 	long state;
 	struct rb_global_entry *entry;
 	struct rb_args_info *args;
@@ -302,11 +302,11 @@ typedef struct RNode {
 #define nd_stts  u1.node
 
 #define nd_entry u3.entry
-#define nd_vid   u1.id
-#define nd_cflag u2.id
+#define nd_vname u1.name
+#define nd_cflag u2.argc
 #define nd_cval  u3.value
 
-#define nd_oid   u1.id
+#define nd_oname u1.name
 #define nd_cnt   u3.cnt
 #define nd_tbl   u1.tbl
 
@@ -314,22 +314,22 @@ typedef struct RNode {
 #define nd_iter  u3.node
 
 #define nd_value u2.node
-#define nd_aid   u3.id
+#define nd_aname u3.name
 
 #define nd_lit   u1.value
 
 #define nd_frml  u2.argc
-#define nd_rest  u1.id
+#define nd_rest  u1.name
 #define nd_opt   u1.node
-#define nd_pid   u1.id
+#define nd_pname u1.name
 #define nd_plen  u2.argc
 
 #define nd_recv  u1.node
-#define nd_mid   u2.id
+#define nd_mname u2.name
 #define nd_args  u3.node
 #define nd_ainfo u3.args
 
-#define nd_noex  u3.id
+#define nd_noex  u3.state
 #define nd_defn  u3.node
 
 #define nd_cfnc  u1.cfunc
@@ -338,7 +338,7 @@ typedef struct RNode {
 #define nd_cpath u1.node
 #define nd_super u3.node
 
-#define nd_modl  u1.id
+#define nd_modl  u1.name
 #define nd_clss_  u1.value
 
 #define nd_beg   u1.node
@@ -348,7 +348,7 @@ typedef struct RNode {
 
 #define nd_nth   u2.argc
 
-#define nd_tag   u1.id
+#define nd_tag   u1.name
 #define nd_tval  u2.value
 
 #define nd_visi_  u2.argc
@@ -490,10 +490,10 @@ struct rb_args_info {
     int pre_args_num;  /* count of mandatory pre-arguments */
     int post_args_num; /* count of mandatory post-arguments */
 
-    ID first_post_arg;
+    VALUE first_post_arg;
 
-    ID rest_arg;
-    ID block_arg;
+    VALUE rest_arg;
+    VALUE block_arg;
 
     NODE *kw_args;
     NODE *kw_rest_arg;

@@ -1077,9 +1077,10 @@ get_lvar_level(const rb_iseq_t *iseq)
 }
 
 static int
-get_dyna_var_idx_at_raw(const rb_iseq_t *iseq, ID id)
+get_dyna_var_idx_at_raw(const rb_iseq_t *iseq, VALUE name)
 {
     unsigned int i;
+    ID id = SYM2ID(name);
 
     for (i = 0; i < iseq->body->local_table_size; i++) {
 	if (iseq->body->local_table[i] == id) {
@@ -1090,9 +1091,9 @@ get_dyna_var_idx_at_raw(const rb_iseq_t *iseq, ID id)
 }
 
 static int
-get_local_var_idx(const rb_iseq_t *iseq, ID id)
+get_local_var_idx(const rb_iseq_t *iseq, VALUE name)
 {
-    int idx = get_dyna_var_idx_at_raw(iseq->body->local_iseq, id);
+    int idx = get_dyna_var_idx_at_raw(iseq->body->local_iseq, name);
 
     if (idx < 0) {
 	rb_bug("get_local_var_idx: %d", idx);
