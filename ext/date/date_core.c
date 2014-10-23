@@ -3672,11 +3672,11 @@ date_s_today(int argc, VALUE *argv, VALUE klass)
 
 #define set_hash0(k,v) rb_hash_aset(hash, k, v)
 #define ref_hash0(k) rb_hash_aref(hash, k)
-#define del_hash0(k) rb_hash_delete(hash, k)
+#define del_hash0(k) rb_hash_delete_key(hash, k)
 
 #define set_hash(k,v) rb_hash_aset(hash, ID2SYM(rb_intern(k)), v)
 #define ref_hash(k) rb_hash_aref(hash, ID2SYM(rb_intern(k)))
-#define del_hash(k) rb_hash_delete(hash, ID2SYM(rb_intern(k)))
+#define del_hash(k) rb_hash_delete_key(hash, ID2SYM(rb_intern(k)))
 
 static VALUE
 rt_rewrite_frags(VALUE hash)

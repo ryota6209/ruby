@@ -39,7 +39,7 @@
 
 #define set_hash(k,v) rb_hash_aset(hash, ID2SYM(rb_intern(k)), v)
 #define ref_hash(k) rb_hash_aref(hash, ID2SYM(rb_intern(k)))
-#define del_hash(k) rb_hash_delete(hash, ID2SYM(rb_intern(k)))
+#define del_hash(k) rb_hash_delete_key(hash, ID2SYM(rb_intern(k)))
 
 #define cstr2num(s) rb_cstr_to_inum(s, 10, 0)
 #define str2num(s) rb_str_to_inum(s, 10, 0)

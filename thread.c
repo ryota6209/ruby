@@ -4796,13 +4796,13 @@ recursive_pop(VALUE list, VALUE obj, VALUE paired_obj)
 		     StringValuePtr(symname), StringValuePtr(thrname));
 	}
 	if (RB_TYPE_P(pair_list, T_HASH)) {
-	    rb_hash_delete(pair_list, paired_obj);
+	    rb_hash_delete_key(pair_list, paired_obj);
 	    if (!RHASH_EMPTY_P(pair_list)) {
 		return; /* keep hash until is empty */
 	    }
 	}
     }
-    rb_hash_delete(list, obj);
+    rb_hash_delete_key(list, obj);
 }
 
 struct exec_recursive_params {

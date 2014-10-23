@@ -972,7 +972,7 @@ rb_hash_index(VALUE hash, VALUE value)
     return rb_hash_key(hash, value);
 }
 
-static VALUE
+VALUE
 rb_hash_delete_key(VALUE hash, VALUE key)
 {
     st_data_t ktmp = (st_data_t)key, val;
@@ -1008,8 +1008,8 @@ rb_hash_delete_key(VALUE hash, VALUE key)
  *
  */
 
-VALUE
-rb_hash_delete(VALUE hash, VALUE key)
+static VALUE
+rb_hash_delete_m(VALUE hash, VALUE key)
 {
     VALUE val;
 
@@ -1020,6 +1020,13 @@ rb_hash_delete(VALUE hash, VALUE key)
 	return rb_yield(key);
     }
     return Qnil;
+}
+
+VALUE
+rb_hash_delete(VALUE hash, VALUE key)
+{
+    rb_warn("rb_hash_delete() is deprecated; use rb_hash_delete_key() instead");
+    return rb_hash_delete_m(hash, key);
 }
 
 struct shift_var {
@@ -3881,7 +3888,7 @@ Init_Hash(void)
     rb_define_method(rb_cHash,"values_at", rb_hash_values_at, -1);
 
     rb_define_method(rb_cHash,"shift", rb_hash_shift, 0);
-    rb_define_method(rb_cHash,"delete", rb_hash_delete, 1);
+    rb_define_method(rb_cHash,"delete", rb_hash_delete_m, 1);
     rb_define_method(rb_cHash,"delete_if", rb_hash_delete_if, 0);
     rb_define_method(rb_cHash,"keep_if", rb_hash_keep_if, 0);
     rb_define_method(rb_cHash,"select", rb_hash_select, 0);

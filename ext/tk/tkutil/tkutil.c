@@ -214,8 +214,8 @@ tk_uninstall_cmd(self, cmd_id)
         return Qnil;
     }
 
-    return rb_hash_delete(CALLBACK_TABLE,
-                          rb_str_new2(RSTRING_PTR(cmd_id) + head_len));
+    return rb_hash_delete_key(CALLBACK_TABLE,
+			      rb_str_new2(RSTRING_PTR(cmd_id) + head_len));
 }
 
 static VALUE

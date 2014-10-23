@@ -283,6 +283,10 @@ with all sufficient information, see the ChangeLog file.
   * RUBY_INTERNAL_EVENT_GC_EXIT
     r47528
 
+* rb_hash_delete() is deprecated, because it often cause confusion by
+  calling the block given to the current method unexpectedly.  Use
+  rb_hash_delete_key() instead.
+
 === Build system updates
 
 * jemalloc is optionally supported via `./configure --with-jemalloc`
