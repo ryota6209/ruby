@@ -31,6 +31,7 @@ require 'date'
 #
 #   t = Time.now
 #   t.iso8601  # => "2011-10-05T22:26:12-04:00"
+#   t.rfc3339  # => "2011-10-05T22:26:12-04:00"
 #   t.rfc2822  # => "Wed, 05 Oct 2011 22:26:12 -0400"
 #   t.httpdate # => "Thu, 06 Oct 2011 02:26:12 GMT"
 #
@@ -605,6 +606,7 @@ class Time
       end
     end
     alias iso8601 xmlschema
+    alias rfc3339 xmlschema
   end # class << self
 
   #
@@ -686,5 +688,6 @@ class Time
     s << (utc? ? 'Z' : strftime("%:z"))
   end
   alias iso8601 xmlschema
+  alias rfc3339 xmlschema
 end
 
