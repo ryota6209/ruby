@@ -214,6 +214,7 @@ warning_string(rb_encoding *enc, const char *fmt, va_list args)
     return str;
 }
 
+#undef rb_warn
 void
 rb_warn(const char *fmt, ...)
 {
@@ -245,6 +246,7 @@ rb_enc_warn(rb_encoding *enc, const char *fmt, ...)
 #endif
 
 /* rb_warning() reports only in verbose mode */
+#undef rb_warning
 void
 rb_warning(const char *fmt, ...)
 {
