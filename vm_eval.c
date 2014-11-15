@@ -24,7 +24,7 @@ static void vm_set_eval_stack(rb_thread_t * th, const rb_iseq_t *iseq, const rb_
 static int vm_collect_local_variables_in_heap(rb_thread_t *th, const VALUE *dfp, const struct local_var_list *vars);
 
 static VALUE rb_eUncaughtThrow;
-static ID id_tag, id_value;
+static ID id_tag, id_value, id_fiber;
 #define id_mesg idMesg
 
 /* vm_backtrace.c */
@@ -1795,6 +1795,7 @@ uncaught_throw_init(int argc, const VALUE *argv, VALUE exc)
     rb_call_super(argc - 2, argv + 2);
     rb_ivar_set(exc, id_tag, argv[0]);
     rb_ivar_set(exc, id_value, argv[1]);
+    rb_ivar_set(exc, id_fiber, rb_fiber_current());
     return exc;
 }
 
@@ -1856,34 +1857,48 @@ rb_f_throw(int argc, VALUE *argv)
 {
     VALUE tag, value;
 
-    rb_scan_args(argc, argv, "11", &tag, &value);
+    rb_check_arity(argc, 1, 2);
+    tag = argv[0];
+    value = argc > 1 ? argv[1] : Qnil;
     rb_throw_obj(tag, value);
     UNREACHABLE;
 }
 
-void
-rb_throw_obj(VALUE tag, VALUE value)
+static void
+throw_tag(VALUE tag, VALUE value)
 {
     rb_thread_t *th = GET_THREAD();
     struct rb_vm_tag *tt = th->tag;
 
     while (tt) {
 	if (tt->tag == tag) {
+	    th->errinfo = (VALUE)THROW_DATA_NEW(tag, NULL, TAG_THROW);
 	    tt->retval = value;
-	    break;
+
+	    JUMP_TAG(TAG_THROW);
 	}
 	tt = tt->prev;
     }
-    if (!tt) {
-	VALUE desc[3];
-	desc[0] = tag;
-	desc[1] = value;
-	desc[2] = rb_str_new_cstr("uncaught throw %p");
-	rb_exc_raise(rb_class_new_instance(numberof(desc), desc, rb_eUncaughtThrow));
-    }
+}
 
-    th->errinfo = (VALUE)THROW_DATA_NEW(tag, NULL, TAG_THROW);
-    JUMP_TAG(TAG_THROW);
+void
+rb_throw_obj(VALUE tag, VALUE value)
+{
+    VALUE desc[3];
+
+    throw_tag(tag, value);
+    desc[0] = tag;
+    desc[1] = value;
+    desc[2] = rb_str_new_cstr("uncaught throw %p");
+    rb_exc_raise(rb_class_new_instance(numberof(desc), desc, rb_eUncaughtThrow));
+}
+
+static VALUE
+uncaught_throw_exception(VALUE exc)
+{
+    if (rb_ivar_get(exc, id_fiber) != rb_fiber_current())
+	throw_tag(uncaught_throw_tag(exc), uncaught_throw_value(exc));
+    return exc;
 }
 
 void
@@ -2181,6 +2196,7 @@ Init_vm_eval(void)
     rb_define_method(rb_eUncaughtThrow, "tag", uncaught_throw_tag, 0);
     rb_define_method(rb_eUncaughtThrow, "value", uncaught_throw_value, 0);
     rb_define_method(rb_eUncaughtThrow, "to_s", uncaught_throw_to_s, 0);
+    rb_define_method(rb_eUncaughtThrow, "exception", uncaught_throw_exception, 0);
 
     id_tag = rb_intern_const("tag");
     id_value = rb_intern_const("value");
