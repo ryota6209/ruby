@@ -36,10 +36,7 @@ module Timeout
       # TODO: use Fiber.current to see if self can be thrown
       if self.thread == Thread.current
         bt = caller
-        begin
-          throw(self, bt)
-        rescue UncaughtThrowError
-        end
+        throw(self, bt)
       end
       self
     end
