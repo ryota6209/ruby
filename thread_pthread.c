@@ -71,6 +71,7 @@ static struct {
 static void
 gvl_acquire_common(rb_vm_t *vm)
 {
+#if RUBY_GVL_ENABLE
     if (vm->gvl.acquired) {
 
 	vm->gvl.waiting++;
@@ -96,6 +97,7 @@ gvl_acquire_common(rb_vm_t *vm)
     }
 
     vm->gvl.acquired = 1;
+#endif
 }
 
 static void
@@ -109,9 +111,11 @@ gvl_acquire(rb_vm_t *vm, rb_thread_t *th)
 static void
 gvl_release_common(rb_vm_t *vm)
 {
+#if RUBY_GVL_ENABLE
     vm->gvl.acquired = 0;
     if (vm->gvl.waiting > 0)
 	native_cond_signal(&vm->gvl.cond);
+#endif
 }
 
 static void

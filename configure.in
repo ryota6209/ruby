@@ -442,6 +442,16 @@ AC_ARG_ENABLE(load-relative,
        AS_HELP_STRING([--enable-load-relative], [resolve load paths at run time]),
        [load_relative=$enableval])
 
+AC_ARG_ENABLE(gvl,
+	AS_HELP_STRING([--disable-gvl], [disable GVL]),
+       [enable_gvl=$enableval], [enable_gvl=yes])
+if test x$enable_gvl = xyes; then
+    RUBY_GVL_ENABLE=1
+else
+    RUBY_GVL_ENABLE=0
+fi
+AC_DEFINE(RUBY_GVL_ENABLE)
+
 AC_ARG_PROGRAM
 
 dnl Checks for programs.
