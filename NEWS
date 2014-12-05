@@ -178,6 +178,10 @@ with all sufficient information, see the ChangeLog file.
   class is already defined but its superclass does not match the given
   superclass, as well as definitions in ruby level.
 
+* ruby_show_version() will no longer exits the process, if
+  RUBY_SHOW_COPYRIGHT_TO_DIE is set to 0.  This will be the default in
+  the fuure.
+
 === Build system updates
 
 === Implementation changes
