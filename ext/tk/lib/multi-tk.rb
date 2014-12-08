@@ -1265,10 +1265,6 @@ class MultiTkIp
   ######################################
 
   def initialize(master, safeip=true, keys={})
-    if $SAFE >= 4
-      fail SecurityError, "cannot create a new interpreter at level #{$SAFE}"
-    end
-
     if safeip == nil && $SAFE >= 2
       fail SecurityError, "cannot create a master-ip at level #{$SAFE}"
     end
@@ -1307,7 +1303,7 @@ class MultiTkIp
 
     name, safe, safe_opts, tk_opts = _parse_slaveopts(keys)
 
-    safe = 4 if safe && !safe.kind_of?(Fixnum)
+    safe = 3 if safe && !safe.kind_of?(Fixnum)
 
     @safe_base = false
 
@@ -1423,7 +1419,7 @@ class MultiTkIp
           safe = master.safe_level if safe < master.safe_level
           @safe_level = [safe]
         else
-          @safe_level = [4]
+          @safe_level = [3]
         end
       else
         @interp, @ip_name = master.__create_trusted_slave_obj(name, tk_opts)
@@ -2754,13 +2750,9 @@ class MultiTkIp
       if @wait_on_mainloop[0]
         begin
           @wait_on_mainloop[1] += 1
-          if $SAFE >= 4
-	    _receiver_mainloop(check_root).join
-          else
-            @cmd_queue.enq([@system, 'call_mainloop',
-                            Thread.current, check_root])
-            Thread.stop
-          end
+          @cmd_queue.enq([@system, 'call_mainloop',
+                          Thread.current, check_root])
+          Thread.stop
         rescue MultiTkIp_OK => ret
           # return value
           if ret.value.kind_of?(Thread)
