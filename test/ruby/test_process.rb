@@ -1436,6 +1436,18 @@ class TestProcess < Test::Unit::TestCase
     }
   end
 
+  def test_execopts_ignore_error
+    fifo = "fifo"
+    with_tmpchdir {|d|
+      if system("mkfifo", fifo)
+        assert_separately(['-', fifo], <<-'end;', pgroup: true, timeout: 3)
+          spawn("echo hello", out: ARGV[0], ignore_error: true)
+          assert_equal("hello\n", File.read(ARGV[0]))
+        end;
+      end
+    }
+  end
+
   def test_fallback_to_sh
     feature = '[ruby-core:32745]'
     with_tmpchdir do |d|

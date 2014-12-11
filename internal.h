@@ -912,6 +912,7 @@ struct rb_execarg {
     unsigned new_pgroup_flag : 1;
     unsigned uid_given : 1;
     unsigned gid_given : 1;
+    unsigned ignore_error : 1;
     rb_pid_t pgroup_pgid; /* asis(-1), new pgroup(0), specified pgroup (0<V). */
     VALUE rlimit_limits; /* Qfalse or [[rtype, softlim, hardlim], ...] */
     mode_t umask_mask;

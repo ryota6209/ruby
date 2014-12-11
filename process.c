@@ -279,6 +279,7 @@ static ID id_CLOCK_BASED_CLOCK_PROCESS_CPUTIME_ID;
 static ID id_MACH_ABSOLUTE_TIME_BASED_CLOCK_MONOTONIC;
 #endif
 static ID id_hertz;
+static ID id_ignore_error;
 
 /*
  *  call-seq:
@@ -1796,6 +1797,9 @@ rb_execarg_addopt(VALUE execarg_obj, VALUE key, VALUE val)
 	    rb_raise(rb_eNotImpError,
 		     "gid option is unimplemented on this machine");
 #endif
+	}
+	else if (id == id_ignore_error) {
+	    eargp->ignore_error = RTEST(val);
 	}
         else {
 	    return ST_STOP;
@@ -3534,7 +3538,7 @@ disable_child_handler_fork_child(struct child_handler_disabler_state *old, char 
 static rb_pid_t
 retry_fork_async_signal_safe(int *status, int *ep,
         int (*chfunc)(void*, char *, size_t), void *charg,
-        char *errmsg, size_t errmsg_buflen)
+        char *errmsg, size_t errmsg_buflen, int ignore_error)
 {
     rb_pid_t pid;
     volatile int try_gc = 1;
@@ -3544,7 +3548,7 @@ retry_fork_async_signal_safe(int *status, int *ep,
         prefork();
         disable_child_handler_before_fork(&old);
 #ifdef HAVE_WORKING_VFORK
-        if (!has_privilege())
+        if (!ignore_error && !has_privilege())
             pid = vfork();
         else
             pid = fork();
@@ -3553,13 +3557,13 @@ retry_fork_async_signal_safe(int *status, int *ep,
 #endif
         if (pid == 0) {/* fork succeed, child process */
             int ret;
-            close(ep[0]);
+            if (ep) close(ep[0]);
             ret = disable_child_handler_fork_child(&old, errmsg, errmsg_buflen); /* async-signal-safe */
             if (ret == 0) {
                 ret = chfunc(charg, errmsg, errmsg_buflen);
                 if (!ret) _exit(EXIT_SUCCESS);
             }
-            send_child_error(ep[1], errmsg, errmsg_buflen);
+            if (ep) send_child_error(ep[1], errmsg, errmsg_buflen);
 #if EXIT_SUCCESS == 127
             _exit(EXIT_FAILURE);
 #else
@@ -3587,7 +3591,7 @@ rb_fork_async_signal_safe(int *status, int (*chfunc)(void*, char *, size_t), voi
     if (status) *status = 0;
 
     if (pipe_nocrash(ep, fds)) return -1;
-    pid = retry_fork_async_signal_safe(status, ep, chfunc, charg, errmsg, errmsg_buflen);
+    pid = retry_fork_async_signal_safe(status, ep, chfunc, charg, errmsg, errmsg_buflen, 0);
     if (pid < 0)
         return pid;
     close(ep[1]);
@@ -3880,7 +3884,15 @@ rb_spawn_process(struct rb_execarg *eargp, char *errmsg, size_t errmsg_buflen)
 #endif
 
 #if defined HAVE_WORKING_FORK && !USE_SPAWNV
-    pid = rb_fork_async_signal_safe(&status, rb_exec_atfork, eargp, eargp->redirect_fds, errmsg, errmsg_buflen);
+    if (eargp->ignore_error) {
+	status = 0;
+	pid = retry_fork_async_signal_safe(&status, NULL, rb_exec_atfork, eargp,
+					   errmsg, errmsg_buflen, 1);
+    }
+    else {
+	pid = rb_fork_async_signal_safe(&status, rb_exec_atfork, eargp,
+					eargp->redirect_fds, errmsg, errmsg_buflen);
+    }
 #else
     prog = eargp->use_shell ? eargp->invoke.sh.shell_script : eargp->invoke.cmd.command_name;
 
@@ -4083,6 +4095,10 @@ rb_f_system(int argc, VALUE *argv)
  *        :close_others => true  : don't inherit
  *      current directory:
  *        :chdir => str
+ *      error handling: in the forked process, wait above preparations
+ *                      and then exec, or ignore errors without waiting.
+ *        :ignore_error => true
+ *        :ignore_error => false (default)
  *
  *      The 'cmdname, arg1, ...' form does not use the shell. However,
  *      on different OSes, different things are provided as built-in
@@ -7942,6 +7958,7 @@ Init_process(void)
     id_MACH_ABSOLUTE_TIME_BASED_CLOCK_MONOTONIC = rb_intern("MACH_ABSOLUTE_TIME_BASED_CLOCK_MONOTONIC");
 #endif
     id_hertz = rb_intern("hertz");
+    id_ignore_error = rb_intern("ignore_error");
 
     InitVM(process);
 }
