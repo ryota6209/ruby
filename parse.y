@@ -102,6 +102,12 @@ typedef VALUE stack_type;
 #define CMDARG_LEXPOP()	BITSTACK_LEXPOP(cmdarg_stack)
 #define CMDARG_P()	BITSTACK_SET_P(cmdarg_stack)
 
+#ifndef RIPPER
+# define restore_cond_stack(val) (cond_stack = (val))
+#else
+# define restore_cond_stack(val) (cond_stack = RNODE(val)->nd_lit)
+#endif
+
 struct vtable {
     ID *tbl;
     int pos;
@@ -857,7 +863,7 @@ static void token_info_pop(struct parser_params*, const char *token);
 %token tDSTAR		"**arg"
 %token tAMPER		"&"
 %token tLAMBDA		"->"
-%token tSYMBEG tSTRING_BEG tXSTRING_BEG tREGEXP_BEG tWORDS_BEG tQWORDS_BEG tSYMBOLS_BEG tQSYMBOLS_BEG
+%token <val> tSYMBEG tSTRING_BEG tXSTRING_BEG tREGEXP_BEG tWORDS_BEG tQWORDS_BEG tSYMBOLS_BEG tQSYMBOLS_BEG
 %token tSTRING_DBEG tSTRING_DEND tSTRING_DVAR tSTRING_END tLAMBEG tLABEL_END
 
 /*
@@ -3895,6 +3901,7 @@ string		: tCHAR
 
 string1		: tSTRING_BEG string_contents tSTRING_END
 		    {
+			restore_cond_stack($1);
 		    /*%%%*/
 			$$ = $2;
 		    /*%
@@ -3927,13 +3934,16 @@ xstring		: tXSTRING_BEG xstring_contents tSTRING_END
 		    /*%
 			$$ = dispatch1(xstring_literal, $2);
 		    %*/
+			restore_cond_stack($1);
 		    }
 		;
 
-regexp		: tREGEXP_BEG regexp_contents tREGEXP_END
+regexp		: tREGEXP_BEG regexp_contents
+		    {restore_cond_stack($1);}
+		  tREGEXP_END
 		    {
 		    /*%%%*/
-			int options = $3;
+			int options = $4;
 			NODE *node = $2;
 			NODE *list, *prev;
 			if (!node) {
@@ -3990,26 +4000,28 @@ regexp		: tREGEXP_BEG regexp_contents tREGEXP_END
 			}
 			$$ = node;
 		    /*%
-			VALUE re = $2, opt = $3, src = 0, err;
+			VALUE *reref = &$2, *optref = &$4;
+			VALUE re = *reref, opt = *optref, src = 0, err;
 			int options = 0;
 			if (ripper_is_node_yylval(re)) {
-			    $2 = RNODE(re)->nd_rval;
+			    *reref = RNODE(re)->nd_rval;
 			    src = RNODE(re)->nd_cval;
 			}
 			if (ripper_is_node_yylval(opt)) {
-			    $3 = RNODE(opt)->nd_rval;
+			    *optref = RNODE(opt)->nd_rval;
 			    options = (int)RNODE(opt)->nd_state;
 			}
 			if (src && NIL_P(rb_parser_reg_compile(parser, src, options, &err))) {
 			    compile_error(PARSER_ARG "%"PRIsVALUE, err);
 			}
-			$$ = dispatch2(regexp_literal, $2, $3);
+			$$ = dispatch2(regexp_literal, re, opt);
 		    %*/
 		    }
 		;
 
 words		: tWORDS_BEG ' ' tSTRING_END
 		    {
+			restore_cond_stack($1);
 		    /*%%%*/
 			$$ = NEW_ZARRAY();
 		    /*%
@@ -4019,6 +4031,7 @@ words		: tWORDS_BEG ' ' tSTRING_END
 		    }
 		| tWORDS_BEG word_list tSTRING_END
 		    {
+			restore_cond_stack($1);
 		    /*%%%*/
 			$$ = $2;
 		    /*%
@@ -4065,6 +4078,7 @@ word		: string_content
 
 symbols	        : tSYMBOLS_BEG ' ' tSTRING_END
 		    {
+			restore_cond_stack($1);
 		    /*%%%*/
 			$$ = NEW_ZARRAY();
 		    /*%
@@ -4074,6 +4088,7 @@ symbols	        : tSYMBOLS_BEG ' ' tSTRING_END
 		    }
 		| tSYMBOLS_BEG symbol_list tSTRING_END
 		    {
+			restore_cond_stack($1);
 		    /*%%%*/
 			$$ = $2;
 		    /*%
@@ -4110,6 +4125,7 @@ symbol_list	: /* none */
 
 qwords		: tQWORDS_BEG ' ' tSTRING_END
 		    {
+			restore_cond_stack($1);
 		    /*%%%*/
 			$$ = NEW_ZARRAY();
 		    /*%
@@ -4119,6 +4135,7 @@ qwords		: tQWORDS_BEG ' ' tSTRING_END
 		    }
 		| tQWORDS_BEG qword_list tSTRING_END
 		    {
+			restore_cond_stack($1);
 		    /*%%%*/
 			$$ = $2;
 		    /*%
@@ -4129,6 +4146,7 @@ qwords		: tQWORDS_BEG ' ' tSTRING_END
 
 qsymbols	: tQSYMBOLS_BEG ' ' tSTRING_END
 		    {
+			restore_cond_stack($1);
 		    /*%%%*/
 			$$ = NEW_ZARRAY();
 		    /*%
@@ -4138,6 +4156,7 @@ qsymbols	: tQSYMBOLS_BEG ' ' tSTRING_END
 		    }
 		| tQSYMBOLS_BEG qsym_list tSTRING_END
 		    {
+			restore_cond_stack($1);
 		    /*%%%*/
 			$$ = $2;
 		    /*%
@@ -4368,6 +4387,7 @@ sym		: fname
 
 dsym		: tSYMBEG xstring_contents tSTRING_END
 		    {
+			restore_cond_stack($1);
 			lex_state = EXPR_END;
 		    /*%%%*/
 			$$ = dsym_node($2);
@@ -5052,12 +5072,16 @@ assoc		: arg_value tASSOC arg_value
 			$$ = dispatch2(assoc_new, $1, $2);
 		    %*/
 		    }
-		| tSTRING_BEG string_contents tLABEL_END arg_value
+		| tSTRING_BEG string_contents
+		    {
+			restore_cond_stack($1);
+		    }
+		  tLABEL_END arg_value
 		    {
 		    /*%%%*/
-			$$ = list_append(NEW_LIST(dsym_node($2)), $4);
+			$$ = list_append(NEW_LIST(dsym_node($2)), $5);
 		    /*%
-			$$ = dispatch2(assoc_new, dispatch1(dyna_symbol, $2), $4);
+			$$ = dispatch2(assoc_new, dispatch1(dyna_symbol, $2), $5);
 		    %*/
 		    }
 		| tDSTAR arg_value
@@ -5174,6 +5198,7 @@ static int parser_here_document(struct parser_params*,NODE*);
 # define set_yylval_name(x)  (yylval.id = (x))
 # define set_yylval_literal(x) (yylval.node = NEW_LIT(x))
 # define set_yylval_node(x) (yylval.node = (x))
+# define set_yylval_stack(x) (yylval.val = (x))
 # define yylval_id() (yylval.id)
 #else
 static inline VALUE
@@ -5187,8 +5212,15 @@ ripper_yylval_id(ID x)
 # define set_yylval_name(x) (void)(yylval.val = ripper_yylval_id(x))
 # define set_yylval_literal(x) (void)(x)
 # define set_yylval_node(x) (void)(x)
+# define set_yylval_stack(x) set_yylval_num(x)
 # define yylval_id() yylval.id
 #endif
+
+#define save_cond_stack(n) do { \
+	set_yylval_stack(cond_stack); \
+	cond_stack = 0; \
+	COND_PUSH(n); \
+    } while (0)
 
 #ifndef RIPPER
 #define ripper_flush(p) (void)(p)
@@ -6497,6 +6529,7 @@ parser_heredoc_identifier(struct parser_params *parser)
 				  lex_lastline);		/* nd_orig */
     nd_set_line(lex_strterm, ruby_sourceline);
     ripper_flush(parser);
+    save_cond_stack(1);
     return term == '`' ? tXSTRING_BEG : tSTRING_BEG;
 }
 
@@ -7472,6 +7505,7 @@ parse_percent(struct parser_params *parser, const int space_seen, const enum lex
 	else if (term == '<') term = '>';
 	else paren = 0;
 
+	save_cond_stack(1);
 	switch (c) {
 	  case 'Q':
 	    lex_strterm = NEW_STRTERM(str_dquote, term, paren);
@@ -8109,6 +8143,7 @@ parser_yylex(struct parser_params *parser)
 
       case '"':
 	lex_strterm = NEW_STRTERM(str_dquote, '"', 0);
+	save_cond_stack(1);
 	return tSTRING_BEG;
 
       case '`':
@@ -8124,10 +8159,12 @@ parser_yylex(struct parser_params *parser)
 	    return c;
 	}
 	lex_strterm = NEW_STRTERM(str_xquote, '`', 0);
+	save_cond_stack(1);
 	return tXSTRING_BEG;
 
       case '\'':
 	lex_strterm = NEW_STRTERM(str_squote, '\'', 0);
+	save_cond_stack(1);
 	return tSTRING_BEG;
 
       case '?':
@@ -8298,9 +8335,11 @@ parser_yylex(struct parser_params *parser)
 	switch (c) {
 	  case '\'':
 	    lex_strterm = NEW_STRTERM(str_ssym, c, 0);
+	    save_cond_stack(1);
 	    break;
 	  case '"':
 	    lex_strterm = NEW_STRTERM(str_dsym, c, 0);
+	    save_cond_stack(1);
 	    break;
 	  default:
 	    pushback(c);
@@ -8312,6 +8351,7 @@ parser_yylex(struct parser_params *parser)
       case '/':
 	if (IS_lex_state(EXPR_BEG_ANY)) {
 	    lex_strterm = NEW_STRTERM(str_regexp, '/', 0);
+	    save_cond_stack(1);
 	    return tREGEXP_BEG;
 	}
 	if ((c = nextc()) == '=') {
@@ -8323,6 +8363,7 @@ parser_yylex(struct parser_params *parser)
 	if (IS_SPCARG(c)) {
 	    (void)arg_ambiguous('/');
 	    lex_strterm = NEW_STRTERM(str_regexp, '/', 0);
+	    save_cond_stack(1);
 	    return tREGEXP_BEG;
 	}
 	lex_state = IS_AFTER_OPERATOR() ? EXPR_ARG : EXPR_BEG;
