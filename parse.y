@@ -2350,24 +2350,14 @@ arg		: lhs '=' arg
 			$$ = dispatch1(defined, $4);
 		    %*/
 		    }
-		| arg '?'
-		    {
-			$<val>$ = cond_stack;
-			cond_stack = 0;
-			COND_PUSH(1);
-		    }
-		  arg opt_nl ':'
-		    {
-			cond_stack = $<val>3;
-		    }
-		  arg
+		| arg '?' arg opt_nl ':' arg
 		    {
 		    /*%%%*/
 			value_expr($1);
-			$$ = NEW_IF(cond($1), $4, $8);
+			$$ = NEW_IF(cond($1), $3, $6);
 			fixpos($$, $1);
 		    /*%
-			$$ = dispatch3(ifop, $1, $4, $8);
+			$$ = dispatch3(ifop, $1, $3, $6);
 		    %*/
 		    }
 		| primary
