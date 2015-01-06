@@ -564,7 +564,7 @@ class TestKeywordArguments < Test::Unit::TestCase
 
   def test_nonsymbol_key
     result = m(["a" => 10]) { |a = nil, **b| [a, b] }
-    assert_equal([{"a" => 10}, {}], result)
+    assert_equal([nil, {"a" => 10}], result)
   end
 
   def method_for_test_to_hash_call_during_setup_complex_parameters k1:, k2:, **rest_kw
