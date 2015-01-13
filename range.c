@@ -573,7 +573,13 @@ is_integer_p(VALUE v)
  */
 
 static VALUE
-range_bsearch(VALUE range)
+range_bsearch(VALUE ary)
+{
+    return rb_range_bsearch(ary, rb_bsearch_by_block, Qnil);
+}
+
+VALUE
+rb_range_bsearch(VALUE range, rb_bsearch_cond_func *cond, VALUE data)
 {
     VALUE beg, end, satisfied = Qnil;
     int smaller;

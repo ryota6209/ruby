@@ -665,6 +665,11 @@ size_t rb_ary_memsize(VALUE);
     })
 #endif
 
+typedef VALUE rb_bsearch_cond_func(VALUE el, VALUE data);
+VALUE rb_bsearch_by_block(VALUE el, VALUE data);
+VALUE rb_ary_bsearch(VALUE ary, rb_bsearch_cond_func *cond, VALUE data);
+VALUE rb_ary_bsearch_index(VALUE ary, rb_bsearch_cond_func *cond, VALUE data);
+
 /* bignum.c */
 extern const char ruby_digitmap[];
 VALUE rb_big_fdiv(VALUE x, VALUE y);
@@ -1051,6 +1056,9 @@ struct rb_execarg {
 
 rb_pid_t rb_fork_ruby(int *status);
 void rb_last_status_clear(void);
+
+/* range.c */
+VALUE rb_range_bsearch(VALUE range, rb_bsearch_cond_func *cond, VALUE data);
 
 /* rational.c */
 VALUE rb_lcm(VALUE x, VALUE y);

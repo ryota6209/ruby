@@ -2546,7 +2546,11 @@ rb_ary_sort(VALUE ary)
     return ary;
 }
 
-static VALUE rb_ary_bsearch_index(VALUE ary);
+VALUE
+rb_bsearch_by_block(VALUE el, VALUE data)
+{
+    return rb_yield(el);
+}
 
 /*
  *  call-seq:
@@ -2602,9 +2606,15 @@ static VALUE rb_ary_bsearch_index(VALUE ary);
  */
 
 static VALUE
-rb_ary_bsearch(VALUE ary)
+rb_ary_bsearch_m(VALUE ary)
 {
-    VALUE index_result = rb_ary_bsearch_index(ary);
+    return rb_ary_bsearch(ary, rb_bsearch_by_block, Qnil);
+}
+
+VALUE
+rb_ary_bsearch(VALUE ary, rb_bsearch_cond_func *cond, VALUE data)
+{
+    VALUE index_result = rb_ary_bsearch_index(ary, cond, data);
 
     if (FIXNUM_P(index_result)) {
 	return rb_ary_entry(ary, FIX2LONG(index_result));
@@ -2626,7 +2636,13 @@ rb_ary_bsearch(VALUE ary)
  */
 
 static VALUE
-rb_ary_bsearch_index(VALUE ary)
+rb_ary_bsearch_index_m(VALUE ary)
+{
+    return rb_ary_bsearch_index(ary, rb_bsearch_by_block, Qnil);
+}
+
+VALUE
+rb_ary_bsearch_index(VALUE ary, VALUE (*cond)(VALUE el, VALUE data), VALUE data)
 {
     long low = 0, high = RARRAY_LEN(ary), mid;
     int smaller = 0, satisfied = 0;
@@ -2636,7 +2652,7 @@ rb_ary_bsearch_index(VALUE ary)
     while (low < high) {
 	mid = low + ((high - low) / 2);
 	val = rb_ary_entry(ary, mid);
-	v = rb_yield(val);
+	v = (*cond)(val, data);
 	if (FIXNUM_P(v)) {
 	    if (v == INT2FIX(0)) return INT2FIX(mid);
 	    smaller = (SIGNED_VALUE)v < 0; /* Fixnum preserves its sign-bit */
@@ -5883,8 +5899,8 @@ Init_Array(void)
     rb_define_method(rb_cArray, "take_while", rb_ary_take_while, 0);
     rb_define_method(rb_cArray, "drop", rb_ary_drop, 1);
     rb_define_method(rb_cArray, "drop_while", rb_ary_drop_while, 0);
-    rb_define_method(rb_cArray, "bsearch", rb_ary_bsearch, 0);
-    rb_define_method(rb_cArray, "bsearch_index", rb_ary_bsearch_index, 0);
+    rb_define_method(rb_cArray, "bsearch", rb_ary_bsearch_m, 0);
+    rb_define_method(rb_cArray, "bsearch_index", rb_ary_bsearch_index_m, 0);
     rb_define_method(rb_cArray, "any?", rb_ary_any_p, 0);
 
     id_cmp = rb_intern("<=>");
