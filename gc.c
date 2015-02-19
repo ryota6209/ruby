@@ -3344,7 +3344,7 @@ gc_page_sweep(rb_objspace_t *objspace, rb_heap_t *heap, struct heap_page *sweep_
     heap_pages_final_slots += final_slots;
     sweep_page->final_slots += final_slots;
 
-    if (heap_pages_deferred_final && !finalizing) {
+    if (heap_pages_deferred_final && !ATOMIC_GET(finalizing)) {
         rb_thread_t *th = GET_THREAD();
         if (th) {
 	    gc_finalize_deferred_register();
@@ -5043,7 +5043,7 @@ gc_verify_internal_consistency(VALUE dummy)
 
     /* check counters */
 
-    if (!is_lazy_sweeping(heap_eden) && !finalizing) {
+    if (!is_lazy_sweeping(heap_eden) && !ATOMIC_GET(finalizing)) {
 	if (objspace_live_slots(objspace) != data.live_object_count) {
 	    fprintf(stderr, "heap_pages_final_slots: %d, objspace->profile.total_freed_objects: %d\n",
 		    (int)heap_pages_final_slots, (int)objspace->profile.total_freed_objects);
@@ -5062,7 +5062,7 @@ gc_verify_internal_consistency(VALUE dummy)
     }
 #endif
 
-    if (!finalizing) {
+    if (!ATOMIC_GET(finalizing)) {
 	size_t list_count = 0;
 
 	{
@@ -6403,7 +6403,7 @@ gc_start_internal(int argc, VALUE *argv, VALUE self)
     }
 
     garbage_collect(objspace, full_mark, immediate_mark, immediate_sweep, GPR_FLAG_METHOD);
-    if (!finalizing) finalize_deferred(objspace);
+    if (!ATOMIC_GET(finalizing)) finalize_deferred(objspace);
 
     return Qnil;
 }
@@ -6420,7 +6420,7 @@ rb_gc(void)
 {
     rb_objspace_t *objspace = &rb_objspace;
     garbage_collect(objspace, TRUE, TRUE, TRUE, GPR_FLAG_CAPI);
-    if (!finalizing) finalize_deferred(objspace);
+    if (!ATOMIC_GET(finalizing)) finalize_deferred(objspace);
 }
 
 int

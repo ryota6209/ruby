@@ -1967,7 +1967,7 @@ threadptr_get_interrupts(rb_thread_t *th)
     rb_atomic_t old;
 
     do {
-	interrupt = th->interrupt_flag;
+	interrupt = ATOMIC_GET(th->interrupt_flag);
 	old = ATOMIC_CAS(th->interrupt_flag, interrupt, interrupt & th->interrupt_mask);
     } while (old != interrupt);
     return interrupt & (rb_atomic_t)~th->interrupt_mask;

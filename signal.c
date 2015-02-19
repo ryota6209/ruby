@@ -705,7 +705,7 @@ sighandler(int sig)
 int
 rb_signal_buff_size(void)
 {
-    return signal_buff.size;
+    return ATOMIC_GET(signal_buff.size);
 }
 
 #if HAVE_PTHREAD_H
@@ -736,12 +736,14 @@ int
 rb_get_next_signal(void)
 {
     int i, sig = 0;
+    rb_atomic_t size = ATOMIC_GET(signal_buff.size);
 
-    if (signal_buff.size != 0) {
+    if (size != 0) {
 	for (i=1; i<RUBY_NSIG; i++) {
-	    if (signal_buff.cnt[i] > 0) {
-		ATOMIC_DEC(signal_buff.cnt[i]);
-		ATOMIC_DEC(signal_buff.size);
+	    rb_atomic_t cnt = ATOMIC_GET(signal_buff.cnt[i]);
+	    if (cnt > 0 && ATOMIC_CAS(signal_buff.cnt[i], cnt, cnt-1) == cnt) {
+		size = ATOMIC_GET(signal_buff.size);
+		if (size > 0) ATOMIC_CAS(signal_buff.size, size, size-1);
 		sig = i;
 		break;
 	    }
