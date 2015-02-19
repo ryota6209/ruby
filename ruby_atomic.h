@@ -4,7 +4,7 @@
 #if 0
 #elif defined HAVE_GCC_ATOMIC_BUILTINS
 typedef unsigned int rb_atomic_t;
-# define ATOMIC_SET(var, val)  (void)__atomic_exchange_n(&(var), (val), __ATOMIC_SEQ_CST)
+# define ATOMIC_SET(var, val)  (void)__atomic_store_n(&(var), (val), __ATOMIC_SEQ_CST)
 # define ATOMIC_INC(var) __atomic_fetch_add(&(var), 1, __ATOMIC_SEQ_CST)
 # define ATOMIC_DEC(var) __atomic_fetch_sub(&(var), 1, __ATOMIC_SEQ_CST)
 # define ATOMIC_OR(var, val) __atomic_fetch_or(&(var), (val), __ATOMIC_SEQ_CST)
