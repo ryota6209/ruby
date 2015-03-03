@@ -53,16 +53,17 @@ class TestProcess < Test::Unit::TestCase
     end
   end
 
-  def rlimit_exist?
+  def self.rlimit_exist?
+    return @rlimit_exist if defined?(@rlimit_exist)
     Process.getrlimit(nil)
   rescue NotImplementedError
-    return false
+    return @rlimit_exist = false
   rescue TypeError
-    return true
+    return @rlimit_exist = true
   end
 
+  skip unless rlimit_exist?
   def test_rlimit_nofile
-    return unless rlimit_exist?
     with_tmpchdir {
       write_file 's', <<-"End"
         # Too small RLIMIT_NOFILE, such as zero, causes problems.
@@ -91,8 +92,8 @@ class TestProcess < Test::Unit::TestCase
     }
   end
 
+  skip unless rlimit_exist?
   def test_rlimit_name
-    return unless rlimit_exist?
     [
       :AS, "AS",
       :CORE, "CORE",
@@ -122,8 +123,8 @@ class TestProcess < Test::Unit::TestCase
     assert_raise_with_message(ArgumentError, /\u{30eb 30d3 30fc}/) { Process.getrlimit("\u{30eb 30d3 30fc}") }
   end
 
+  skip unless rlimit_exist?
   def test_rlimit_value
-    return unless rlimit_exist?
     assert_raise(ArgumentError) { Process.setrlimit(:FOO, 0) }
     assert_raise(ArgumentError) { Process.setrlimit(:CORE, :FOO) }
     assert_raise_with_message(ArgumentError, /\u{30eb 30d3 30fc}/) { Process.setrlimit("\u{30eb 30d3 30fc}", 0) }
@@ -166,8 +167,8 @@ class TestProcess < Test::Unit::TestCase
     }
   end
 
+  skip "system(:pgroup) is not supported" if windows?
   def test_execopts_pgroup
-    skip "system(:pgroup) is not supported" if windows?
     assert_nothing_raised { system(*TRUECOMMAND, :pgroup=>false) }
 
     io = IO.popen([RUBY, "-e", "print Process.getpgrp"])
@@ -191,8 +192,8 @@ class TestProcess < Test::Unit::TestCase
     io2.close
   end
 
+  skip unless rlimit_exist?
   def test_execopts_rlimit
-    return unless rlimit_exist?
     assert_raise(ArgumentError) { system(*TRUECOMMAND, :rlimit_foo=>0) }
     assert_raise(ArgumentError) { system(*TRUECOMMAND, :rlimit_NOFILE=>0) }
     assert_raise(ArgumentError) { system(*TRUECOMMAND, :rlimit_nofile=>[]) }
@@ -444,8 +445,8 @@ class TestProcess < Test::Unit::TestCase
 
   UMASK = [RUBY, '-e', 'printf "%04o\n", File.umask']
 
+  skip "umask is not supported" if windows?
   def test_execopts_umask
-    skip "umask is not supported" if windows?
     IO.popen([*UMASK, :umask => 0]) {|io|
       assert_equal("0000", io.read.chomp)
     }
@@ -659,8 +660,10 @@ class TestProcess < Test::Unit::TestCase
         Process.wait(pid)
       }
     }
+  end
 
-    unless windows?
+  unless windows?
+    def test_execopts_redirect_pipe_nonstdio
       # passing non-stdio fds is not supported on Windows
       with_pipes(5) {|pipes|
         ios = pipes.flatten
@@ -755,8 +758,12 @@ class TestProcess < Test::Unit::TestCase
       Process.wait spawn(RUBY, "-e", "STDERR.print 'err'; STDOUT.print 'out'",
                          STDERR=>"out", STDOUT=>[:child, STDERR])
       assert_equal("errout", File.read("out"))
+    }
+  end
 
-      skip "inheritance of fd other than stdin,stdout and stderr is not supported" if windows?
+  skip "inheritance of fd other than stdin,stdout and stderr is not supported" if windows?
+  def test_execopts_redirect_dup2_child_nonstdio
+    with_tmpchdir {|d|
       Process.wait spawn(RUBY, "-e", "STDERR.print 'err'; STDOUT.print 'out'",
                          STDOUT=>"out",
                          STDERR=>[:child, 3],
@@ -836,8 +843,8 @@ class TestProcess < Test::Unit::TestCase
   rescue NotImplementedError
   end
 
+  skip "inheritance of fd other than stdin,stdout and stderr is not supported" if windows?
   def test_fd_inheritance
-    skip "inheritance of fd other than stdin,stdout and stderr is not supported" if windows?
     with_pipe {|r, w|
       system(RUBY, '-e', 'IO.new(ARGV[0].to_i, "w").puts(:ba)', w.fileno.to_s, w=>w)
       w.close
@@ -882,8 +889,8 @@ class TestProcess < Test::Unit::TestCase
     }
   end
 
+  skip "inheritance of fd other than stdin,stdout and stderr is not supported" if windows?
   def test_execopts_close_others
-    skip "inheritance of fd other than stdin,stdout and stderr is not supported" if windows?
     with_tmpchdir {|d|
       with_pipe {|r, w|
         system(RUBY, '-e', 'STDERR.reopen("err", "w"); IO.new(ARGV[0].to_i, "w").puts("ma")', w.fileno.to_s, :close_others=>true)
@@ -1342,10 +1349,9 @@ class TestProcess < Test::Unit::TestCase
     end
   end
 
+  skip unless Process.respond_to?(:kill)
+  skip unless Signal.list.include?("KILL")
   def test_status_kill
-    return unless Process.respond_to?(:kill)
-    return unless Signal.list.include?("KILL")
-
     # assume the system supports signal if SIGQUIT is available
     expected = Signal.list.include?("QUIT") ? [false, true, false, nil] : [true, false, false, true]
 
@@ -1359,10 +1365,9 @@ class TestProcess < Test::Unit::TestCase
     end
   end
 
+  skip unless Process.respond_to?(:kill)
+  skip unless Signal.list.include?("QUIT")
   def test_status_quit
-    return unless Process.respond_to?(:kill)
-    return unless Signal.list.include?("QUIT")
-
     with_tmpchdir do
       s = assert_in_out_err([], "Process.kill(:SIGQUIT, $$);sleep 30", //, //)
       assert_equal([false, true, false, nil],
@@ -1518,12 +1523,12 @@ class TestProcess < Test::Unit::TestCase
     assert_nothing_raised { Process::Status.allocate.inspect }
   end
 
+  # this relates #4173
+  # When ruby can use 2 cores, signal and wait4 may miss the signal.
+  if /freebsd|openbsd/ =~ RUBY_PLATFORM
+    skip "this fails on FreeBSD and OpenBSD on multithreaded environment"
+  end
   def test_wait_and_sigchild
-    if /freebsd|openbsd/ =~ RUBY_PLATFORM
-      # this relates #4173
-      # When ruby can use 2 cores, signal and wait4 may miss the signal.
-      skip "this fails on FreeBSD and OpenBSD on multithreaded environment"
-    end
     signal_received = []
     Signal.trap(:CHLD)  { signal_received << true }
     pid = nil
@@ -1616,9 +1621,8 @@ class TestProcess < Test::Unit::TestCase
     end
   end
 
+  skip if windows?
   def test_system_sigpipe
-    return if windows?
-
     pid = 0
 
     with_tmpchdir do
@@ -1708,8 +1712,8 @@ class TestProcess < Test::Unit::TestCase
     end
   end
 
+  skip unless defined? Fcntl::FD_CLOEXEC
   def test_popen_cloexec
-    return unless defined? Fcntl::FD_CLOEXEC
     IO.popen([RUBY, "-e", ""]) {|io|
       assert_predicate(io, :close_on_exec?)
     }
@@ -1744,9 +1748,8 @@ class TestProcess < Test::Unit::TestCase
     end
   end
 
+  skip unless windows?
   def test_execopts_new_pgroup
-    return unless windows?
-
     assert_nothing_raised { system(*TRUECOMMAND, :new_pgroup=>true) }
     assert_nothing_raised { system(*TRUECOMMAND, :new_pgroup=>false) }
     assert_nothing_raised { spawn(*TRUECOMMAND, :new_pgroup=>true) }
@@ -1783,8 +1786,8 @@ class TestProcess < Test::Unit::TestCase
     end
   end
 
+  skip "Process.groups not implemented on Windows platform" if windows?
   def test_execopts_gid
-    skip "Process.groups not implemented on Windows platform" if windows?
     feature6975 = '[ruby-core:47414]'
 
     [30000, *Process.groups.map {|g| g = Etc.getgrgid(g); [g.name, g.gid]}].each do |group, gid|
@@ -1833,13 +1836,12 @@ class TestProcess < Test::Unit::TestCase
     }
   end if File.executable?("/bin/sh")
 
+  skip unless Process.respond_to?(:setsid)
+  skip unless Process.respond_to?(:getsid)
+  # OpenBSD and AIX don't allow Process::getsid(pid) when pid is in
+  # different session.
+  skip if /openbsd|aix/ =~ RUBY_PLATFORM
   def test_setsid
-    return unless Process.respond_to?(:setsid)
-    return unless Process.respond_to?(:getsid)
-    # OpenBSD and AIX don't allow Process::getsid(pid) when pid is in
-    # different session.
-    return if /openbsd|aix/ =~ RUBY_PLATFORM
-
     IO.popen([RUBY, "-e", <<EOS]) do|io|
 	Marshal.dump(Process.getsid, STDOUT)
 	newsid = Process.setsid
