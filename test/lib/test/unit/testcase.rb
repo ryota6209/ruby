@@ -29,6 +29,12 @@ module Test
           warn "test/unit warning: method #{ self }##{ name } is redefined"
         end
         @test_methods[name] = true
+        remove_method(name) if @skip
+        @skip = nil
+      end
+
+      def self.skip(reason = nil)
+        @skip = true
       end
     end
   end
