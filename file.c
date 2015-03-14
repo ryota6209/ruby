@@ -4420,6 +4420,34 @@ rb_file_join(VALUE ary, VALUE sep)
     return result;
 }
 
+VALUE
+rb_join_path_2(VALUE s1, VALUE s2)
+{
+    rb_encoding *enc = rb_enc_compatible(s1, s2);
+    char *p1, *p2, *tail;
+    long l1, l2, n;
+    int sep;
+
+    RSTRING_GETMEM(s1, p1, l1);
+    RSTRING_GETMEM(s2, p2, l2);
+    tail = rb_enc_path_end(p1, p1 + l1, enc);
+    sep = !isdirsep(p2[0]) && !*tail;
+    n = tail - p1 + sep + l2;
+    if (n > l1) {
+	s1 = rb_str_dup(s1);
+	rb_str_modify_expand(s1, n - l1);
+    }
+    else {
+	s1 = rb_str_subseq(s1, 0, n);
+    }
+    RSTRING_GETMEM(s1, p1, l1);
+    if (sep) p1[n - sep - l2] = '/';
+    MEMCPY(&p1[n - l2], p2, char, l2);
+    rb_str_set_len(s1, n);
+    RB_GC_GUARD(s2);
+    return s1;
+}
+
 /*
  *  call-seq:
  *     File.join(string, ...)  ->  string
