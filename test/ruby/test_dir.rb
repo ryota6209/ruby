@@ -181,6 +181,8 @@ class TestDir < Test::Unit::TestCase
   def assert_entries(entries)
     entries.sort!
     assert_equal(%w(. ..) + ("a".."z").to_a, entries)
+    assert_equal(%w(. ..) + ("a".."z").select {|i| i.ord.odd?}, entries.select {|e| e.directory?(false)})
+    assert_equal(("a".."z").select {|i| i.ord.even?}, entries.select {|e| e.file?(false)})
   end
 
   def test_entries

@@ -411,6 +411,12 @@ fnmatch(
 }
 
 VALUE rb_cDir;
+VALUE rb_cDirEntry;
+
+VALUE rb_join_path_2(VALUE s1, VALUE s2);
+static VALUE direntry_new(VALUE name, VALUE dir, VALUE path, uint8_t type);
+
+static ID id_direntry;
 
 struct dir_data {
     DIR *dir;
@@ -760,6 +766,7 @@ dir_each(VALUE dir)
 	else
 #endif
 	path = rb_external_str_new_with_enc(name, namlen, dirp->enc);
+	path = direntry_new(path, dir, dirp->path, dp->d_type);
 	rb_yield(path);
 	if (dirp->dir == NULL) dir_closed();
     }
@@ -1611,6 +1618,232 @@ replace_real_basename(char *path, long base, rb_encoding *enc, int norm_p, int f
 #    define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
 #  endif
 #endif
+
+typedef struct {
+#ifdef HAVE_FSTATAT
+    const VALUE dir;
+#endif
+    const VALUE path;
+    rb_pathtype_t type, link;
+} rb_direntry_t;
+
+static void
+direntry_mark(void *ptr)
+{
+    rb_direntry_t *p = ptr;
+#ifdef HAVE_FSTATAT
+    rb_gc_mark(p->dir);
+#endif
+    rb_gc_mark(p->path);
+}
+
+static size_t
+direntry_memsize(const void *ptr)
+{
+    return ptr ? sizeof(rb_direntry_t) : 0;
+}
+
+static const rb_data_type_t direntry_type = {
+    "Dir::Entry",
+    {direntry_mark, RUBY_TYPED_DEFAULT_FREE, direntry_memsize,},
+    0, 0, RUBY_TYPED_FREE_IMMEDIATELY|RUBY_TYPED_WB_PROTECTED,
+};
+
+static VALUE
+direntry_new(VALUE name, VALUE dir, VALUE path, uint8_t type)
+{
+    rb_direntry_t *p;
+    VALUE d = TypedData_Make_Struct(0, rb_direntry_t, &direntry_type, p);
+    RBASIC_SET_CLASS(name, rb_cDirEntry);
+    rb_ivar_set(name, id_direntry, d);
+#ifdef HAVE_FSTATAT
+    RB_OBJ_WRITE(d, &p->dir, dir);
+#endif
+    RB_OBJ_WRITE(d, &p->path, path);
+    p->type = type;
+    p->link = path_unknown;
+    return name;
+}
+
+static rb_direntry_t *
+direntry_get(VALUE obj)
+{
+    return rb_check_typeddata(rb_ivar_get(obj, id_direntry), &direntry_type);
+}
+
+static VALUE
+direntry_name(VALUE name)
+{
+    return name;
+}
+
+static VALUE
+direntry_inspect(VALUE name)
+{
+    rb_direntry_t *p = direntry_get(name);
+    VALUE str = rb_str_inspect(name);
+#if defined DT_DIR
+    if (p->type == DT_DIR)
+	rb_str_cat_cstr(str, "/");
+#endif
+#if defined DT_LNK
+    if (p->type == DT_LNK)
+	rb_str_cat_cstr(str, "@");
+#endif
+    return str;
+}
+
+static VALUE
+direntry_path(VALUE name)
+{
+    rb_direntry_t *p = direntry_get(name);
+    VALUE dir = p->path;
+    if (NIL_P(dir)) return name;
+    return rb_join_path_2(dir, name);
+}
+
+static int
+direntry_stat_get1(rb_pathtype_t *type, VALUE name, const rb_direntry_t *p, struct stat *st, int follow_symlink)
+{
+    VALUE path = p->path;
+#ifdef HAVE_FSTATAT
+    VALUE dir = p->dir;
+    int fd;
+#endif
+
+    if (*type != path_unknown) return *type;
+#ifdef HAVE_FSTATAT
+    if (!NIL_P(dir) && rb_typeddata_is_kind_of(dir, &dir_data_type) &&
+	(dirp = DATA_PTR(dir)) != 0 && (fd = dirfd(dirp->dir)) >= 0) {
+	const int opt = follow_symlink ? O_FOLLOW : 0;
+	if (!fstatat(fd, RSTRING_PTR(name), st, opt))
+	    return *type = IFTODT(st->st_mode);
+    }
+    else
+#endif
+
+    if (!NIL_P(path)) {
+	int ret;
+	const char *s;
+	path = rb_join_path_2(path, name);
+	s = RSTRING_PTR(path);
+#ifdef HAVE_LSTAT
+	if (!follow_symlink)
+	    ret = lstat(s, st);
+	else
+#endif
+	    ret = stat(s, st);
+	if (ret == 0)
+	    return *type = IFTODT(st->st_mode);
+    }
+    return *type = path_noent;
+}
+
+static int
+direntry_stat_get(VALUE name, rb_direntry_t *p, struct stat *st, int follow_symlink)
+{
+#if defined HAVE_READLINK
+    if (follow_symlink && p->type == DT_LNK) {
+	return direntry_stat_get1(&p->link, name, p, st, 1);
+    }
+#endif
+    return direntry_stat_get1(&p->type, name, p, st, 0);
+}
+
+static int
+follow_symlink(int argc, VALUE *argv)
+{
+    rb_check_arity(argc, 0, 1);
+    if (argc) {
+	switch (argv[0]) {
+	  case Qtrue: case Qnil:
+	    break;
+	  case Qfalse:
+	    return 0;
+	    break;
+	  default:
+	    rb_raise(rb_eArgError, "%"PRIsVALUE" (true or false expected)", argv[0]);
+	}
+    }
+#ifdef HAVE_READLINK
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+static VALUE
+direntry_stat(int argc, VALUE *argv, VALUE name)
+{
+    struct stat st;
+    int follow = follow_symlink(argc, argv);
+    rb_direntry_t *p = direntry_get(name);
+
+    if (direntry_stat_get(name, p, &st, follow) == path_noent)
+	rb_sys_fail_path(name);
+    return rb_stat_new(&st);
+}
+
+static VALUE
+direntry_directory_p(int argc, VALUE *argv, VALUE name)
+{
+    struct stat st;
+    int follow = follow_symlink(argc, argv);
+    rb_direntry_t *p = direntry_get(name);
+
+#if defined DT_LNK
+    if (!follow || (p->type != DT_LNK)) {
+	return (p->type == DT_DIR) ? Qtrue : Qfalse;
+    }
+#endif
+    switch (direntry_stat_get(name, p, &st, follow)) {
+      case path_noent:
+	rb_sys_fail_path(name);
+      case path_directory:
+	return Qtrue;
+    }
+    return Qfalse;
+}
+
+static VALUE
+direntry_file_p(int argc, VALUE *argv, VALUE name)
+{
+    struct stat st;
+    int follow = follow_symlink(argc, argv);
+    rb_direntry_t *p = direntry_get(name);
+
+#if defined DT_LNK
+    if (!follow || (p->type != DT_LNK)) {
+	return (p->type == DT_REG) ? Qtrue : Qfalse;
+    }
+#endif
+    switch (direntry_stat_get(name, p, &st, follow)) {
+      case path_noent:
+	rb_sys_fail_path(name);
+      case path_regular:
+	return Qtrue;
+    }
+    return Qfalse;
+}
+
+static VALUE
+direntry_symlink_p(VALUE name)
+{
+    rb_direntry_t *p = direntry_get(name);
+
+#if defined DT_LNK
+    return (p->type == DT_LNK) ? Qtrue : Qfalse;
+#else
+    struct stat st;
+    switch (direntry_stat_get(name, p, &st, follow)) {
+      case path_noent:
+	rb_sys_fail_path(name);
+      case path_symlink:
+	return Qtrue;
+    }
+    return Qfalse;
+#endif
+}
 
 struct glob_args {
     void (*func)(const char *, VALUE, void *);
@@ -2603,7 +2836,15 @@ rb_dir_exists_p(VALUE obj, VALUE fname)
 void
 Init_Dir(void)
 {
+    id_direntry = rb_make_internal_id();
+    InitVM(Dir);
+}
+
+void
+InitVM_Dir(void)
+{
     rb_cDir = rb_define_class("Dir", rb_cObject);
+    rb_cDirEntry = rb_define_class_under(rb_cDir, "Entry", rb_cString);
 
     rb_include_module(rb_cDir, rb_mEnumerable);
 
@@ -2625,6 +2866,14 @@ Init_Dir(void)
     rb_define_method(rb_cDir,"pos", dir_tell, 0);
     rb_define_method(rb_cDir,"pos=", dir_set_pos, 1);
     rb_define_method(rb_cDir,"close", dir_close, 0);
+
+    rb_define_method(rb_cDirEntry, "name", direntry_name, 0);
+    rb_define_method(rb_cDirEntry, "inspect", direntry_inspect, 0);
+    rb_define_method(rb_cDirEntry, "path", direntry_path, 0);
+    rb_define_method(rb_cDirEntry, "stat", direntry_stat, -1);
+    rb_define_method(rb_cDirEntry, "directory?", direntry_directory_p, -1);
+    rb_define_method(rb_cDirEntry, "file?", direntry_file_p, -1);
+    rb_define_method(rb_cDirEntry, "symlink?", direntry_symlink_p, 0);
 
     rb_define_singleton_method(rb_cDir,"chdir", dir_s_chdir, -1);
     rb_define_singleton_method(rb_cDir,"getwd", dir_s_getwd, 0);
