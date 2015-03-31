@@ -279,6 +279,10 @@ class TestDir < Test::Unit::TestCase
     end
   end
 
+  def test_glob_direntry
+    assert_empty(Dir.glob("#{@root}/**/*/").select {|d| !d.directory?(false)})
+  end
+
   def test_home
     env_home = ENV["HOME"]
     env_logdir = ENV["LOGDIR"]

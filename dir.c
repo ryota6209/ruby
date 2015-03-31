@@ -1845,21 +1845,38 @@ direntry_symlink_p(VALUE name)
 #endif
 }
 
+typedef int ruby_glob_ext_func(const char*, VALUE, void*, rb_pathtype_t);
+
 struct glob_args {
-    void (*func)(const char *, VALUE, void *);
+    union {
+	void (*basic)(const char *, VALUE, void *);
+	void (*withtype)(const char *, VALUE, void *, rb_pathtype_t);
+    } func;
     const char *path;
     VALUE value;
     rb_encoding *enc;
+    rb_pathtype_t type;
 };
 
 #define glob_call_func(func, path, arg, enc) (*(func))((path), (arg), (void *)(enc))
+#define glob_ext_call_func(func, path, arg, enc, type) \
+    (*(func))((path), (arg), (void *)(enc), (type))
 
 static VALUE
 glob_func_caller(VALUE val)
 {
     struct glob_args *args = (struct glob_args *)val;
 
-    glob_call_func(args->func, args->path, args->value, args->enc);
+    glob_call_func(args->func.basic, args->path, args->value, args->enc);
+    return Qnil;
+}
+
+static VALUE
+glob_ext_func_caller(VALUE val)
+{
+    struct glob_args *args = (struct glob_args *)val;
+
+    glob_ext_call_func(args->func.withtype, args->path, args->value, args->enc, args->type);
     return Qnil;
 }
 
@@ -1883,7 +1900,7 @@ glob_helper(
     struct glob_pattern **beg,
     struct glob_pattern **end,
     int flags,
-    ruby_glob_func *func,
+    ruby_glob_ext_func *func,
     VALUE arg,
     rb_encoding *enc)
 {
@@ -1944,13 +1961,13 @@ glob_helper(
 	    }
 	}
 	if (match_all && pathtype > path_noent) {
-	    status = glob_call_func(func, path, arg, enc);
+	    status = glob_ext_call_func(func, path, arg, enc, pathtype);
 	    if (status) return status;
 	}
 	if (match_dir && pathtype == path_directory) {
 	    char *tmp = join_path(path, pathlen, dirsep, "", 0);
 	    if (!tmp) return -1;
-	    status = glob_call_func(func, tmp, arg, enc);
+	    status = glob_ext_call_func(func, tmp, arg, enc, pathtype);
 	    GLOB_FREE(tmp);
 	    if (status) return status;
 	}
@@ -2158,7 +2175,7 @@ glob_helper(
 }
 
 static int
-ruby_glob0(const char *path, int flags, ruby_glob_func *func, VALUE arg, rb_encoding *enc)
+ruby_glob0(const char *path, int flags, ruby_glob_ext_func *func, VALUE arg, rb_encoding *enc)
 {
     struct glob_pattern *list;
     const char *root, *start;
@@ -2192,15 +2209,8 @@ ruby_glob0(const char *path, int flags, ruby_glob_func *func, VALUE arg, rb_enco
     return status;
 }
 
-int
-ruby_glob(const char *path, int flags, ruby_glob_func *func, VALUE arg)
-{
-    return ruby_glob0(path, flags & ~GLOB_VERBOSE, func, arg,
-		      rb_ascii8bit_encoding());
-}
-
 static int
-rb_glob_caller(const char *path, VALUE a, void *enc)
+rb_glob_caller(const char *path, VALUE a, void *enc, rb_pathtype_t type)
 {
     int status;
     struct glob_args *args = (struct glob_args *)a;
@@ -2211,13 +2221,25 @@ rb_glob_caller(const char *path, VALUE a, void *enc)
 }
 
 static int
+rb_glob_ext_caller(const char *path, VALUE a, void *enc, rb_pathtype_t type)
+{
+    int status;
+    struct glob_args *args = (struct glob_args *)a;
+
+    args->path = path;
+    args->type = type;
+    rb_protect(glob_ext_func_caller, a, &status);
+    return status;
+}
+
+static int
 rb_glob2(const char *path, int flags,
 	 void (*func)(const char *, VALUE, void *), VALUE arg,
 	 rb_encoding* enc)
 {
     struct glob_args args;
 
-    args.func = func;
+    args.func.basic = func;
     args.value = arg;
     args.enc = enc;
 
@@ -2237,7 +2259,7 @@ rb_glob(const char *path, void (*func)(const char *, VALUE, void *), VALUE arg)
 }
 
 static void
-push_pattern(const char *path, VALUE ary, void *enc)
+push_pattern(const char *path, VALUE ary, void *enc, rb_pathtype_t type)
 {
 #ifdef __APPLE__
     VALUE name = rb_utf8_str_new_cstr(path);
@@ -2247,6 +2269,7 @@ push_pattern(const char *path, VALUE ary, void *enc)
 #else
     VALUE name = rb_external_str_new_with_enc(path, strlen(path), enc);
 #endif
+    name = direntry_new(name, Qnil, Qnil, type);
     rb_ary_push(ary, name);
 }
 
@@ -2316,11 +2339,29 @@ struct brace_args {
 };
 
 static int
+glob_caller(const char *path, VALUE val, void *enc, rb_pathtype_t type)
+{
+    struct brace_args *arg = (struct brace_args *)val;
+
+    return (*arg->func)(path, arg->value, enc);
+}
+
+int
+ruby_glob(const char *path, int flags, ruby_glob_func *func, VALUE arg)
+{
+    struct brace_args args;
+    args.func = func;
+    args.value = arg;
+    return ruby_glob0(path, flags & ~GLOB_VERBOSE, glob_caller, (VALUE)&args,
+		      rb_ascii8bit_encoding());
+}
+
+static int
 glob_brace(const char *path, VALUE val, void *enc)
 {
     struct brace_args *arg = (struct brace_args *)val;
 
-    return ruby_glob0(path, arg->flags, arg->func, arg->value, enc);
+    return ruby_glob0(path, arg->flags, glob_caller, val, enc);
 }
 
 int
@@ -2351,7 +2392,7 @@ push_caller(const char *path, VALUE val, void *enc)
 {
     struct push_glob_args *arg = (struct push_glob_args *)val;
 
-    return ruby_glob0(path, arg->flags, rb_glob_caller, (VALUE)&arg->glob, enc);
+    return ruby_glob0(path, arg->flags, rb_glob_ext_caller, (VALUE)&arg->glob, enc);
 }
 
 static int
@@ -2368,7 +2409,7 @@ push_glob(VALUE ary, VALUE str, int flags)
     if (rb_enc_to_index(enc) == ENCINDEX_US_ASCII)
 	enc = rb_ascii8bit_encoding();
     flags |= GLOB_VERBOSE;
-    args.glob.func = push_pattern;
+    args.glob.func.withtype = push_pattern;
     args.glob.value = ary;
     args.glob.enc = enc;
     args.flags = flags;
