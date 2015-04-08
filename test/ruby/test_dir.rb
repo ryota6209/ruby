@@ -178,19 +178,49 @@ class TestDir < Test::Unit::TestCase
     end
   end
 
-  def assert_entries(entries)
-    entries.sort!
+  def _test_entries
+    (entries = yield).sort!
     assert_equal(%w(. ..) + ("a".."z").to_a, entries)
+    assert_equal([], entries.select {|e| e.symlink?})
+    assert_equal(%w(. ..) + ("a".."z").select {|i| i.ord.odd?}, entries.select {|e| e.directory?})
+    assert_equal(("a".."z").select {|i| i.ord.even?}, entries.select {|e| e.file?})
     assert_equal(%w(. ..) + ("a".."z").select {|i| i.ord.odd?}, entries.select {|e| e.directory?(false)})
     assert_equal(("a".."z").select {|i| i.ord.even?}, entries.select {|e| e.file?(false)})
+    assert_equal(%w(. ..) + ("a".."z").select {|i| i.ord.odd?}, entries.select {|e| e.directory?(true)})
+    assert_equal(("a".."z").select {|i| i.ord.even?}, entries.select {|e| e.file?(true)})
+  end
+
+  def _test_symlink_entries
+    begin
+      File.symlink("a", File.join(@root, "symlink-a"))
+      File.symlink("b", File.join(@root, "symlink-b"))
+    rescue NotImplementedError
+      return
+    end
+    (entries = yield.grep(/\Asymlink/)).sort
+    assert_equal(["symlink-a", "symlink-b"], entries.select {|e| e.symlink?})
+    assert_equal([], entries.select {|e| e.directory?})
+    assert_equal([], entries.select {|e| e.file?})
+    assert_equal([], entries.select {|e| e.directory?(false)})
+    assert_equal([], entries.select {|e| e.file?(false)})
+    assert_equal(["symlink-a"], entries.select {|e| e.directory?(true)})
+    assert_equal(["symlink-b"], entries.select {|e| e.file?(true)})
   end
 
   def test_entries
-    assert_entries(Dir.open(@root) {|dir| dir.entries})
+    _test_entries {Dir.open(@root) {|dir| dir.entries}}
   end
 
   def test_foreach
-    assert_entries(Dir.foreach(@root).to_a)
+    _test_entries {Dir.foreach(@root).to_a}
+  end
+
+  def test_symlink_entries
+    _test_symlink_entries {Dir.open(@root) {|dir| dir.entries}}
+  end
+
+  def test_symlink_foreach
+    _test_symlink_entries {Dir.foreach(@root).to_a}
   end
 
   def test_dir_enc

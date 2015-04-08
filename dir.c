@@ -1756,20 +1756,15 @@ follow_symlink(int argc, VALUE *argv)
     rb_check_arity(argc, 0, 1);
     if (argc) {
 	switch (argv[0]) {
-	  case Qtrue: case Qnil:
-	    break;
-	  case Qfalse:
-	    return 0;
+	  case Qtrue:
+	    return 1;
+	  case Qnil: case Qfalse:
 	    break;
 	  default:
 	    rb_raise(rb_eArgError, "%"PRIsVALUE" (true or false expected)", argv[0]);
 	}
     }
-#ifdef HAVE_READLINK
-    return 1;
-#else
     return 0;
-#endif
 }
 
 static VALUE
