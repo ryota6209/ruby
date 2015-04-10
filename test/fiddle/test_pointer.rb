@@ -231,7 +231,7 @@ module Fiddle
     end
 
     def test_no_memory_leak
-      assert_no_memory_leak(%w[-W0 -rfiddle.so], '', '100_000.times {Fiddle::Pointer.allocate}', rss: true)
+      assert_no_memory_leak(%w[-W0 -rfiddle.so], '', '1000.times {Fiddle::Pointer.allocate}', repeat: 100, rss: true)
     end
   end
 end if defined?(Fiddle)

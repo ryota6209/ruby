@@ -61,12 +61,6 @@ WARNING
   end
 
   def test_redefinition_memory_leak
-    code = <<-PRE
-olderr = $stderr.dup
-$stderr.reopen(File::NULL, "wb")
-350000.times { FOO = :BAR }
-$stderr.reopen(olderr)
-PRE
-    assert_no_memory_leak([], '', code, 'redefined constant', timeout: 30)
+    assert_no_memory_leak([], '$VERBOSE=nil', '1000.times {FOO = :BAR}', 'redefined constant', repeat: 300, timeout: 30)
   end
 end

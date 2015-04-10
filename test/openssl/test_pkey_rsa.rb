@@ -77,26 +77,26 @@ class OpenSSL::TestPKeyRSA < Test::Unit::TestCase
 
   def test_sign_verify_memory_leak
     bug9743 = '[ruby-core:62038] [Bug #9743]'
-    assert_no_memory_leak(%w[-ropenssl], <<-PREP, <<-CODE, bug9743, rss: true, timeout: 30)
+    assert_no_memory_leak(%w[-ropenssl], <<-PREP, <<-CODE, bug9743, repeat: 20, rss: true, timeout: 30)
     data = 'Sign me!'
     digest = OpenSSL::Digest::SHA512.new
     pkey = OpenSSL::PKey::RSA.new(2048)
     signature = pkey.sign(digest, data)
     pub_key = pkey.public_key
     PREP
-    20_000.times {
+    1000.times {
       pub_key.verify(digest, signature, data)
     }
     CODE
 
-    assert_no_memory_leak(%w[-ropenssl], <<-PREP, <<-CODE, bug9743, rss: true, timeout: 30)
+    assert_no_memory_leak(%w[-ropenssl], <<-PREP, <<-CODE, bug9743, repeat: 20, rss: true, timeout: 30)
     data = 'Sign me!'
     digest = OpenSSL::Digest::SHA512.new
     pkey = OpenSSL::PKey::RSA.new(2048)
     signature = pkey.sign(digest, data)
     pub_key = pkey.public_key
     PREP
-    20_000.times {
+    1000.times {
       begin
         pub_key.verify(digest, signature, 1)
       rescue TypeError

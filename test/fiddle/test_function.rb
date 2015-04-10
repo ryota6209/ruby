@@ -76,7 +76,7 @@ module Fiddle
     def test_no_memory_leak
       prep = 'r = Fiddle::Function.new(Fiddle.dlopen(nil)["rb_obj_tainted"], [Fiddle::TYPE_UINTPTR_T], Fiddle::TYPE_UINTPTR_T); a = "a"'
       code = 'begin r.call(a); rescue TypeError; end'
-      assert_no_memory_leak(%w[-W0 -rfiddle], "#{prep}\n1000.times{#{code}}", "10_000.times {#{code}}", limit: 1.2)
+      assert_no_memory_leak(%w[-W0 -rfiddle], prep, "1000.times{#{code}}", repeat: 10, limit: 1.2)
     end
   end
 end if defined?(Fiddle)

@@ -437,7 +437,9 @@ eom
         assert_warning(*args) {$VERBOSE = false; yield}
       end
 
-      def assert_no_memory_leak(args, prepare, code, message=nil, limit: 2.0, rss: false, **opt)
+      def assert_no_memory_leak(args, prepare, code, message=nil,
+                                repeat: nil, rehearsal: (repeat / 10 if repeat),
+                                **opt)
         require_relative 'memory_status'
         token = "\e[7;1m#{$$.to_s}:#{Time.now.strftime('%s.%L')}:#{rand(0x10000).to_s(16)}:\e[m"
         token_dump = token.dump
@@ -458,10 +460,14 @@ eom
         cmd = [
           'END {STDERR.puts '"#{token_dump}"'"FINAL=#{Memory::Status.new}"}',
           prepare,
-          'STDERR.puts('"#{token_dump}"'"START=#{$initial_status = Memory::Status.new}")',
+          '$initial_status = Memory::Status.new',
           '$initial_size = $initial_status.size',
+          (["#{rehearsal}.times {", code, "}"] if rehearsal),
+          'STDERR.puts('"#{token_dump}"'"START=#{$initial_status}")',
+          ("#{repeat}.times {" if repeat),
           code,
           'GC.start',
+          ("}" if repeat),
         ].join("\n")
         _, err, status = EnvUtil.invoke_ruby(args, cmd, true, true, **opt)
         before = err.sub!(/^#{token_re}START=(\{.*\})\n/, '') && Memory::Status.parse($1)
@@ -476,6 +482,29 @@ eom
       rescue LoadError
         skip
       end
+
+      case RUBY_PLATFORM
+      when /solaris2\.(?:9|[1-9][0-9])/i # Solaris 9, 10, 11,...
+        bits = [nil].pack('p').size == 8 ? 64 : 32
+        if ENV['LD_PRELOAD'].to_s.empty? &&
+            ENV["LD_PRELOAD_#{bits}"].to_s.empty? &&
+            (ENV['UMEM_OPTIONS'].to_s.empty? ||
+             ENV['UMEM_OPTIONS'] == 'backend=mmap') then
+          envs = {
+            'LD_PRELOAD' => 'libumem.so',
+            'UMEM_OPTIONS' => 'backend=mmap'
+          }
+          args = [
+            envs,
+            "--disable=gems",
+            "-v", "-",
+          ]
+          _, err, status = EnvUtil.invoke_ruby(args, "exit(0)", true, true)
+          if status.exitstatus == 0 && err.to_s.empty? then
+            NO_MEMORY_LEAK_ENVS = envs
+          end
+        end
+      end #case RUBY_PLATFORM
 
       def assert_is_minus_zero(f)
         assert(1.0/f == -Float::INFINITY, "#{f} is not -0.0")
