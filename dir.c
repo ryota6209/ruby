@@ -1620,55 +1620,35 @@ replace_real_basename(char *path, long base, rb_encoding *enc, int norm_p, int f
 #endif
 
 typedef struct {
-#ifdef HAVE_FSTATAT
     const VALUE dir;
-#endif
     const VALUE path;
     rb_pathtype_t type, link;
 } rb_direntry_t;
 
-static void
-direntry_mark(void *ptr)
-{
-    rb_direntry_t *p = ptr;
-#ifdef HAVE_FSTATAT
-    rb_gc_mark(p->dir);
-#endif
-    rb_gc_mark(p->path);
-}
-
-static size_t
-direntry_memsize(const void *ptr)
-{
-    return ptr ? sizeof(rb_direntry_t) : 0;
-}
-
-static const rb_data_type_t direntry_type = {
-    "Dir::Entry",
-    {direntry_mark, RUBY_TYPED_DEFAULT_FREE, direntry_memsize,},
-    0, 0, RUBY_TYPED_FREE_IMMEDIATELY|RUBY_TYPED_WB_PROTECTED,
-};
-
 static VALUE
 direntry_new(VALUE name, VALUE dir, VALUE path, uint8_t type)
 {
-    rb_direntry_t *p;
-    VALUE d = TypedData_Make_Struct(0, rb_direntry_t, &direntry_type, p);
+    struct MEMO *m = MEMO_NEW(dir, path, 0);
+    rb_direntry_t *p = (rb_direntry_t *)&(m->v1);
     RBASIC_SET_CLASS(name, rb_cDirEntry);
-    rb_ivar_set(name, id_direntry, d);
-#ifdef HAVE_FSTATAT
-    RB_OBJ_WRITE(d, &p->dir, dir);
-#endif
-    RB_OBJ_WRITE(d, &p->path, path);
+    rb_ivar_set(name, id_direntry, (VALUE)m);
     p->type = type;
     p->link = path_unknown;
     return name;
 }
+#ifndef HAVE_FSTATAT
+# define direntry_new(name, dir, path, type) \
+    direntry_new((name), Qnil, (path), (type))
+#endif
 
 static rb_direntry_t *
 direntry_get(VALUE obj)
 {
-    return rb_check_typeddata(rb_ivar_get(obj, id_direntry), &direntry_type);
+    VALUE d = rb_ivar_get(obj, id_direntry);
+    Check_Type(d, T_IMEMO);
+    if (imemo_type(d) != imemo_memo)
+	rb_raise(rb_eTypeError, "imemo expected");
+    return (rb_direntry_t *)&(MEMO_CAST(d)->v1);
 }
 
 static VALUE
