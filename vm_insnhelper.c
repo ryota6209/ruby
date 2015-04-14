@@ -2574,3 +2574,69 @@ vm_defined(rb_thread_t *th, rb_control_frame_t *reg_cfp, rb_num_t op_type, VALUE
 	return Qnil;
     }
 }
+
+static void
+vm_opt_append_string(VALUE val, VALUE v)
+{
+#define OPT(klass) rb_method_basic_definition_p(klass, idTo_s)
+    if (IMMEDIATE_P(v)) {
+	if (FIXNUM_P(v)) {
+	    if (OPT(rb_cFixnum)) {
+		rb_str_catf(val, "%ld", FIX2LONG(v));
+		return;
+	    }
+	}
+	else if (FLONUM_P(v)) {
+	    goto t_float;
+	}
+	else if (v == Qtrue) {
+	    if (OPT(rb_cTrueClass)) {
+		rb_str_cat_cstr(val, "true");
+		return;
+	    }
+	}
+	else if (STATIC_SYM_P(v)) {
+	  t_symbol:
+	    if (OPT(rb_cSymbol)) {
+		rb_str_buf_append(val, rb_sym2str(v));
+		return;
+	    }
+	}
+    }
+    else if (!RTEST(v)) {
+	if (NIL_P(v)) {
+	    if (OPT(rb_cNilClass)) {
+		return;
+	    }
+	}
+	else {
+	    if (OPT(rb_cFalseClass)) {
+		rb_str_cat_cstr(val, "false");
+		return;
+	    }
+	}
+    }
+    else {
+	switch (BUILTIN_TYPE(v)) {
+	  case T_STRING:
+	    rb_str_buf_append(val, v);
+	    return;
+	  case T_SYMBOL:
+	    goto t_symbol;
+	  t_float:
+	  case T_FLOAT:
+	    if (OPT(rb_cFloat)) {
+		rb_str_catf(val, "%f", RFLOAT_VALUE(v));
+		return;
+	    }
+	  case T_BIGNUM:
+	    if (OPT(rb_cBignum)) {
+		rb_str_buf_append(val, rb_big2str(v, 10));
+		return;
+	    }
+	    break;
+	}
+    }
+    v = rb_obj_as_string(v);
+    rb_str_append(val, v);
+}

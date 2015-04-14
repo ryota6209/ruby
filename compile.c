@@ -2348,7 +2348,9 @@ compile_dstr_fragments(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE *node, int *cntp)
 	else {
 	    COMPILE(ret, "each string", node);
 	}
-	cnt++;
+	if (!cnt++) {
+	    ADD_INSN(ret, nd_line(node), tostring);
+	}
 	list = list->nd_next;
     }
     *cntp = cnt;
@@ -5076,9 +5078,6 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 
 	if (poped) {
 	    ADD_INSN(ret, line, pop);
-	}
-	else {
-	    ADD_INSN(ret, line, tostring);
 	}
 	break;
       }

@@ -370,7 +370,7 @@ concatstrings
     val = rb_str_resurrect(TOPN(i));
     while (i-- > 0) {
 	const VALUE v = TOPN(i);
-	rb_str_append(val, v);
+	vm_opt_append_string(val, v);
     }
     POPN(num);
 }
