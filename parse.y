@@ -420,6 +420,8 @@ static NODE *new_evstr_gen(struct parser_params*,NODE*);
 static NODE *evstr2dstr_gen(struct parser_params*,NODE*);
 #define evstr2dstr(n) evstr2dstr_gen(parser,(n))
 static NODE *splat_array(NODE*);
+static NODE *new_pipeline_gen(struct parser_params*, NODE *arg, NODE *call);
+#define new_pipeline(arg, call) new_pipeline_gen(parser,(arg),(call))
 
 static NODE *call_bin_op_gen(struct parser_params*,NODE*,ID,NODE*);
 #define call_bin_op(recv,id,arg1) call_bin_op_gen(parser, (recv),(id),(arg1))
@@ -817,7 +819,7 @@ static void token_info_pop(struct parser_params*, const char *token, size_t len)
 %type <node> literal numeric simple_numeric dsym cpath
 %type <node> top_compstmt top_stmts top_stmt
 %type <node> bodystmt compstmt stmts stmt_or_begin stmt expr arg primary command command_call method_call
-%type <node> expr_value arg_value primary_value fcall
+%type <node> expr_value arg_value primary_value fcall pipeline
 %type <node> if_tail opt_else case_body cases opt_rescue exc_list exc_var opt_ensure
 %type <node> args call_args opt_call_args
 %type <node> paren_args opt_paren_args args_tail opt_args_tail block_args_tail opt_block_args_tail
@@ -859,6 +861,7 @@ static void token_info_pop(struct parser_params*, const char *token, size_t len)
 %token tASET		RUBY_TOKEN(ASET)   "[]="
 %token tLSHFT		RUBY_TOKEN(LSHFT)  "<<"
 %token tRSHFT		RUBY_TOKEN(RSHFT)  ">>"
+%token tPIPELINE	RUBY_TOKEN(PIPELINE)   "|>"
 %token tCOLON2		"::"
 %token tCOLON3		":: at EXPR_BEG"
 %token <id> tOP_ASGN	/* +=, -=  etc. */
@@ -900,6 +903,7 @@ static void token_info_pop(struct parser_params*, const char *token, size_t len)
 %left  tLSHFT tRSHFT
 %left  '+' '-'
 %left  '*' '/' '%'
+%left  tPIPELINE
 %right tUMINUS_NUM tUMINUS
 %right tPOW
 %right '!' '~' tUPLUS
@@ -1390,6 +1394,7 @@ block_command	: block_call
 			$$ = method_arg($$, $4);
 		    %*/
 		    }
+		| pipeline
 		;
 
 cmd_brace_block	: tLBRACE_ARG
@@ -1528,6 +1533,16 @@ command		: fcall command_args       %prec tLOWEST
 			$$ = NEW_NEXT(ret_args($2));
 		    /*%
 			$$ = dispatch1(next, $2);
+		    %*/
+		    }
+		;
+
+pipeline	: arg tPIPELINE primary
+		    {
+		    /*%%%*/
+			$$ = new_pipeline($1, $3);
+		    /*%
+		        $$ = dispatch1($1, $3);
 		    %*/
 		    }
 		;
@@ -8260,6 +8275,10 @@ parser_yylex(struct parser_params *parser)
 	    lex_state = EXPR_BEG;
 	    return tOP_ASGN;
 	}
+	if (c == '>') {
+	    lex_state = EXPR_BEG;
+	    return tPIPELINE;
+	}
 	lex_state = IS_AFTER_OPERATOR() ? EXPR_ARG : EXPR_BEG|EXPR_LABEL;
 	pushback(c);
 	return '|';
@@ -9219,6 +9238,31 @@ splat_array(NODE* node)
     if (nd_type(node) == NODE_SPLAT) node = node->nd_head;
     if (nd_type(node) == NODE_ARRAY) return node;
     return 0;
+}
+
+static NODE *
+new_pipeline_gen(struct parser_params *parser, NODE *arg, NODE *call)
+{
+    const char *ruby_node_name(int node);
+    NODE *pipeline = call;
+    NODE *args;
+
+    if (nd_type(call) == NODE_ITER) {
+	call = call->nd_iter;
+    }
+    switch (nd_type(call)) {
+      default:
+	compile_error(PARSER_ARG "unexpected node: %s", ruby_node_name(nd_type(call)));
+      case NODE_VCALL:
+	nd_set_type(call, NODE_FCALL);
+      case NODE_FCALL: case NODE_CALL:
+	break;
+    }
+    arg = NEW_LIST(arg);
+    args = call->nd_args;
+    if (args) arg = list_concat(arg, args);
+    call->nd_args = arg;
+    return pipeline;
 }
 
 static NODE *
