@@ -62,6 +62,22 @@ class TestEnumerable < Test::Unit::TestCase
     assert_equal([[2, 1], [2, 4]], a)
   end
 
+  def test_grep_v
+    assert_equal([1, 1], @obj.grep_v(2..3))
+    a = []
+    @obj.grep_v(2) {|x| a << x }
+    assert_equal([1, 3, 1], a)
+
+    bug5801 = '[ruby-dev:45041]'
+    @empty.grep_v(//)
+    assert_nothing_raised(bug5801) {100.times {@empty.block.call}}
+
+    a = []
+    lambda = ->(x, i) {a << [x, i]}
+    @obj.each_with_index.grep_v(proc{|x,i|x!=2}, &lambda)
+    assert_equal([[2, 1], [2, 4]], a)
+  end
+
   def test_count
     assert_equal(5, @obj.count)
     assert_equal(2, @obj.count(1))

@@ -119,6 +119,55 @@ enum_grep_v(VALUE obj, VALUE pat)
 }
 
 static VALUE
+grep_v_i(RB_BLOCK_CALL_FUNC_ARGLIST(i, args))
+{
+    struct MEMO *memo = MEMO_CAST(args);
+    ENUM_WANT_SVALUE();
+
+    if (!RTEST(rb_funcall(memo->v1, id_eqq, 1, i))) {
+	rb_ary_push(memo->v2, i);
+    }
+    return Qnil;
+}
+
+static VALUE
+grep_v_iter_i(RB_BLOCK_CALL_FUNC_ARGLIST(i, args))
+{
+    struct MEMO *memo = MEMO_CAST(args);
+    ENUM_WANT_SVALUE();
+
+    if (!RTEST(rb_funcall(memo->v1, id_eqq, 1, i))) {
+	rb_ary_push(memo->v2, rb_yield(i));
+    }
+    return Qnil;
+}
+
+/*
+ *  call-seq:
+ *     enum.grep_v(pattern)                  -> array
+ *     enum.grep_v(pattern) { |obj| block }  -> array
+ *
+ *  Returns an array of every element in <i>enum</i> for which
+ *  <code>!(Pattern === element)</code>. If the optional <em>block</em> is
+ *  supplied, each unmatching element is passed to it, and the block's
+ *  result is stored in the output array.
+ *
+ *     (36..48).grep_v 38..44   #=> [36, 37, 45, 46, 47, 48]
+ *
+ */
+
+static VALUE
+enum_grep_v(VALUE obj, VALUE pat)
+{
+    VALUE ary = rb_ary_new();
+    struct MEMO *memo = MEMO_NEW(pat, ary, 0);
+
+    rb_block_call(obj, id_each, 0, 0, rb_block_given_p() ? grep_v_iter_i : grep_v_i, (VALUE)memo);
+
+    return ary;
+}
+
+static VALUE
 count_i(RB_BLOCK_CALL_FUNC_ARGLIST(i, memop))
 {
     struct MEMO *memo = MEMO_CAST(memop);
