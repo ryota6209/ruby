@@ -763,4 +763,9 @@ class TestEnumerable < Test::Unit::TestCase
     assert_equal([[1,2],0,[3,4],1],
                  @obj.each_with_index.flat_map(&lambda2))
   end
+
+  def test_each_uniq
+    src = [1, 1, 1, 1, 2, 2, 3, 4, 5, 6]
+    assert_equal([1, 2, 3, 4, 5, 6], src.each_uniq.to_a)
+  end
 end
