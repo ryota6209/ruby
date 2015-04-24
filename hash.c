@@ -44,6 +44,7 @@ has_extra_methods(VALUE klass)
     return 0;
 }
 
+int rb_hash_store(VALUE hash, VALUE key, VALUE val);
 static VALUE rb_hash_s_try_convert(VALUE, VALUE);
 
 /*
@@ -513,9 +514,8 @@ tbl_update(VALUE hash, VALUE key, int (*func)(st_data_t *key, st_data_t *val, st
 
 #define UPDATE_CALLBACK(iter_lev, func) ((iter_lev) > 0 ? func##_noinsert : func##_insert)
 
-#define RHASH_UPDATE_ITER(h, iter_lev, key, func, a) do {                        \
-    tbl_update((h), (key), UPDATE_CALLBACK((iter_lev), func), (st_data_t)(a)); \
-} while (0)
+#define RHASH_UPDATE_ITER(h, iter_lev, key, func, a) \
+    tbl_update((h), (key), UPDATE_CALLBACK((iter_lev), func), (st_data_t)(a))
 
 #define RHASH_UPDATE(hash, key, func, arg) \
     RHASH_UPDATE_ITER(hash, RHASH_ITER_LEV(hash), key, func, arg)
@@ -1525,8 +1525,16 @@ NOINSERT_UPDATE_CALLBACK(hash_aset_str);
 VALUE
 rb_hash_aset(VALUE hash, VALUE key, VALUE val)
 {
+    rb_hash_store(hash, key, val);
+    return val;
+}
+
+int
+rb_hash_store(VALUE hash, VALUE key, VALUE value)
+{
     int iter_lev = RHASH_ITER_LEV(hash);
     st_table *tbl = RHASH(hash)->ntbl;
+    int val;
 
     rb_hash_modify(hash);
     if (!tbl) {
@@ -1534,10 +1542,10 @@ rb_hash_aset(VALUE hash, VALUE key, VALUE val)
 	tbl = hash_tbl(hash);
     }
     if (tbl->type == &identhash || rb_obj_class(key) != rb_cString) {
-	RHASH_UPDATE_ITER(hash, iter_lev, key, hash_aset, val);
+	val = RHASH_UPDATE_ITER(hash, iter_lev, key, hash_aset, value);
     }
     else {
-	RHASH_UPDATE_ITER(hash, iter_lev, key, hash_aset_str, val);
+	val = RHASH_UPDATE_ITER(hash, iter_lev, key, hash_aset_str, value);
     }
     return val;
 }
