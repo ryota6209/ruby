@@ -3468,6 +3468,34 @@ enum_chunk_while(VALUE enumerable)
     return enumerator;
 }
 
+int rb_hash_store(VALUE hash, VALUE key, VALUE val);
+
+static VALUE
+each_uniq_i(RB_BLOCK_CALL_FUNC_ARGLIST(i, hash))
+{
+    if (!rb_hash_store(hash, i, Qtrue))
+	rb_yield_values2(argc, argv);
+    return Qnil;
+}
+
+/*
+ *  call-seq:
+ *     enum.each_uniq                -> an_enumerator
+ *     enum.each_uniq { |item| ... } -> new_ary
+ */
+
+static VALUE
+enum_each_uniq(VALUE obj)
+{
+    VALUE hash, ret;
+
+    RETURN_ENUMERATOR(obj, 0, 0);
+    hash = rb_obj_hide(rb_hash_new());
+    ret = rb_block_call(obj, id_each, 0, 0, each_uniq_i, hash);
+    rb_hash_clear(hash);
+    return ret;
+}
+
 /*
  *  The <code>Enumerable</code> mixin provides collection classes with
  *  several traversal and searching methods, and with the ability to
@@ -3540,6 +3568,7 @@ Init_Enumerable(void)
     rb_define_method(rb_mEnumerable, "slice_after", enum_slice_after, -1);
     rb_define_method(rb_mEnumerable, "slice_when", enum_slice_when, 0);
     rb_define_method(rb_mEnumerable, "chunk_while", enum_chunk_while, 0);
+    rb_define_method(rb_mEnumerable, "each_uniq", enum_each_uniq, 0);
 
     id_next = rb_intern("next");
     id_call = rb_intern("call");
