@@ -3496,6 +3496,56 @@ enum_each_uniq(VALUE obj)
     return ret;
 }
 
+struct each_uniq_by_arg {
+    VALUE enumerable;
+    VALUE pred;
+    VALUE yielder;
+    VALUE keys;
+};
+
+static VALUE
+each_uniq_by_ii(RB_BLOCK_CALL_FUNC_ARGLIST(i, arg))
+{
+    struct each_uniq_by_arg *memo = MEMO_FOR(struct each_uniq_by_arg, arg);
+    VALUE key = rb_proc_call_with_block(memo->pred, argc, argv, Qnil);
+    if (!rb_hash_store(memo->keys, key, Qtrue)) {
+	ENUM_WANT_SVALUE();
+        rb_funcall(memo->yielder, id_lshift, 1, i);
+    }
+    return Qnil;
+}
+
+static VALUE
+each_uniq_by_i(RB_BLOCK_CALL_FUNC_ARGLIST(yielder, arg))
+{
+    struct each_uniq_by_arg *memo;
+
+    arg = rb_ary_dup(arg);
+    memo = MEMO_FOR(struct each_uniq_by_arg, arg);
+    memo->keys = rb_obj_hide(rb_hash_new());
+    memo->yielder = yielder;
+
+    rb_block_call(memo->enumerable, id_each, 0, 0, each_uniq_by_ii, arg);
+    return Qnil;
+}
+
+/*
+ *  call-seq:
+ *     enum.each_uniq_by { |item| ... } -> an_enumerator
+ */
+
+static VALUE
+enum_each_uniq_by(VALUE enumerable)
+{
+    VALUE arg, enumerator = rb_obj_alloc(rb_cEnumerator);
+    struct each_uniq_by_arg *memo = NEW_MEMO_FOR(struct each_uniq_by_arg, arg);
+    memo->enumerable = enumerable;
+    memo->keys = Qnil;
+    memo->pred = rb_block_proc();
+    rb_block_call(enumerator, idInitialize, 0, 0, each_uniq_by_i, arg);
+    return enumerator;
+}
+
 /*
  *  The <code>Enumerable</code> mixin provides collection classes with
  *  several traversal and searching methods, and with the ability to
@@ -3569,6 +3619,7 @@ Init_Enumerable(void)
     rb_define_method(rb_mEnumerable, "slice_when", enum_slice_when, 0);
     rb_define_method(rb_mEnumerable, "chunk_while", enum_chunk_while, 0);
     rb_define_method(rb_mEnumerable, "each_uniq", enum_each_uniq, 0);
+    rb_define_method(rb_mEnumerable, "each_uniq_by", enum_each_uniq_by, 0);
 
     id_next = rb_intern("next");
     id_call = rb_intern("call");

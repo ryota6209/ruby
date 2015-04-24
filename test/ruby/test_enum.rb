@@ -768,4 +768,10 @@ class TestEnumerable < Test::Unit::TestCase
     src = [1, 1, 1, 1, 2, 2, 3, 4, 5, 6]
     assert_equal([1, 2, 3, 4, 5, 6], src.each_uniq.to_a)
   end
+
+  def test_each_uniq_by
+    src = [1, 1, 1, 1, 2, 2, 3, 4, 5, 6]
+    assert_equal([1, 2, 3], src.each_uniq_by {|i| i % 3}.to_a)
+    assert_equal([1, 2], src.each_uniq_by(&:even?).to_a)
+  end
 end
