@@ -1485,4 +1485,16 @@ class TestSetTraceFunc < Test::Unit::TestCase
     th.join
     assert_equal([l1], lines)
   end
+
+  def test_tracepoint_new_thread
+    assert_thread_tracepoint {|events, trace, body|
+      TracePoint.new(Thread.current, *events, &trace).enable(&body)
+    }
+  end
+
+  def test_tracepoint_trace_thread
+    assert_thread_tracepoint {|events, trace, body|
+      TracePoint.trace(Thread.current, *events, &trace); body.call
+    }
+  end
 end

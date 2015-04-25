@@ -1243,7 +1243,7 @@ rb_tracepoint_new(VALUE target_thval, rb_event_flag_t events, void (*func)(VALUE
 
 /*
  * call-seq:
- *	TracePoint.new(*events) { |obj| block }	    -> obj
+ *	TracePoint.new([thread,] *events) { |obj| block }	    -> obj
  *
  * Returns a new TracePoint object, not enabled by default.
  *
@@ -1292,9 +1292,15 @@ static VALUE
 tracepoint_new_s(int argc, VALUE *argv, VALUE self)
 {
     rb_event_flag_t events = 0;
+    rb_thread_t *target_th = 0;
 
+    if (argc > 0 && rb_typeddata_is_kind_of(argv[0], &ruby_threadptr_data_type)) {
+	target_th = DATA_PTR(argv[0]);
+	++argv;
+	--argc;
+    }
     events = list2event_flag(argc, argv);
-    return tracepoint_new_block(self, 0, events);
+    return tracepoint_new_block(self, target_th, events);
 }
 
 static VALUE
