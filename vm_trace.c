@@ -1326,6 +1326,14 @@ thread_tracepoint(int argc, VALUE *argv, VALUE target_thval)
     return tracepoint_new_block(rb_cTracePoint, target_th, list2event_flag(argc, argv));
 }
 
+static VALUE
+thread_trace(int argc, VALUE *argv, VALUE target_thval)
+{
+    VALUE trace = thread_tracepoint(argc, argv, target_thval);
+    rb_tracepoint_enable(trace);
+    return trace;
+}
+
 /*
  *  call-seq:
  *    trace.inspect  -> string
@@ -1519,6 +1527,7 @@ Init_vm_trace(void)
     rb_define_singleton_method(rb_cTracePoint, "stat", tracepoint_stat_s, 0);
 
     rb_define_method(rb_cThread, "trace_point", thread_tracepoint, -1);
+    rb_define_method(rb_cThread, "trace", thread_trace, -1);
 
     /* initialized for postponed job */
 

@@ -1503,4 +1503,10 @@ class TestSetTraceFunc < Test::Unit::TestCase
       Thread.current.trace_point(*events, &trace).enable(&body)
     }
   end
+
+  def test_thread_trace
+    assert_thread_tracepoint {|events, trace, body|
+      Thread.current.trace(*events, &trace); body.call
+    }
+  end
 end
