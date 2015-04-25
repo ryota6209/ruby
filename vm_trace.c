@@ -709,6 +709,22 @@ symbol2event_flag(VALUE v)
     rb_raise(rb_eArgError, "unknown event: %"PRIsVALUE, rb_sym2str(sym));
 }
 
+static rb_event_flag_t
+list2event_flag(int argc, VALUE *argv)
+{
+    if (argc > 0) {
+	rb_event_flag_t events = 0;
+	int i;
+	for (i=0; i<argc; i++) {
+	    events |= symbol2event_flag(argv[i]);
+	}
+	return events;
+    }
+    else {
+	return RUBY_EVENT_TRACEPOINT_ALL;
+    }
+}
+
 static rb_tp_t *
 tpptr(VALUE tpval)
 {
@@ -1267,16 +1283,8 @@ static VALUE
 tracepoint_new_s(int argc, VALUE *argv, VALUE self)
 {
     rb_event_flag_t events = 0;
-    int i;
 
-    if (argc > 0) {
-	for (i=0; i<argc; i++) {
-	    events |= symbol2event_flag(argv[i]);
-	}
-    }
-    else {
-	events = RUBY_EVENT_TRACEPOINT_ALL;
-    }
+    events = list2event_flag(argc, argv);
 
     if (!rb_block_given_p()) {
 	rb_raise(rb_eThreadError, "must be called with a block");
