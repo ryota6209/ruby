@@ -1953,29 +1953,12 @@ rb_uv_to_utf8(char buf[6], unsigned long uv)
 	buf[2] = castchar((uv&0x3f)|0x80);
 	return 3;
     }
-    if (uv <= 0x1fffff) {
+    if (uv <= 0x10ffff) {
 	buf[0] = castchar(((uv>>18)&0xff)|0xf0);
 	buf[1] = castchar(((uv>>12)&0x3f)|0x80);
 	buf[2] = castchar(((uv>>6)&0x3f)|0x80);
 	buf[3] = castchar((uv&0x3f)|0x80);
 	return 4;
-    }
-    if (uv <= 0x3ffffff) {
-	buf[0] = castchar(((uv>>24)&0xff)|0xf8);
-	buf[1] = castchar(((uv>>18)&0x3f)|0x80);
-	buf[2] = castchar(((uv>>12)&0x3f)|0x80);
-	buf[3] = castchar(((uv>>6)&0x3f)|0x80);
-	buf[4] = castchar((uv&0x3f)|0x80);
-	return 5;
-    }
-    if (uv <= 0x7fffffff) {
-	buf[0] = castchar(((uv>>30)&0xff)|0xfc);
-	buf[1] = castchar(((uv>>24)&0x3f)|0x80);
-	buf[2] = castchar(((uv>>18)&0x3f)|0x80);
-	buf[3] = castchar(((uv>>12)&0x3f)|0x80);
-	buf[4] = castchar(((uv>>6)&0x3f)|0x80);
-	buf[5] = castchar((uv&0x3f)|0x80);
-	return 6;
     }
     rb_raise(rb_eRangeError, "pack(U): value out of range");
 
@@ -1987,9 +1970,6 @@ static const unsigned long utf8_limits[] = {
     0x80,			/* 2 */
     0x800,			/* 3 */
     0x10000,			/* 4 */
-    0x200000,			/* 5 */
-    0x4000000,			/* 6 */
-    0x80000000,			/* 7 */
 };
 
 static unsigned long
@@ -2011,8 +1991,6 @@ utf8_to_uv(const char *p, long *lenp)
     if      (!(uv & 0x20)) { n = 2; uv &= 0x1f; }
     else if (!(uv & 0x10)) { n = 3; uv &= 0x0f; }
     else if (!(uv & 0x08)) { n = 4; uv &= 0x07; }
-    else if (!(uv & 0x04)) { n = 5; uv &= 0x03; }
-    else if (!(uv & 0x02)) { n = 6; uv &= 0x01; }
     else {
 	*lenp = 1;
 	rb_raise(rb_eArgError, "malformed UTF-8 character");
@@ -2038,6 +2016,9 @@ utf8_to_uv(const char *p, long *lenp)
     n = *lenp - 1;
     if (uv < utf8_limits[n]) {
 	rb_raise(rb_eArgError, "redundant UTF-8 sequence");
+    }
+    else if (uv > 0x10ffff) {
+	rb_raise(rb_eRangeError, "unpack(U): value out of range");
     }
     return uv;
 }

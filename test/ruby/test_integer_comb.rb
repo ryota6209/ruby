@@ -619,7 +619,7 @@ class TestIntegerComb < Test::Unit::TestCase
   def test_pack_utf8
     template = "U"
     VS.reverse_each {|a|
-      if a < 0 || 0x7fffffff < a
+      if a < 0 || 0x10ffff < a
         assert_raise(RangeError) { [a].pack(template) }
       else
         s = [a].pack(template)
