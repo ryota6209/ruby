@@ -1312,6 +1312,21 @@ tracepoint_trace_s(int argc, VALUE *argv, VALUE self)
 }
 
 /*
+ * call-seq:
+ *   thread.trace_point(*events) { |tp| block }  -> trace_point
+ *
+ * Returns a new TracePoint object to trace the thread, not enabled by
+ * default.
+ */
+static VALUE
+thread_tracepoint(int argc, VALUE *argv, VALUE target_thval)
+{
+    rb_thread_t *target_th;
+    GetThreadPtr(target_thval, target_th);
+    return tracepoint_new_block(rb_cTracePoint, target_th, list2event_flag(argc, argv));
+}
+
+/*
  *  call-seq:
  *    trace.inspect  -> string
  *
@@ -1502,6 +1517,8 @@ Init_vm_trace(void)
     rb_define_method(rb_cTracePoint, "raised_exception", tracepoint_attr_raised_exception, 0);
 
     rb_define_singleton_method(rb_cTracePoint, "stat", tracepoint_stat_s, 0);
+
+    rb_define_method(rb_cThread, "trace_point", thread_tracepoint, -1);
 
     /* initialized for postponed job */
 
