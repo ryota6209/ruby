@@ -1468,4 +1468,21 @@ class TestSetTraceFunc < Test::Unit::TestCase
       assert_equal ev, :fiber_switch
     }
   end
+
+  def assert_thread_tracepoint
+    require 'thread'
+    lines = []
+    q1 = Queue.new
+    q2 = Queue.new
+    l1 = nil
+    th = Thread.start do
+      yield([:line], proc {|tp| lines << tp.lineno},
+            proc {q1 << __LINE__; q2.pop})
+    end
+    th.abort_on_exception = true
+    l1 = q1.pop
+    q2 << 2
+    th.join
+    assert_equal([l1], lines)
+  end
 end
