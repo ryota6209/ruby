@@ -1192,6 +1192,15 @@ tracepoint_new(VALUE klass, rb_thread_t *target_th, rb_event_flag_t events, void
     return tpval;
 }
 
+static VALUE
+tracepoint_new_block(VALUE klass, rb_thread_t *target_th, rb_event_flag_t events)
+{
+    if (!rb_block_given_p()) {
+	rb_raise(rb_eThreadError, "must be called with a block");
+    }
+    return tracepoint_new(klass, target_th, events, 0, 0, rb_block_proc());
+}
+
 /*
  * Creates a tracepoint by registering a callback function for one or more
  * tracepoint events. Once the tracepoint is created, you can use
@@ -1285,12 +1294,7 @@ tracepoint_new_s(int argc, VALUE *argv, VALUE self)
     rb_event_flag_t events = 0;
 
     events = list2event_flag(argc, argv);
-
-    if (!rb_block_given_p()) {
-	rb_raise(rb_eThreadError, "must be called with a block");
-    }
-
-    return tracepoint_new(self, 0, events, 0, 0, rb_block_proc());
+    return tracepoint_new_block(self, 0, events);
 }
 
 static VALUE
