@@ -147,7 +147,7 @@ tk_eval_cmd(argc, argv, self)
     VALUE argv[];
     VALUE self;
 {
-    volatile VALUE cmd, rest;
+    VALUE cmd, rest;
 
     rb_scan_args(argc, argv, "1*", &cmd, &rest);
     return rb_eval_cmd(cmd, rest, 0);
@@ -160,8 +160,8 @@ tk_do_callback(argc, argv, self)
     VALUE self;
 {
 #if 0
-    volatile VALUE id;
-    volatile VALUE rest;
+    VALUE id;
+    VALUE rest;
 
     rb_scan_args(argc, argv, "1*", &id, &rest);
     return rb_apply(rb_hash_aref(CALLBACK_TABLE, id), ID_call, rest);
@@ -177,7 +177,7 @@ static VALUE
 tk_install_cmd_core(cmd)
     VALUE cmd;
 {
-    volatile VALUE id_num;
+    VALUE id_num;
 
     id_num = ULONG2NUM(CALLBACK_ID_NUM++);
     id_num = rb_funcallv(id_num, ID_to_s, 0, 0);
@@ -192,7 +192,7 @@ tk_install_cmd(argc, argv, self)
     VALUE *argv;
     VALUE self;
 {
-    volatile VALUE cmd;
+    VALUE cmd;
 
 #if 0
     if (rb_scan_args(argc, argv, "01", &cmd) == 0) {
@@ -286,11 +286,12 @@ tk_symbolkey2str(self, keys)
     VALUE self;
     VALUE keys;
 {
-    volatile VALUE new_keys = rb_hash_new();
+    VALUE new_keys = rb_hash_new();
 
     if (NIL_P(keys)) return new_keys;
     keys = rb_convert_type(keys, T_HASH, "Hash", "to_hash");
     st_foreach_check(RHASH_TBL(keys), to_strkey, new_keys, Qundef);
+    RB_GC_GUARD(keys);
     return new_keys;
 }
 
@@ -310,9 +311,9 @@ ary2list(ary, enc_flag, self)
 {
     long idx, idx2, size, size2;
     int req_chk_flag;
-    volatile VALUE val, val2, str_val;
-    volatile VALUE dst;
-    volatile VALUE sys_enc, dst_enc, str_enc;
+    VALUE val, val2, str_val;
+    VALUE dst;
+    VALUE sys_enc, dst_enc, str_enc;
 
     sys_enc = rb_funcallv(cTclTkLib, ID_encoding, 0, 0);
     if (NIL_P(sys_enc)) {
@@ -432,6 +433,7 @@ ary2list(ary, enc_flag, self)
             }
         }
     }
+    RB_GC_GUARD(ary);
 
     if (RTEST(dst_enc) && !NIL_P(sys_enc)) {
         for(idx = 0; idx < RARRAY_LEN(dst); idx++) {
@@ -464,9 +466,9 @@ ary2list2(ary, enc_flag, self)
 {
     long idx, size;
     int req_chk_flag;
-    volatile VALUE val, str_val;
-    volatile VALUE dst;
-    volatile VALUE sys_enc, dst_enc, str_enc;
+    VALUE val, str_val;
+    VALUE dst;
+    VALUE sys_enc, dst_enc, str_enc;
 
     sys_enc = rb_funcallv(cTclTkLib, ID_encoding, 0, 0);
     if (NIL_P(sys_enc)) {
@@ -526,6 +528,7 @@ ary2list2(ary, enc_flag, self)
             }
         }
     }
+    RB_GC_GUARD(ary);
 
     if (RTEST(dst_enc) && !NIL_P(sys_enc)) {
         for(idx = 0; idx < RARRAY_LEN(dst); idx++) {
@@ -563,10 +566,10 @@ assoc2kv(assoc, ary, self)
     VALUE ary;
     VALUE self;
 {
-    long i, j, len;
-    volatile VALUE pair;
-    volatile VALUE val;
-    volatile VALUE dst = rb_ary_new2(2 * RARRAY_LEN(assoc));
+    long i, len;
+    VALUE pair;
+    VALUE val;
+    VALUE dst = rb_ary_new2(2 * RARRAY_LEN(assoc));
 
     len = RARRAY_LEN(assoc);
 
@@ -588,12 +591,7 @@ assoc2kv(assoc, ary, self)
 
         default:
             rb_ary_push(dst, key2keyname(RARRAY_PTR(pair)[0]));
-
-            val = rb_ary_new2(RARRAY_LEN(pair) - 1);
-            for(j = 1; j < RARRAY_LEN(pair); j++) {
-                rb_ary_push(val, RARRAY_PTR(pair)[j]);
-            }
-
+            val = rb_ary_subseq(pair, 1, RARRAY_LEN(pair) - 1);
             rb_ary_push(dst, val);
         }
     }
@@ -611,10 +609,10 @@ assoc2kv_enc(assoc, ary, self)
     VALUE ary;
     VALUE self;
 {
-    long i, j, len;
-    volatile VALUE pair;
-    volatile VALUE val;
-    volatile VALUE dst = rb_ary_new2(2 * RARRAY_LEN(assoc));
+    long i, len;
+    VALUE pair;
+    VALUE val;
+    VALUE dst = rb_ary_new2(2 * RARRAY_LEN(assoc));
 
     len = RARRAY_LEN(assoc);
 
@@ -636,12 +634,7 @@ assoc2kv_enc(assoc, ary, self)
 
         default:
             rb_ary_push(dst, key2keyname(RARRAY_PTR(pair)[0]));
-
-            val = rb_ary_new2(RARRAY_LEN(pair) - 1);
-            for(j = 1; j < RARRAY_LEN(pair); j++) {
-                rb_ary_push(val, RARRAY_PTR(pair)[j]);
-            }
-
+            val = rb_ary_subseq(pair, 1, RARRAY_LEN(pair) - 1);
             rb_ary_push(dst, get_eval_string_core(val, Qtrue, self));
         }
     }
@@ -659,7 +652,7 @@ push_kv(key, val, args)
     VALUE val;
     VALUE args;
 {
-    volatile VALUE ary;
+    VALUE ary;
 
     ary = RARRAY_PTR(args)[0];
 
@@ -682,8 +675,8 @@ hash2kv(hash, ary, self)
     VALUE ary;
     VALUE self;
 {
-    volatile VALUE dst = rb_ary_new2(2 * RHASH_SIZE(hash));
-    volatile VALUE args = rb_ary_new3(2, dst, self);
+    VALUE dst = rb_ary_new2(2 * RHASH_SIZE(hash));
+    VALUE args = rb_ary_new3(2, dst, self);
 
     st_foreach_check(RHASH_TBL(hash), push_kv, args, Qundef);
 
@@ -700,7 +693,7 @@ push_kv_enc(key, val, args)
     VALUE val;
     VALUE args;
 {
-    volatile VALUE ary;
+    VALUE ary;
 
     ary = RARRAY_PTR(args)[0];
 
@@ -761,7 +754,7 @@ tk_hash_kv(argc, argv, self)
     VALUE *argv;
     VALUE self;
 {
-    volatile VALUE hash, enc_flag, ary;
+    VALUE hash, enc_flag, ary;
 
     ary = Qnil;
     enc_flag = Qnil;
@@ -915,7 +908,7 @@ tk_get_eval_string(argc, argv, self)
     VALUE *argv;
     VALUE self;
 {
-    volatile VALUE obj, enc_flag;
+    VALUE obj, enc_flag;
 
     if (rb_scan_args(argc, argv, "11", &obj, &enc_flag) == 1) {
         enc_flag = Qnil;
@@ -944,7 +937,7 @@ tk_conv_args(argc, argv, self)
 {
     int idx;
     long size;
-    volatile VALUE dst;
+    VALUE dst;
     int thr_crit_bup;
     VALUE old_gc;
 
@@ -1196,7 +1189,6 @@ static VALUE
 allocate_cbsubst_info(struct cbsubst_info **inf_ptr)
 {
   struct cbsubst_info *inf;
-  volatile VALUE proc, aliases;
   int idx;
 
   VALUE info = TypedData_Make_Struct(cSUBST_INFO, struct cbsubst_info,
@@ -1211,11 +1203,8 @@ allocate_cbsubst_info(struct cbsubst_info **inf_ptr)
     inf->ivar[idx]   = (ID) 0;
   }
 
-  proc = rb_hash_new();
-  inf->proc = proc;
-
-  aliases = rb_hash_new();
-  inf->aliases = aliases;
+  inf->proc = rb_hash_new();
+  inf->aliases = rb_hash_new();
 
   if (inf_ptr != (struct cbsubst_info **)NULL) *inf_ptr = inf;
 
@@ -1365,7 +1354,7 @@ cbsubst_sym_to_subst(self, sym)
     VALUE str;
     int idx;
     ID id;
-    volatile VALUE ret;
+    VALUE ret;
 
     if (!RB_TYPE_P(sym, T_SYMBOL)) return sym;
 
@@ -1524,10 +1513,10 @@ cbsubst_table_setup(argc, argv, self)
      VALUE *argv;
      VALUE self;
 {
-  volatile VALUE cbsubst_obj;
-  volatile VALUE key_inf;
-  volatile VALUE longkey_inf;
-  volatile VALUE proc_inf;
+  VALUE cbsubst_obj;
+  VALUE key_inf;
+  VALUE longkey_inf;
+  VALUE proc_inf;
   VALUE inf;
   ID id;
   struct cbsubst_info *subst_inf;
@@ -1572,7 +1561,7 @@ cbsubst_table_setup(argc, argv, self)
 
     rb_attr(self, id, 1, 0, Qtrue);
   }
-
+  RB_GC_GUARD(key_inf);
 
   /*
    * longkeys : array of [name, type, ivar]
@@ -1607,6 +1596,7 @@ cbsubst_table_setup(argc, argv, self)
 
     rb_attr(self, id, 1, 0, Qtrue);
   }
+  RB_GC_GUARD(longkey_inf);
 
   /*
    * procs : array of [type, proc]
@@ -1624,6 +1614,7 @@ cbsubst_table_setup(argc, argv, self)
 		  RARRAY_PTR(inf)[0]),
 		 RARRAY_PTR(inf)[1]);
   }
+  RB_GC_GUARD(proc_inf);
 
   rb_const_set(self, ID_SUBST_INFO, cbsubst_obj);
 
@@ -1649,8 +1640,8 @@ cbsubst_scan_args(self, arg_key, val_ary)
     long keylen = RSTRING_LEN(arg_key);
     long vallen = (Check_Type(val_ary, T_ARRAY), RARRAY_LEN(val_ary));
     unsigned char type_chr;
-    volatile VALUE dst = rb_ary_new2(vallen);
-    volatile VALUE proc;
+    VALUE dst = rb_ary_new2(vallen);
+    VALUE proc;
     int thr_crit_bup;
     VALUE old_gc;
 
