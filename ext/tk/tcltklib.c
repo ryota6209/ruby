@@ -1246,7 +1246,7 @@ setup_rubytkkit(void)
     const_id = rb_intern(RUBYTK_KITPATH_CONST_NAME);
 
     if (rb_const_defined(rb_cObject, const_id)) {
-      volatile VALUE pathobj;
+      VALUE pathobj;
       pathobj = rb_const_get(rb_cObject, const_id);
 
       if (rb_obj_is_kind_of(pathobj, rb_cString)) {
@@ -1254,6 +1254,7 @@ setup_rubytkkit(void)
 	pathobj = rb_str_export_to_enc(pathobj, rb_utf8_encoding());
 #endif
 	set_rubytk_kitpath(RSTRING_PTR(pathobj));
+	RB_GC_GUARD(pathobj);
       }
     }
   }
@@ -1263,10 +1264,11 @@ setup_rubytkkit(void)
 #ifdef __WIN32__
     /* rbtk_win32_SetHINSTANCE("tcltklib.so"); */
     {
-      volatile VALUE basename;
+      VALUE basename;
       basename = rb_funcall(rb_cFile, rb_intern("basename"), 1,
 			    rb_str_new2(rb_sourcefile()));
       rbtk_win32_SetHINSTANCE(RSTRING_PTR(basename));
+      RB_GC_GUARD(basename);
     }
 #endif
     set_rubytk_kitpath(rb_sourcefile());
@@ -1393,7 +1395,7 @@ static int rbtk_internal_eventloop_handler = 0;
 static int
 pending_exception_check0(void)
 {
-    volatile VALUE exc = rbtk_pending_exception;
+    VALUE exc = rbtk_pending_exception;
 
     if (!NIL_P(exc) && rb_obj_is_kind_of(exc, rb_eException)) {
         DUMP1("find a pending exception");
@@ -1429,7 +1431,7 @@ pending_exception_check1(thr_crit_bup, ptr)
     int thr_crit_bup;
     struct tcltkip *ptr;
 {
-    volatile VALUE exc = rbtk_pending_exception;
+    VALUE exc = rbtk_pending_exception;
 
     if (!NIL_P(exc) && rb_obj_is_kind_of(exc, rb_eException)) {
         DUMP1("find a pending exception");
@@ -2196,7 +2198,7 @@ lib_eventloop_core(check_root, update_flag, check_var, interp)
     int *check_var;
     Tcl_Interp *interp;
 {
-    volatile VALUE current = eventloop_thread;
+    VALUE current = eventloop_thread;
     int found_event = 1;
     int event_flag;
 #if 0
@@ -2592,7 +2594,7 @@ lib_eventloop_main(args)
     return lib_eventloop_main_core(args);
 
 #if 0
-    volatile VALUE ret;
+    VALUE ret;
     int status = 0;
 
     ret = rb_protect(lib_eventloop_main_core, args, &status);
@@ -2625,7 +2627,7 @@ lib_eventloop_ensure(args)
     VALUE args;
 {
     struct evloop_params *ptr = (struct evloop_params *)args;
-    volatile VALUE current_evloop = rb_thread_current();
+    VALUE current_evloop = rb_thread_current();
 
     Tcl_DeleteEventSource(rbtk_EventSetupProc, rbtk_EventCheckProc, (ClientData)args);
 
@@ -2689,8 +2691,8 @@ lib_eventloop_launcher(check_root, update_flag, check_var, interp)
     int *check_var;
     Tcl_Interp *interp;
 {
-    volatile VALUE parent_evloop = eventloop_thread;
-    struct evloop_params *args = ALLOC(struct evloop_params);
+    VALUE parent_evloop = eventloop_thread;
+    struct evloop_params *args = 0;
     /* struct evloop_params *args = RbTk_ALLOC_N(struct evloop_params, 1); */
 
     tcl_stubs_check();
@@ -2719,6 +2721,7 @@ lib_eventloop_launcher(check_root, update_flag, check_var, interp)
     DUMP3("tcltklib: eventloop-thread : %"PRIxVALUE" -> %"PRIxVALUE"\n",
                 parent_evloop, eventloop_thread);
 
+    args = ALLOC(struct evloop_params);
     args->check_root   = check_root;
     args->update_flag  = update_flag;
     args->check_var    = check_var;
@@ -2762,7 +2765,7 @@ ip_mainloop(argc, argv, self)
     VALUE *argv;
     VALUE self;
 {
-    volatile VALUE ret;
+    VALUE ret;
     struct tcltkip *ptr = get_ip(self);
 
     /* ip is deleted? */
@@ -3022,7 +3025,7 @@ lib_do_one_event_core(argc, argv, self, is_ip)
     VALUE self;
     int   is_ip;
 {
-    volatile VALUE vflags;
+    VALUE vflags;
     int flags;
     int found_event;
 
@@ -3098,11 +3101,11 @@ ip_set_exc_message(interp, exc)
 {
     char *buf;
     Tcl_DString dstr;
-    volatile VALUE msg;
+    VALUE msg;
     int thr_crit_bup;
 
 #if TCL_MAJOR_VERSION > 8 || (TCL_MAJOR_VERSION == 8 && TCL_MINOR_VERSION > 0)
-    volatile VALUE enc;
+    VALUE enc;
     Tcl_Encoding encoding;
 #endif
 
@@ -3122,10 +3125,12 @@ ip_set_exc_message(interp, exc)
     } else if (RB_TYPE_P(enc, T_STRING)) {
         /* encoding = Tcl_GetEncoding(interp, RSTRING_PTR(enc)); */
         encoding = Tcl_GetEncoding((Tcl_Interp*)NULL, RSTRING_PTR(enc));
+	RB_GC_GUARD(enc);
     } else {
         enc = rb_funcallv(enc, ID_to_s, 0, 0);
         /* encoding = Tcl_GetEncoding(interp, RSTRING_PTR(enc)); */
         encoding = Tcl_GetEncoding((Tcl_Interp*)NULL, RSTRING_PTR(enc));
+	RB_GC_GUARD(enc);
     }
 
     /* to avoid a garbled error message dialog */
@@ -3150,6 +3155,7 @@ ip_set_exc_message(interp, exc)
 #else /* TCL_VERSION <= 8.0 */
     Tcl_AppendResult(interp, RSTRING_PTR(msg), (char*)NULL);
 #endif
+    RB_GC_GUARD(msg);
 
     rb_thread_critical = thr_crit_bup;
 }
@@ -3193,7 +3199,7 @@ tcl_protect_core(interp, proc, data) /* should not raise exception */
     VALUE data;
 #endif
 {
-    volatile VALUE ret, exc = Qnil;
+    VALUE ret, exc = Qnil;
     int status = 0;
     int thr_crit_bup = rb_thread_critical;
 
@@ -3203,9 +3209,8 @@ tcl_protect_core(interp, proc, data) /* should not raise exception */
     ret = rb_protect(proc, data, &status);
     rb_thread_critical = Qtrue;
     if (status) {
-        char *buf;
         VALUE old_gc;
-        volatile VALUE type, str;
+        VALUE type, str;
 
         old_gc = rb_gc_disable();
 
@@ -3269,12 +3274,11 @@ tcl_protect_core(interp, proc, data) /* should not raise exception */
             break;
 
         default:
-            buf = ALLOC_N(char, 256);
-            /* buf = ckalloc(sizeof(char) * 256); */
-            sprintf(buf, "unknown loncaljmp status %d", status);
-            exc = rb_exc_new2(rb_eException, buf);
-            xfree(buf);
-            /* ckfree(buf); */
+	    {
+		char buf[64];
+		snprintf(buf, sizeof(buf), "unknown loncaljmp status %d", status);
+		exc = rb_exc_new2(rb_eException, buf);
+	    }
             break;
         }
 
@@ -3289,8 +3293,8 @@ tcl_protect_core(interp, proc, data) /* should not raise exception */
 
     /* status check */
     if (!NIL_P(exc)) {
-        volatile VALUE eclass = rb_obj_class(exc);
-        volatile VALUE backtrace;
+        VALUE eclass = rb_obj_class(exc);
+        VALUE backtrace;
 
         DUMP1("(failed)");
 
@@ -3301,6 +3305,7 @@ tcl_protect_core(interp, proc, data) /* should not raise exception */
         if (!NIL_P(backtrace = rb_funcallv(exc, ID_backtrace, 0, 0))) {
             backtrace = rb_ary_join(backtrace, rb_str_new2("\n"));
             Tcl_AddErrorInfo(interp, StringValuePtr(backtrace));
+	    RB_GC_GUARD(backtrace);
         }
 
         rb_thread_critical = thr_crit_bup;
@@ -3358,6 +3363,7 @@ tcl_protect_core(interp, proc, data) /* should not raise exception */
     }
 
     DUMP2("(result) %s", NIL_P(ret) ? "nil" : RSTRING_PTR(ret));
+    RB_GC_GUARD(ret);
 
     return TCL_OK;
 }
@@ -3475,7 +3481,7 @@ static VALUE
 ip_ruby_cmd_core(arg)
     struct cmd_body_arg *arg;
 {
-    volatile VALUE ret;
+    VALUE ret;
     int thr_crit_bup;
 
     DUMP1("call ip_ruby_cmd_core");
@@ -3500,7 +3506,7 @@ static VALUE
 ip_ruby_cmd_receiver_get(str)
      char *str;
 {
-  volatile VALUE receiver;
+  VALUE receiver;
   int state;
 
   if (str[0] == ':' || ('A' <= str[0] && str[0] <= 'Z')) {
@@ -3545,13 +3551,13 @@ ip_ruby_cmd(clientData, interp, argc, argv)
     char *argv[];
 #endif
 {
-    volatile VALUE receiver;
-    volatile ID method;
-    volatile VALUE args;
+    VALUE receiver;
+    ID method;
+    VALUE args;
     char *str;
     int i;
     int  len;
-    struct cmd_body_arg *arg;
+    struct cmd_body_arg arg;
     int thr_crit_bup;
     VALUE old_gc;
     int code;
@@ -3633,19 +3639,12 @@ ip_ruby_cmd(clientData, interp, argc, argv)
     if (old_gc == Qfalse) rb_gc_enable();
     rb_thread_critical = thr_crit_bup;
 
-    /* allocate */
-    arg = ALLOC(struct cmd_body_arg);
-    /* arg = RbTk_ALLOC_N(struct cmd_body_arg, 1); */
-
-    arg->receiver = receiver;
-    arg->method = method;
-    arg->args = args;
+    arg.receiver = receiver;
+    arg.method = method;
+    arg.args = args;
 
     /* evaluate the argument string by ruby */
-    code = tcl_protect(interp, ip_ruby_cmd_core, (VALUE)arg);
-
-    xfree(arg);
-    /* ckfree((char*)arg); */
+    code = tcl_protect(interp, ip_ruby_cmd_core, (VALUE)&arg);
 
     return code;
 }
@@ -3991,7 +3990,7 @@ ip_rb_threadUpdateCommand(clientData, interp, objc, objv)
     struct th_update_param *param;
     static CONST char *updateOptions[] = {"idletasks", (char *) NULL};
     enum updateOptions {REGEXP_IDLETASKS};
-    volatile VALUE current_thread = rb_thread_current();
+    VALUE current_thread = rb_thread_current();
     struct timeval t;
 
     DUMP1("Ruby's 'thread_update' is called");
@@ -4867,7 +4866,7 @@ ip_rb_threadVwaitCommand(clientData, interp, objc, objv)
     char *nameString;
     int ret, dummy;
     int thr_crit_bup;
-    volatile VALUE current_thread = rb_thread_current();
+    VALUE current_thread = rb_thread_current();
     struct timeval t;
 
     DUMP1("Ruby's 'thread_vwait' is called");
@@ -5030,7 +5029,7 @@ ip_rb_threadTkWaitCommand(clientData, interp, objc, objv)
     char *nameString;
     int ret, dummy;
     int thr_crit_bup;
-    volatile VALUE current_thread = rb_thread_current();
+    VALUE current_thread = rb_thread_current();
     struct timeval t;
 
     DUMP1("Ruby's 'thread_tkwait' is called");
@@ -5451,7 +5450,7 @@ ip_thread_vwait(self, var)
     VALUE var;
 {
     VALUE argv[2];
-    volatile VALUE cmd_str = rb_str_new2("thread_vwait");
+    VALUE cmd_str = rb_str_new2("thread_vwait");
 
     argv[0] = cmd_str;
     argv[1] = var;
@@ -5466,7 +5465,7 @@ ip_thread_tkwait(self, mode, target)
     VALUE target;
 {
     VALUE argv[3];
-    volatile VALUE cmd_str = rb_str_new2("thread_tkwait");
+    VALUE cmd_str = rb_str_new2("thread_tkwait");
 
     argv[0] = cmd_str;
     argv[1] = mode;
@@ -6399,7 +6398,7 @@ ip_create_slave_core(interp, argc, argv)
 #if 0
     /* init Tk */
     if (RTEST(with_tk)) {
-        volatile VALUE exc;
+        VALUE exc;
         if (!tk_stubs_init_p()) {
             exc = tcltkip_init_tk(interp);
             if (!NIL_P(exc)) {
@@ -6851,7 +6850,7 @@ get_str_from_obj(obj)
 {
     int len, binary = 0;
     const char *s;
-    volatile VALUE str;
+    VALUE str;
 
 #if TCL_MAJOR_VERSION == 8 && TCL_MINOR_VERSION == 0
     s = Tcl_GetStringFromObj(obj, &len);
@@ -6935,7 +6934,7 @@ ip_get_result_string_obj(interp)
 {
 #if TCL_MAJOR_VERSION >= 8
     Tcl_Obj *retObj;
-    volatile VALUE strval;
+    VALUE strval;
 
     retObj = Tcl_GetObjResult(interp);
     Tcl_IncrRefCount(retObj);
@@ -6970,9 +6969,9 @@ call_queue_handler(evPtr, flags)
     int flags;
 {
     struct call_queue *q = (struct call_queue *)evPtr;
-    volatile VALUE ret;
-    volatile VALUE q_dat;
-    volatile VALUE thread = q->thread;
+    VALUE ret;
+    VALUE q_dat;
+    VALUE thread = q->thread;
     struct tcltkip *ptr;
 
     DUMP2("do_call_queue_handler : evPtr = %p", evPtr);
@@ -7070,10 +7069,10 @@ tk_funcall(func, argc, argv, obj)
     int  *alloc_done;
     int  thr_crit_bup;
     int  is_tk_evloop_thread;
-    volatile VALUE current = rb_thread_current();
-    volatile VALUE ip_obj = obj;
-    volatile VALUE result;
-    volatile VALUE ret;
+    VALUE current = rb_thread_current();
+    VALUE ip_obj = obj;
+    VALUE result;
+    VALUE ret;
     struct timeval t;
 
     if (!NIL_P(ip_obj) && rb_obj_is_kind_of(ip_obj, tcltkip_class)) {
