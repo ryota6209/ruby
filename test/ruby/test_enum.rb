@@ -296,6 +296,8 @@ class TestEnumerable < Test::Unit::TestCase
     assert_equal(false, [true, true, false].all?)
     assert_equal(true, [].all?)
     assert_equal(true, @empty.all?)
+    assert_equal(true, @obj.all?(Fixnum))
+    assert_equal(false, @obj.all?(1..2))
   end
 
   def test_any
@@ -305,32 +307,45 @@ class TestEnumerable < Test::Unit::TestCase
     assert_equal(false, [false, false, false].any?)
     assert_equal(false, [].any?)
     assert_equal(false, @empty.any?)
+    assert_equal(true, @obj.any?(1..2))
+    assert_equal(false, @obj.any?(Float))
   end
 
   def test_one
     assert(@obj.one? {|x| x == 3 })
     assert(!(@obj.one? {|x| x == 1 }))
     assert(!(@obj.one? {|x| x == 4 }))
+    assert(@obj.one?(3..4))
+    assert(!(@obj.one?(1..2)))
+    assert(!(@obj.one?(4..5)))
     assert(%w{ant bear cat}.one? {|word| word.length == 4})
     assert(!(%w{ant bear cat}.one? {|word| word.length > 4}))
     assert(!(%w{ant bear cat}.one? {|word| word.length < 4}))
+    assert(%w{ant bear cat}.one?(/b/))
+    assert(!(%w{ant bear cat}.one?(/t/)))
     assert(!([ nil, true, 99 ].one?))
     assert([ nil, true, false ].one?)
     assert(![].one?)
     assert(!@empty.one?)
+    assert([nil, true, 99].one?(NilClass))
   end
 
   def test_none
     assert(@obj.none? {|x| x == 4 })
     assert(!(@obj.none? {|x| x == 1 }))
     assert(!(@obj.none? {|x| x == 3 }))
+    assert(@obj.none?(4..5))
+    assert(!(@obj.none?(1..3)))
     assert(%w{ant bear cat}.none? {|word| word.length == 5})
     assert(!(%w{ant bear cat}.none? {|word| word.length >= 4}))
+    assert(%w{ant bear cat}.none?(/d/))
+    assert(!(%w{ant bear cat}.none?(/b/)))
     assert([].none?)
     assert([nil].none?)
     assert([nil,false].none?)
     assert(![nil,false,true].none?)
     assert(@empty.none?)
+    assert(![nil, true, 99].none?(NilClass))
   end
 
   def test_min
