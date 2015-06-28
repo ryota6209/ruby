@@ -4199,6 +4199,51 @@ rb_ary_or(VALUE ary1, VALUE ary2)
     return ary3;
 }
 
+/*
+ *  call-seq:
+ *     ary ^ other_ary     -> new_ary
+ *
+ *  Symmetric Difference --- Returns a new array containing the elements
+ *  which appear in either +ary+ or +other_ary+, but not both. The order
+ *  is preserved from the original array.
+ *
+ *  It compares elements using their #hash and #eql? methods for efficiency.
+ *
+ *     [1, 2, 3] ^ [2, 3, 4]      # => [1, 4]
+ *     %w[a b c] ^ %w[b c d d]    # => ["a", "d"]
+ *
+ *  If you need set-like behavior, see the library class Set.
+ */
+
+static VALUE
+rb_ary_xor(VALUE ary1, VALUE ary2)
+{
+    VALUE seen, result, ary3;
+    st_data_t elt;
+    long i;
+
+    ary2 = to_ary(ary2);
+    seen = rb_hash_new();
+    result = ary_make_hash(ary1);
+
+    for (i = 0; i < RARRAY_LEN(ary2); ++i) {
+    elt = (st_data_t)RARRAY_AREF(ary2, i);
+    if (st_lookup(RHASH_TBL_RAW(seen), elt, 0)) continue;
+    st_update(RHASH_TBL_RAW(seen), elt, ary_hash_orset, elt);
+    if (st_lookup(RHASH_TBL_RAW(result), elt, 0)) {
+        st_delete(RHASH_TBL_RAW(result), &elt, 0);
+    }
+    else {
+        st_update(RHASH_TBL_RAW(result), elt, ary_hash_orset, elt);
+    }
+    }
+
+    ary3 = rb_hash_values(result);
+    ary_recycle_hash(result);
+    ary_recycle_hash(seen);
+    return ary3;
+}
+
 static int
 push_value(st_data_t key, st_data_t val, st_data_t ary)
 {
@@ -5861,6 +5906,7 @@ Init_Array(void)
     rb_define_method(rb_cArray, "-", rb_ary_diff, 1);
     rb_define_method(rb_cArray, "&", rb_ary_and, 1);
     rb_define_method(rb_cArray, "|", rb_ary_or, 1);
+    rb_define_method(rb_cArray, "^", rb_ary_xor, 1);
 
     rb_define_method(rb_cArray, "uniq", rb_ary_uniq, 0);
     rb_define_method(rb_cArray, "uniq!", rb_ary_uniq_bang, 0);

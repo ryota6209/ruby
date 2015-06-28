@@ -1757,6 +1757,17 @@ class TestArray < Test::Unit::TestCase
     assert_equal([obj1], [obj1]|[obj2])
   end
 
+  def test_XOR
+    assert_equal(@cls[],  @cls[]  ^ @cls[])
+    assert_equal(@cls[1], @cls[1] ^ @cls[])
+    assert_equal(@cls[1], @cls[]  ^ @cls[1])
+    assert_equal(@cls[],  @cls[1] ^ @cls[1])
+
+    assert_equal(@cls[1,2], @cls[1] ^ @cls[2])
+    assert_equal(@cls[1,4], @cls[1,2,3] ^ @cls[2,3,4])
+    assert_equal(@cls[1,4], @cls[1,1,2,3] ^ @cls[2,3,4,4])
+  end
+
   def test_combination
     assert_equal(@cls[[]], @cls[1,2,3,4].combination(0).to_a)
     assert_equal(@cls[[1],[2],[3],[4]], @cls[1,2,3,4].combination(1).to_a)
