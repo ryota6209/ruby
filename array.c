@@ -4199,6 +4199,14 @@ rb_ary_or(VALUE ary1, VALUE ary2)
     return ary3;
 }
 
+static int
+ary_hash_xorset(st_data_t *key, st_data_t *value, st_data_t arg, int existing)
+{
+    if (existing) return ST_DELETE;
+    *key = *value = (VALUE)arg;
+    return ST_CONTINUE;
+}
+
 /*
  *  call-seq:
  *     ary ^ other_ary     -> new_ary
@@ -4227,15 +4235,9 @@ rb_ary_xor(VALUE ary1, VALUE ary2)
     result = ary_make_hash(ary1);
 
     for (i = 0; i < RARRAY_LEN(ary2); ++i) {
-    elt = (st_data_t)RARRAY_AREF(ary2, i);
-    if (st_lookup(RHASH_TBL_RAW(seen), elt, 0)) continue;
-    st_update(RHASH_TBL_RAW(seen), elt, ary_hash_orset, elt);
-    if (st_lookup(RHASH_TBL_RAW(result), elt, 0)) {
-        st_delete(RHASH_TBL_RAW(result), &elt, 0);
-    }
-    else {
-        st_update(RHASH_TBL_RAW(result), elt, ary_hash_orset, elt);
-    }
+	elt = (st_data_t)RARRAY_AREF(ary2, i);
+	if (!st_update(RHASH_TBL_RAW(seen), elt, ary_hash_orset, elt))
+	    st_update(RHASH_TBL_RAW(result), elt, ary_hash_xorset, elt);
     }
 
     ary3 = rb_hash_values(result);
