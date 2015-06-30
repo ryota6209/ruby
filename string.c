@@ -1636,25 +1636,27 @@ rb_str_format_m(VALUE str, VALUE arg)
     return rb_str_format(1, &arg, str);
 }
 
-static inline void
-str_modifiable(VALUE str)
+static inline VALUE
+str_nolock(VALUE str)
 {
     if (FL_TEST(str, STR_TMPLOCK)) {
 	rb_raise(rb_eRuntimeError, "can't modify string; temporarily locked");
     }
+    return str;
+}
+
+static inline VALUE
+str_modifiable(VALUE str)
+{
+    str_nolock(str);
     rb_check_frozen(str);
+    return str;
 }
 
 static inline int
 str_independent(VALUE str)
 {
-    str_modifiable(str);
-    if (STR_EMBED_P(str) || !FL_TEST(str, STR_SHARED|STR_NOFREE)) {
-	return 1;
-    }
-    else {
-	return 0;
-    }
+    return STR_EMBED_P(str) || !FL_TEST(str, STR_SHARED|STR_NOFREE);
 }
 
 static void
@@ -1695,7 +1697,7 @@ str_make_independent_expand(VALUE str, long expand)
 void
 rb_str_modify(VALUE str)
 {
-    if (!str_independent(str))
+    if (!str_independent(str_modifiable(str)))
 	str_make_independent(str);
     ENC_CODERANGE_CLEAR(str);
 }
@@ -1706,7 +1708,7 @@ rb_str_modify_expand(VALUE str, long expand)
     if (expand < 0) {
 	rb_raise(rb_eArgError, "negative expanding string size");
     }
-    if (!str_independent(str)) {
+    if (!str_independent(str_modifiable(str))) {
 	str_make_independent_expand(str, expand);
     }
     else if (expand > 0) {
@@ -1728,7 +1730,7 @@ rb_str_modify_expand(VALUE str, long expand)
 static void
 str_modify_keep_cr(VALUE str)
 {
-    if (!str_independent(str))
+    if (!str_independent(str_modifiable(str)))
 	str_make_independent(str);
     if (ENC_CODERANGE(str) == ENC_CODERANGE_BROKEN)
 	/* Force re-scan later */
@@ -1801,7 +1803,7 @@ str_fill_term(VALUE str, char *s, long len, int oldtermlen, int termlen)
     if (capa < len + termlen) {
 	rb_str_modify_expand(str, termlen);
     }
-    else if (!str_independent(str)) {
+    else if (!str_independent(str_nolock(str))) {
 	if (zero_filled(s + len, termlen)) return s;
 	str_make_independent(str);
     }
@@ -1829,7 +1831,8 @@ rb_string_value_cstr(volatile VALUE *ptr)
 	rb_raise(rb_eArgError, "string contains null byte");
     }
     if (s[len]) {
-	rb_str_modify(str);
+	if (!str_independent(str_nolock(str)))
+	    str_make_independent(str);
 	s = RSTRING_PTR(str);
 	s[RSTRING_LEN(str)] = 0;
     }
@@ -2202,6 +2205,7 @@ rb_str_resize(VALUE str, long len)
 	rb_raise(rb_eArgError, "negative string size (or size too big)");
     }
 
+    str_modifiable(str);
     independent = str_independent(str);
     ENC_CODERANGE_CLEAR(str);
     slen = RSTRING_LEN(str);
@@ -4711,7 +4715,7 @@ rb_str_setbyte(VALUE str, VALUE index, VALUE value)
     if (pos < 0)
         pos += len;
 
-    if (!str_independent(str))
+    if (!str_independent(str_modifiable(str)))
 	str_make_independent(str);
     enc = STR_ENC_GET(str);
     head = RSTRING_PTR(str);
