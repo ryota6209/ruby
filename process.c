@@ -2474,7 +2474,9 @@ rb_execarg_parent_end(VALUE execarg_obj)
 }
 
 #if defined(__APPLE__) || defined(__HAIKU__)
-static int rb_exec_without_timer_thread(const struct rb_execarg *eargp, char *errmsg, size_t errmsg_buflen);
+# define maybe_async_signal_safe(f) f()
+#else
+# define maybe_async_signal_safe(f) f##_async_signal_safe()
 #endif
 
 /*
@@ -2557,23 +2559,21 @@ rb_f_exec(int argc, const VALUE *argv)
     struct rb_execarg *eargp;
 #define CHILD_ERRMSG_BUFLEN 80
     char errmsg[CHILD_ERRMSG_BUFLEN] = { '\0' };
+    int e;
 
     execarg_obj = rb_execarg_new(argc, argv, TRUE);
     eargp = rb_execarg_get(execarg_obj);
     rb_execarg_parent_start(execarg_obj);
     fail_str = eargp->use_shell ? eargp->invoke.sh.shell_script : eargp->invoke.cmd.command_name;
 
-#if defined(__APPLE__) || defined(__HAIKU__)
-    rb_exec_without_timer_thread(eargp, errmsg, sizeof(errmsg));
-#else
-    before_exec_async_signal_safe(); /* async-signal-safe */
+    maybe_async_signal_safe(before_exec);
     rb_exec_async_signal_safe(eargp, errmsg, sizeof(errmsg));
-    preserving_errno(after_exec_async_signal_safe()); /* async-signal-safe */
-#endif
+    e = errno;
+    maybe_async_signal_safe(after_exec);
     RB_GC_GUARD(execarg_obj);
     if (errmsg[0])
-        rb_sys_fail(errmsg);
-    rb_sys_fail_str(fail_str);
+	rb_syserr_fail(e, errmsg);
+    rb_syserr_fail_str(e, fail_str);
     return Qnil;		/* dummy */
 }
 
@@ -3076,18 +3076,6 @@ rb_exec_async_signal_safe(const struct rb_execarg *eargp, char *errmsg, size_t e
 failure:
     return -1;
 }
-
-#if defined(__APPLE__) || defined(__HAIKU__)
-static int
-rb_exec_without_timer_thread(const struct rb_execarg *eargp, char *errmsg, size_t errmsg_buflen)
-{
-    int ret;
-    before_exec();
-    ret = rb_exec_async_signal_safe(eargp, errmsg, errmsg_buflen); /* hopefully async-signal-safe */
-    preserving_errno(after_exec()); /* not async-signal-safe because it calls rb_thread_start_timer_thread.  */
-    return ret;
-}
-#endif
 
 #ifdef HAVE_WORKING_FORK
 /* This function should be async-signal-safe.  Hopefully it is. */
