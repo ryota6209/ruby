@@ -562,8 +562,7 @@ For detail, see the MSDN[http://msdn.microsoft.com/library/en-us/sysinfo/base/pr
     #
     # Enumerate values.
     #
-    def each_value
-      encoding = export_encoding
+    def each_value(encoding: export_encoding())
       index = 0
       while true
         begin
@@ -600,8 +599,7 @@ For detail, see the MSDN[http://msdn.microsoft.com/library/en-us/sysinfo/base/pr
     # wtime is last write time as FILETIME (64-bit integer).
     # (see Registry.wtime2time)
     #
-    def each_key
-      encoding = export_encoding
+    def each_key(encoding: export_encoding())
       index = 0
       while true
         begin
