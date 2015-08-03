@@ -563,6 +563,7 @@ For detail, see the MSDN[http://msdn.microsoft.com/library/en-us/sysinfo/base/pr
     # Enumerate values.
     #
     def each_value
+      encoding = export_encoding
       index = 0
       while true
         begin
@@ -570,12 +571,12 @@ For detail, see the MSDN[http://msdn.microsoft.com/library/en-us/sysinfo/base/pr
         rescue Error
           break
         end
-        subkey = export_string(subkey)
         begin
-          type, data = read(subkey)
+          type, data = read(subkey, encoding: encoding)
         rescue Error
           next
         end
+        subkey.encode!(encoding)
         yield subkey, type, data
         index += 1
       end
@@ -600,6 +601,7 @@ For detail, see the MSDN[http://msdn.microsoft.com/library/en-us/sysinfo/base/pr
     # (see Registry.wtime2time)
     #
     def each_key
+      encoding = export_encoding
       index = 0
       while true
         begin
@@ -607,7 +609,7 @@ For detail, see the MSDN[http://msdn.microsoft.com/library/en-us/sysinfo/base/pr
         rescue Error
           break
         end
-        subkey = export_string(subkey)
+        subkey.encode!(encoding)
         yield subkey, wtime
         index += 1
       end
@@ -639,16 +641,19 @@ For detail, see the MSDN[http://msdn.microsoft.com/library/en-us/sysinfo/base/pr
     #
     # When rtype is specified, the value type must be included by
     # rtype array, or TypeError is raised.
-    def read(name, *rtype)
+    def read(name, *rtype, encoding: name.encoding)
       type, data = API.QueryValue(@hkey, name)
       unless rtype.empty? or rtype.include?(type)
         raise TypeError, "Type mismatch (expect #{rtype.inspect} but #{type} present)"
       end
       case type
       when REG_SZ, REG_EXPAND_SZ
-        [ type, data.encode(name.encoding, WCHAR).chop ]
+        data.encode!(encoding, WCHAR).chomp!
+        [ type, data ]
       when REG_MULTI_SZ
-        [ type, data.encode(name.encoding, WCHAR).split(/\0/) ]
+        data = data.force_encoding(WCHAR).split(WCHAR_NUL)
+        data.each {|s| s.encode!(encoding)} unless encoding == WCHAR
+        [ type, data ]
       when REG_BINARY
         [ type, data ]
       when REG_DWORD
@@ -903,8 +908,8 @@ For detail, see the MSDN[http://msdn.microsoft.com/library/en-us/sysinfo/base/pr
 
     private
 
-    def export_string(str, enc = Encoding.default_internal || LOCALE) # :nodoc:
-      str.encode(enc)
+    def export_encoding # :nodoc:
+      Encoding.default_internal || LOCALE
     end
   end
 end
