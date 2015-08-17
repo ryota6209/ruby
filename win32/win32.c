@@ -53,6 +53,7 @@
 #include "win32/file.h"
 #include "internal.h"
 #include "encindex.h"
+#include "win32/iscygpty.h"
 #define isdirsep(x) ((x) == '/' || (x) == '\\')
 
 #if defined _MSC_VER && _MSC_VER <= 1200
@@ -7387,7 +7388,7 @@ rb_w32_isatty(int fd)
     if (_get_osfhandle(fd) == -1) {
 	return 0;
     }
-    if (!GetConsoleMode((HANDLE)_osfhnd(fd), &mode)) {
+    if (!GetConsoleMode((HANDLE)_osfhnd(fd), &mode) && !is_cygpty(fd)) {
 	errno = ENOTTY;
 	return 0;
     }
