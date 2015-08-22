@@ -734,7 +734,12 @@ VALUE
 rb_sym2str(VALUE sym)
 {
     if (DYNAMIC_SYM_P(sym)) {
-	return RSYMBOL(sym)->fstr;
+	VALUE str = RSYMBOL(sym)->fstr;
+	if (UNLIKELY(!str)) {
+	    str = rb_any_to_s(sym);
+	    RSYMBOL(sym)->fstr = str;
+	}
+	return str;
     }
     else {
 	return rb_id2str(STATIC_SYM2ID(sym));
@@ -814,6 +819,23 @@ size_t
 rb_sym_immortal_count(void)
 {
     return (size_t)global_symbols.last_id;
+}
+
+VALUE
+rb_sym_s_generate(VALUE klass)
+{
+    const VALUE dsym = rb_newobj_of(klass, T_SYMBOL | FL_WB_PROTECTED);
+    long hashval = rb_objid_hash((st_index_t)dsym);
+
+    OBJ_FREEZE(dsym);
+    RSYMBOL(dsym)->id = ID_JUNK;
+    RSYMBOL(dsym)->hashval = RSHIFT(hashval, 1);
+
+    if (RUBY_DTRACE_SYMBOL_CREATE_ENABLED()) {
+	RUBY_DTRACE_SYMBOL_CREATE(NULL, rb_sourcefile(), rb_sourceline());
+    }
+
+    return dsym;
 }
 
 int

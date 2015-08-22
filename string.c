@@ -10032,6 +10032,7 @@ rb_to_symbol(VALUE name)
 void
 Init_String(void)
 {
+    VALUE rb_sym_s_generate(VALUE klass);
 #undef rb_intern
 #define rb_intern(str) rb_intern_const(str)
 
@@ -10186,6 +10187,7 @@ Init_String(void)
     rb_undef_alloc_func(rb_cSymbol);
     rb_undef_method(CLASS_OF(rb_cSymbol), "new");
     rb_define_singleton_method(rb_cSymbol, "all_symbols", rb_sym_all_symbols, 0); /* in symbol.c */
+    rb_define_singleton_method(rb_cSymbol, "gen", rb_sym_s_generate, 0); /* in symbol.c */
 
     rb_define_method(rb_cSymbol, "==", sym_equal, 1);
     rb_define_method(rb_cSymbol, "===", sym_equal, 1);
