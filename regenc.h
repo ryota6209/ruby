@@ -231,4 +231,7 @@ extern int ONIG_ENC_REGISTER(const char *, OnigEncoding);
 
 RUBY_SYMBOL_EXPORT_END
 
+extern const char *const onigenc_unicode_property_name_list;
+extern const int onigenc_unicode_property_name_count;
+
 #endif /* ONIGURUMA_REGENC_H */

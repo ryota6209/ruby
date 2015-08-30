@@ -216,6 +216,11 @@ onigenc_unicode_property_name_to_ctype(OnigEncoding enc, const UChar* name, cons
   return ctype;
 }
 
+const char *const onigenc_unicode_property_name_list =
+    (const char *)&uniname2ctype_pool_contents;
+const int onigenc_unicode_property_name_count =
+    TOTAL_KEYWORDS;
+
 #define onigenc_unicode_fold_lookup onigenc_unicode_CaseFold_11_lookup
 #define onigenc_unicode_unfold1_lookup onigenc_unicode_CaseUnfold_11_lookup
 #define onigenc_unicode_unfold2_lookup onigenc_unicode_CaseUnfold_12_lookup

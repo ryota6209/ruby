@@ -1907,6 +1907,7 @@ Init_Encoding(void)
 {
 #undef rb_intern
 #define rb_intern(str) rb_intern_const(str)
+    VALUE uni;
     VALUE list;
     int i;
 
@@ -1942,8 +1943,22 @@ Init_Encoding(void)
     rb_encoding_list = list;
     rb_gc_register_mark_object(list);
 
+    uni = rb_define_module_under(rb_cEncoding, "Unicode");
+    {
+	const char *list = onigenc_unicode_property_name_list;
+	VALUE props = rb_ary_new_capa(onigenc_unicode_property_name_count);
+	for (i = 0; i < onigenc_unicode_property_name_count; ++i) {
+	    rb_ary_push(props, rb_str_new_static(list, strlen(list)));
+	}
+	OBJ_FREEZE_RAW(props);
+	rb_define_const(uni, "Properties", props);
+    }
+
     for (i = 0; i < enc_table.count; ++i) {
-	rb_ary_push(list, enc_new(enc_table.list[i].enc));
+	rb_encoding *enc = enc_table.list[i].enc;
+	VALUE e = enc_new(enc);
+	if (ONIGENC_IS_UNICODE(enc)) rb_extend_object(e, uni);
+	rb_ary_push(list, e);
     }
 }
 
