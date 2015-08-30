@@ -514,6 +514,63 @@ rb_enc_unicode_p(rb_encoding *enc)
     return ONIGENC_IS_UNICODE(enc);
 }
 
+static int
+property_name_to_ctype(rb_encoding *enc, VALUE prop)
+{
+    const char *ptr;
+    long len;
+    RSTRING_GETMEM(prop, ptr, len);
+    return ONIGENC_PROPERTY_NAME_TO_CTYPE(enc, (const OnigUChar *)ptr,
+					  (const OnigUChar *)ptr + len);
+}
+
+/*
+ *  call-seq:
+ *    str.property?(name) -> bool
+ *
+ *  Returns true if _str_ starts with a character which has _name_
+ *  property.
+ */
+VALUE
+rb_enc_str_property_p(VALUE str, VALUE prop)
+{
+    const char *ptr;
+    long len;
+    VALUE propstr = rb_check_string_type(prop);
+    rb_encoding *enc;
+    int ctype;
+    int c;
+
+    if (NIL_P(propstr)) {
+	ctype = NUM2INT(prop);
+	enc = rb_enc_get(str);
+    }
+    else {
+	enc = rb_enc_get(str);
+	ctype = property_name_to_ctype(enc, propstr);
+    }
+    RSTRING_GETMEM(str, ptr, len);
+    if (!len) return Qfalse;
+    c = rb_enc_mbc_to_codepoint(ptr, ptr+len, enc);
+    return ONIGENC_IS_CODE_CTYPE(enc, c, ctype) ? Qtrue : Qfalse;
+}
+
+/*
+ *  call-seq:
+ *    enc.property_ctype(name) -> int
+ *
+ *  Returns property type code correspoinding to _name_.
+ */
+static VALUE
+enc_property_name_to_ctype(VALUE self, VALUE prop)
+{
+    int ctype;
+
+    StringValue(prop);
+    ctype = property_name_to_ctype(rb_to_encoding(self), prop);
+    return INT2NUM(ctype);
+}
+
 static st_data_t
 enc_dup_name(st_data_t name)
 {
@@ -1863,6 +1920,8 @@ Init_Encoding(void)
     rb_define_method(rb_cEncoding, "dummy?", enc_dummy_p, 0);
     rb_define_method(rb_cEncoding, "ascii_compatible?", enc_ascii_compatible_p, 0);
     rb_define_method(rb_cEncoding, "replicate", enc_replicate, 1);
+    rb_define_method(rb_cEncoding, "property_ctype", enc_property_name_to_ctype, 1);
+
     rb_define_singleton_method(rb_cEncoding, "list", enc_list, 0);
     rb_define_singleton_method(rb_cEncoding, "name_list", rb_enc_name_list, 0);
     rb_define_singleton_method(rb_cEncoding, "aliases", rb_enc_aliases, 0);

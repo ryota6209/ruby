@@ -50,6 +50,7 @@
 #undef rb_fstring_cstr
 
 static VALUE rb_str_clear(VALUE str);
+VALUE rb_enc_str_property_p(VALUE str, VALUE prop);
 
 VALUE rb_cString;
 VALUE rb_cSymbol;
@@ -9314,6 +9315,7 @@ Init_String(void)
     rb_define_method(rb_cString, "b", rb_str_b, 0);
     rb_define_method(rb_cString, "valid_encoding?", rb_str_valid_encoding_p, 0);
     rb_define_method(rb_cString, "ascii_only?", rb_str_is_ascii_only_p, 0);
+    rb_define_method(rb_cString, "property?", rb_enc_str_property_p, 1); /* in encoding.c */
 
     id_to_s = rb_intern("to_s");
 
