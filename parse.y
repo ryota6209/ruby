@@ -288,6 +288,8 @@ struct parser_params {
 
     ID cur_arg;
 
+    short math_ctype;
+
     unsigned int command_start:1;
     unsigned int eofp: 1;
     unsigned int ruby__end__seen: 1;
@@ -6877,6 +6879,16 @@ parser_encode_length(struct parser_params *parser, const char *name, long len)
     return len;
 }
 
+#define enc_property_name_to_ctype(enc, name) \
+    ONIGENC_PROPERTY_NAME_TO_CTYPE(enc, (const OnigUChar *)name, (const OnigUChar *)name + strlen(name))
+
+static void
+parser_set_current_encoding(struct parser_params *parser, rb_encoding *enc)
+{
+    parser->enc = enc;
+    parser->math_ctype = enc_property_name_to_ctype(enc, "Math");
+}
+
 static void
 parser_set_encode(struct parser_params *parser, const char *name)
 {
@@ -6897,7 +6909,7 @@ parser_set_encode(struct parser_params *parser, const char *name)
 	excargs[1] = rb_sprintf("%s is not ASCII compatible", rb_enc_name(enc));
 	goto error;
     }
-    parser->enc = enc;
+    parser_set_current_encoding(parser, enc);
 #ifndef RIPPER
     if (ruby_debug_lines) {
 	VALUE lines = ruby_debug_lines;
@@ -7195,7 +7207,7 @@ parser_prepare(struct parser_params *parser)
 	if (lex_pend - lex_p >= 2 &&
 	    (unsigned char)lex_p[0] == 0xbb &&
 	    (unsigned char)lex_p[1] == 0xbf) {
-	    parser->enc = rb_utf8_encoding();
+	    parser_set_current_encoding(parser, rb_utf8_encoding());
 	    lex_p += 2;
 	    lex_pbeg = lex_p;
 	    return;
@@ -7205,7 +7217,7 @@ parser_prepare(struct parser_params *parser)
 	return;
     }
     pushback(c);
-    parser->enc = rb_enc_get(lex_lastline);
+    parser_set_current_encoding(parser, rb_enc_get(lex_lastline));
     deferred_nodes = 0;
     parser->token_info_enabled = !compile_for_eval && RTEST(ruby_verbose);
 }
@@ -7852,11 +7864,29 @@ parse_ident(struct parser_params *parser, int c, int cmd_state)
     const enum lex_state_e last_state = lex_state;
     ID ident;
 
-    do {
-	if (!ISASCII(c)) mb = ENC_CODERANGE_UNKNOWN;
+    if (!ISASCII(c) && parser->math_ctype != -1) {
 	if (tokadd_mbchar(c) == -1) return 0;
 	c = nextc();
-    } while (parser_is_identchar());
+	mb = rb_enc_mbc_to_codepoint(tok(), tok()+toklen(), current_enc);
+	if (ONIGENC_IS_CODE_CTYPE(current_enc, mb, parser->math_ctype)) {
+	    mb = ENC_CODERANGE_VALID;
+	}
+	else if (!parser_is_identchar()) {
+	    /* end of the identfier */
+	    mb = ENC_CODERANGE_VALID;
+	}
+	else {
+	    /* continuing the identfier */
+	    mb = ENC_CODERANGE_UNKNOWN;
+	}
+    }
+    if (mb != ENC_CODERANGE_VALID) {
+	do {
+	    if (!ISASCII(c)) mb = ENC_CODERANGE_UNKNOWN;
+	    if (tokadd_mbchar(c) == -1) return 0;
+	    c = nextc();
+	} while (parser_is_identchar());
+    }
     if ((c == '!' || c == '?') && !peek('=')) {
 	tokadd(c);
     }
@@ -10801,7 +10831,7 @@ parser_initialize(struct parser_params *parser)
     parser->error_buffer = Qfalse;
 #endif
     parser->debug_buffer = Qnil;
-    parser->enc = rb_utf8_encoding();
+    parser_set_current_encoding(parser, rb_utf8_encoding());
 }
 
 #ifdef RIPPER
