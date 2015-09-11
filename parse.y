@@ -7668,7 +7668,11 @@ parse_gvar(struct parser_params *parser, const enum lex_state_e last_state)
 	tokadd(c);
 	c = nextc();
 	if (parser_is_identchar()) {
-	    if (tokadd_mbchar(c) == -1) return 0;
+	    do {
+		if (tokadd_mbchar(c) == -1) return 0;
+		c = nextc();
+	    } while (parser_is_identchar());
+	    pushback(c);
 	}
 	else {
 	    pushback(c);

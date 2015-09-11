@@ -218,10 +218,11 @@ is_special_global_name(const char *m, const char *e, rb_encoding *enc)
     }
     else if (*m == '-') {
 	if (++m >= e) return 0;
-	if (is_identchar(m, e, enc)) {
+	if (!is_identchar(m, e, enc)) return 0;
+	do {
 	    if (!ISASCII(*m)) mb = 1;
 	    m += rb_enc_mbclen(m, e, enc);
-	}
+	} while (m < e && is_identchar(m, e, enc));
     }
     else {
 	if (!rb_enc_isdigit(*m, enc)) return 0;
