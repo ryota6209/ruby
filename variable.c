@@ -880,6 +880,12 @@ rb_gvar_defined(struct global_entry *entry)
     return Qtrue;
 }
 
+void
+rb_gvar_readonly(struct global_entry *entry)
+{
+    entry->var->setter = readonly_setter;
+}
+
 static int
 gvar_i(st_data_t k, st_data_t v, st_data_t a)
 {

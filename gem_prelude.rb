@@ -1,7 +1,8 @@
-if defined?(Gem)
+features = $-z
+if features['gems']
   require 'rubygems.rb'
   begin
     require 'did_you_mean'
   rescue LoadError
-  end if defined?(DidYouMean)
+  end if features['did_you_mean']
 end

@@ -1327,6 +1327,7 @@ rb_f_chomp(int argc, VALUE *argv)
     return str;
 }
 
+void rb_gvar_readonly(struct rb_global_entry *entry);
 static VALUE
 process_options(int argc, char **argv, struct cmdline_options *opt)
 {
@@ -1460,11 +1461,20 @@ process_options(int argc, char **argv, struct cmdline_options *opt)
 	}
     }
     Init_ext();		/* load statically linked extensions before rubygems */
-    if (opt->features & FEATURE_BIT(gems)) {
-	rb_define_module("Gem");
-    }
-    if (opt->features & FEATURE_BIT(did_you_mean)) {
-	rb_define_module("DidYouMean");
+    {
+	static const char name[] = "$-z";
+	ID gid = rb_intern3(name, sizeof(name)-1, rb_utf8_encoding());
+	struct rb_global_entry *gvar = rb_global_entry(gid);
+	VALUE features = rb_gvar_set(gvar, rb_hash_new());
+	rb_gvar_readonly(gvar);
+
+#define set_feature(name) \
+	rb_hash_aset(features, rb_str_new_cstr(#name), \
+		     (opt->features & FEATURE_BIT(name)) ? Qtrue : Qfalse)
+	set_feature(gems);
+	set_feature(did_you_mean);
+#undef set_feature
+	rb_obj_freeze(features);
     }
     ruby_init_prelude();
     if (opt->features & FEATURE_BIT(frozen_string_literal)) {
