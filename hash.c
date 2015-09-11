@@ -257,6 +257,36 @@ static const struct st_hash_type identhash = {
     rb_ident_hash,
 };
 
+static int
+rb_strsym_cmp(st_data_t x, st_data_t y)
+{
+    VALUE s1 = (VALUE)x, s2 = (VALUE)y;
+    if (SYMBOL_P(s1)) s1 = rb_sym2str(s1);
+    if (SYMBOL_P(s2)) s2 = rb_sym2str(s2);
+    return rb_any_cmp(s1, s2);
+}
+
+static st_index_t
+rb_strsym_hash(st_data_t x)
+{
+    VALUE s = (VALUE)x;
+    if (SYMBOL_P(s)) s = rb_sym2str(s);
+    return rb_any_hash(s);
+}
+
+static const struct st_hash_type strsymhash = {
+    rb_strsym_cmp,
+    rb_strsym_hash,
+};
+
+VALUE
+rb_strsym_hash_new(void)
+{
+    VALUE hash = rb_hash_new();
+    RHASH(hash)->ntbl = st_init_table(&strsymhash);
+    return hash;
+}
+
 typedef int st_foreach_func(st_data_t, st_data_t, st_data_t);
 
 struct foreach_safe_arg {
