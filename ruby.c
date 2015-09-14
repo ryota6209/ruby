@@ -1304,6 +1304,21 @@ rb_f_chomp(int argc, VALUE *argv)
     return str;
 }
 
+static void
+Init_features(unsigned int features)
+{
+    VALUE set = rb_hash_new();
+#define set_feature(bit) \
+    rb_hash_aset(set, rb_str_new_cstr(#bit), \
+		 ((FEATURE_BIT(bit) & features) ? Qtrue : Qfalse))
+
+    rb_define_const(rb_define_module("RbConfig"), "Features", set);
+    set_feature(gems);
+    set_feature(rubyopt);
+    OBJ_FREEZE(features);
+#undef set_feature
+}
+
 static VALUE
 process_options(int argc, char **argv, struct cmdline_options *opt)
 {
@@ -1437,12 +1452,7 @@ process_options(int argc, char **argv, struct cmdline_options *opt)
 	}
     }
     Init_ext();		/* load statically linked extensions before rubygems */
-    if (opt->features & FEATURE_BIT(gems)) {
-	rb_define_module("Gem");
-    }
-    if (opt->features & FEATURE_BIT(did_you_mean)) {
-	rb_define_module("DidYouMean");
-    }
+    Init_features(opt->features);
     ruby_init_prelude();
 #if UTF8_PATH
     opt->script_name = str_conv_enc(opt->script_name, rb_utf8_encoding(), lenc);
