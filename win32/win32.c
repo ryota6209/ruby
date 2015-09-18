@@ -93,28 +93,18 @@ static char *w32_getenv(const char *name, UINT cp);
 #endif
 #define ENV_MAX 512
 
-#define rb_id_table htbl
-#define rb_id_table_create htbl_create
-#define rb_id_table_free htbl_free
-#define rb_id_table_clear htbl_clear
-#define rb_id_table_size htbl_size
-#define rb_id_table_memsize htbl_memsize
-#define rb_id_table_insert htbl_insert
-#define rb_id_table_lookup htbl_lookup
-#define rb_id_table_delete htbl_delete
-#define rb_id_table_foreach htbl_foreach
-#define rb_id_table_iterator_result htbl_iterator_result
-#define rb_id_table_foreach_values htbl_foreach_values
-#define rb_id_table_iterator_result htbl_iterator_result
-#define ID uintptr_t
-#include "id_table.h"
-#undef ID
-static inline void *
-alloced_buffer(void *p)
-{
-    if (!p) rb_memerror();
-    return p;
-}
+#include "khash.h"
+
+#if SIZEOF_VOIDP > 4
+# define handle_hash_func(key)   kh_int64_hash_func(ctx, (uint64_t)(key))
+#else
+# define handle_hash_func(key)   kh_int_hash_func(ctx, (uint32_t)(key))
+#endif
+# define handle_hash_equal(a, b) (a == b)
+
+#define kh_found(h,k) (k != kh_end(h) && kh_exist(h, k))
+
+KHASH_INIT(htbl, HANDLE, uintptr_t, 1, handle_hash_func, handle_hash_equal)
 
 #undef stat
 #undef fclose
@@ -649,9 +639,9 @@ rtc_error_handler(int e, const char *src, int line, const char *exe, const char 
 
 static CRITICAL_SECTION select_mutex;
 static int NtSocketsInitialized = 0;
-static struct htbl *socklist = NULL;
-static struct htbl *conlist = NULL;
-#define conlist_disabled ((struct htbl *)-1)
+static kh_htbl_t *socklist = NULL;
+static kh_htbl_t *conlist = NULL;
+#define conlist_disabled ((kh_htbl_t *)-1)
 static char *uenvarea;
 
 /* License: Ruby's */
@@ -665,23 +655,13 @@ struct constat {
 enum {constat_init = -2, constat_esc = -1, constat_seq = 0};
 
 /* License: Ruby's */
-static enum htbl_iterator_result
-free_conlist(VALUE val, void *arg)
-{
-    free((struct constat *)val);
-    return ID_TABLE_DELETE;
-}
-
-/* License: Ruby's */
 static void
 constat_delete(HANDLE h)
 {
     if (conlist && conlist != conlist_disabled) {
-	VALUE val;
-	uintptr_t key = (uintptr_t)h;
-	if (htbl_lookup(conlist, key, &val)) {
-	    htbl_delete(conlist, key);
-	    free((struct constat *)val);
+	khiter_t k = kh_get(htbl, conlist, h);
+	if (kh_found(conlist, k)) {
+	    free((void *)kh_val(htbl, conlist, k));
 	}
     }
 }
@@ -693,15 +673,17 @@ exit_handler(void)
     if (NtSocketsInitialized) {
 	WSACleanup();
 	if (socklist) {
-	    htbl_free(socklist);
+	    kh_destroy(htbl, socklist);
 	    socklist = NULL;
 	}
 	DeleteCriticalSection(&select_mutex);
 	NtSocketsInitialized = 0;
     }
     if (conlist && conlist != conlist_disabled) {
-	htbl_foreach_values(conlist, free_conlist, 0);
-	htbl_free(conlist);
+	khiter_t k;
+	uintptr_t v;
+	kh_foreach_value(conlist, v, free((void *)v));
+	kh_destroy(htbl, conlist);
 	conlist = NULL;
     }
     if (uenvarea) {
@@ -740,23 +722,29 @@ StartSockets(void)
 static inline int
 socklist_insert(SOCKET sock, int flag)
 {
-    if (!socklist)
-	socklist = htbl_create(1);
-    return htbl_insert(socklist, (uintptr_t)sock, (VALUE)flag);
+    khiter_t k;
+    int r;
+    if (!socklist && !(socklist = kh_init(htbl)))
+	return -1;
+    k = kh_put(htbl, socklist, (HANDLE)sock, &r);
+    if (r < 0) return -1;
+    kh_val(socklist, k) = flag;
+    return 0;
 }
 
 /* License: Ruby's */
 static inline int
 socklist_lookup(SOCKET sock, int *flagp)
 {
-    VALUE data;
+    khiter_t k;
     int ret;
 
     if (!socklist)
 	return 0;
-    ret = htbl_lookup(socklist, (uintptr_t)sock, &data);
+    k = kh_get(htbl, socklist, (HANDLE)sock);
+    ret = kh_found(socklist, k);
     if (ret && flagp)
-	*flagp = (int)data;
+	*flagp = (int)kh_val(socklist, k);
 
     return ret;
 }
@@ -765,14 +753,17 @@ socklist_lookup(SOCKET sock, int *flagp)
 static inline int
 socklist_delete(SOCKET sock, int *flagp)
 {
+    khiter_t k;
     int ret;
 
     if (!socklist)
 	return 0;
-    ret = htbl_delete(socklist, (uintptr_t)sock);
+    k = kh_get(htbl, socklist, (HANDLE)sock);
+    ret = kh_found(socklist, k);
     if (ret) {
 	if (flagp)
-	    *flagp = (int)data;
+	    *flagp = (int)kh_val(htbl, socklist, k);
+	kh_del(htbl, socklist, k);
     }
 
     return ret;
@@ -3171,6 +3162,24 @@ get_wsa_extension_function(SOCKET s, GUID *guid)
     return ptr;
 }
 
+static int
+wrap_socket(SOCKET s, int flag)
+{
+    int fd = -1;
+    if (s == INVALID_SOCKET) {
+	errno = map_errno(WSAGetLastError());
+    }
+    else if ((fd = rb_w32_open_osfhandle(s, O_RDWR|O_BINARY|O_NOINHERIT)) == -1) {
+	closesocket(s);
+    }
+    else if (socklist_insert(s, flag) < 0) {
+	_set_osfhnd(fd, (SOCKET)INVALID_HANDLE_VALUE);
+	fd = -1;
+	closesocket(s);
+    }
+    return fd;
+}
+
 #undef accept
 
 /* License: Artistic or GPL */
@@ -3187,16 +3196,8 @@ rb_w32_accept(int s, struct sockaddr *addr, int *addrlen)
 	r = accept(TO_SOCKET(s), addr, addrlen);
 	if (r != INVALID_SOCKET) {
 	    SetHandleInformation((HANDLE)r, HANDLE_FLAG_INHERIT, 0);
-	    fd = rb_w32_open_osfhandle((intptr_t)r, O_RDWR|O_BINARY|O_NOINHERIT);
-	    if (fd != -1)
-		socklist_insert(r, 0);
-	    else
-		closesocket(r);
 	}
-	else {
-	    errno = map_errno(WSAGetLastError());
-	    fd = -1;
-	}
+	fd = wrap_socket(r, 0);
     }
     return fd;
 }
@@ -3755,17 +3756,7 @@ rb_w32_socket(int af, int type, int protocol)
     }
     RUBY_CRITICAL {
 	s = open_ifs_socket(af, type, protocol);
-	if (s == INVALID_SOCKET) {
-	    errno = map_errno(WSAGetLastError());
-	    fd = -1;
-	}
-	else {
-	    fd = rb_w32_open_osfhandle(s, O_RDWR|O_BINARY|O_NOINHERIT);
-	    if (fd != -1)
-		socklist_insert(s, MAKE_SOCKDATA(af, 0));
-	    else
-		closesocket(s);
-	}
+	fd = wrap_socket(s, MAKE_SOCKDATA(af, 0));
     }
     return fd;
 }
@@ -3996,20 +3987,18 @@ socketpair(int af, int type, int protocol, int *sv)
 
     if (socketpair_internal(af, type, protocol, pair) < 0)
 	return -1;
-    sv[0] = rb_w32_open_osfhandle(pair[0], O_RDWR|O_BINARY|O_NOINHERIT);
+    sv[0] = wrap_socket(pair[0], MAKE_SOCKDATA(af, 0));
     if (sv[0] == -1) {
 	closesocket(pair[0]);
 	closesocket(pair[1]);
 	return -1;
     }
-    sv[1] = rb_w32_open_osfhandle(pair[1], O_RDWR|O_BINARY|O_NOINHERIT);
+    sv[1] = wrap_socket(pair[1], MAKE_SOCKDATA(af, 0));
     if (sv[1] == -1) {
 	rb_w32_close(sv[0]);
 	closesocket(pair[1]);
 	return -1;
     }
-    socklist_insert(pair[0], MAKE_SOCKDATA(af, 0));
-    socklist_insert(pair[1], MAKE_SOCKDATA(af, 0));
 
     return 0;
 }
@@ -4206,7 +4195,7 @@ setfl(SOCKET sock, int arg)
     RUBY_CRITICAL {
 	ret = ioctlsocket(sock, FIONBIO, &ioctlArg);
 	if (ret == 0)
-	    socklist_insert(sock, MAKE_SOCKDATA(af, flag));
+	    ret = socklist_insert(sock, MAKE_SOCKDATA(af, flag));
 	else
 	    errno = map_errno(WSAGetLastError());
     }
@@ -6447,24 +6436,29 @@ console_emulator_p(void)
 static struct constat *
 constat_handle(HANDLE h)
 {
-    VALUE data;
+    khiter_t k;
+    int r;
     struct constat *p;
     if (!conlist) {
 	if (console_emulator_p()) {
 	    conlist = conlist_disabled;
 	    return NULL;
 	}
-	conlist = htbl_create(1);
+	if (!(conlist = kh_init(htbl)))
+	    return NULL;
     }
     else if (conlist == conlist_disabled) {
 	return NULL;
     }
-    if (htbl_lookup(conlist, (uintptr_t)h, &data)) {
-	p = (struct constat *)data;
+    k = kh_put(htbl, conlist, h, &r);
+    if (r < 0) return NULL;	/* no memory */
+    if (r) {
+	p = (struct constat *)kh_val(conlist, k);
     }
-    else {
+    else if ((p = malloc(sizeof(struct constat))) != 0) {
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
-	p = alloced_buffer(malloc(sizeof(struct constat)));
+	int put;
+	khiter_t k;
 	p->vt100.state = constat_init;
 	p->vt100.attr = FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED;
 	p->vt100.reverse = 0;
@@ -6472,7 +6466,7 @@ constat_handle(HANDLE h)
 	if (GetConsoleScreenBufferInfo(h, &csbi)) {
 	    p->vt100.attr = csbi.wAttributes;
 	}
-	htbl_insert(conlist, (uintptr_t)h, (VALUE)p);
+	kh_val(conlist, k) = (uintptr_t)p;
     }
     return p;
 }
@@ -6481,11 +6475,11 @@ constat_handle(HANDLE h)
 static void
 constat_reset(HANDLE h)
 {
-    VALUE data;
+    khiter_t k;
     struct constat *p;
     if (!conlist || conlist == conlist_disabled) return;
-    if (!htbl_lookup(conlist, (uintptr_t)h, &data)) return;
-    p = (struct constat *)data;
+    if (!kh_found(conlist, (k = kh_get(htbl, conlist, h)))) return;
+    p = (struct constat *)kh_val(conlist, k);
     p->vt100.state = constat_init;
 }
 
@@ -7694,7 +7688,7 @@ rb_w32_wrap_io_handle(HANDLE h, int flags)
             flags &= ~O_NONBLOCK;
             f = O_NONBLOCK;
         }
-        socklist_insert((SOCKET)h, f);
+        if (socklist_insert((SOCKET)h, f) < 0) return -1;
     }
     else if (flags & O_NONBLOCK) {
         errno = EINVAL;
@@ -7743,15 +7737,3 @@ VALUE (*const rb_f_notimplement_)(int, const VALUE *, VALUE) = rb_f_notimplement
 #if RUBY_MSVCRT_VERSION < 120
 #include "missing/nextafter.c"
 #endif
-
-#define ruby_xmalloc(x) alloced_buffer(malloc((x)))
-#define ruby_xmalloc2(x, y) alloced_buffer(malloc(ruby_xmalloc2_size((x), (y))))
-#define ruby_xcalloc(x, y) (ruby_xmalloc2_size(x, y), alloced_buffer(calloc((x), (y))))
-#define ruby_xfree(p) free(p)
-#define rb_id_serial_t uintptr_t
-#define rb_id_to_serial (rb_id_serial_t)
-#define rb_id_serial_to_id (ID)
-#define ID uintptr_t
-
-#define ID_TABLE_IMPL 22
-#include "id_table.c"
