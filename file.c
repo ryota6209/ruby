@@ -5511,6 +5511,68 @@ rb_stat_sticky(VALUE obj)
     return Qfalse;
 }
 
+/*
+ *  call-seq:
+ *     File.mknod(file_name, [type, [mode, [dev]]])  => 0
+ *
+ * Create a filesystem node (file, device special file or named pipe)
+ * named _file_name_, specified by _mode_ and _dev_.
+ *
+ * _type_ and _mode_ specifies the type and the permissions of node to
+ * be created respectively.
+ *
+ * The permissions are modified by the process's umask in the usual
+ * way: the permissions of the created node are (mode & ~umask).
+ *
+ * _type_ should be one of +?f+, +?c+, +?b+ and +?p+ to specify a
+ * normal file (which will be created empty), character special file,
+ * block special file or FIFO (named pipe), respectively, or +nil+,
+ * which will create a normal file.
+ */
+
+#ifdef HAVE_MKNOD
+static VALUE
+rb_file_s_mknod(int argc, VALUE *argv)
+{
+    VALUE path, type;
+    int mode = 0666, dev = 0;
+
+    rb_check_arity(argc, 1, 4);
+    path = argv[0];
+    switch (argc) {
+      case 4:
+	dev = NUM2INT(argv[3]);
+      case 3:
+	mode = NUM2INT(argv[2]) & ~S_IFMT;
+      case 2:
+	type = argv[1];
+    }
+    FilePathValue(path);
+    path = rb_str_encode_ospath(path);
+    if (!NIL_P(type)) {
+	rb_check_safe_obj(type);
+	switch (NUM2CHR(type)) {
+	  case 'f': mode |= S_IFREG; break;
+	  case 'c': mode |= S_IFCHR; break;
+#ifdef S_IFBLK
+	  case 'b': mode |= S_IFBLK; break;
+#endif
+#ifdef S_IFIFO
+	  case 'p': mode |= S_IFIFO; break;
+#endif
+	  default:
+	    rb_raise(rb_eArgError, "unknown node type - %"PRIsVALUE, type);
+	}
+    }
+    if (mknod(RSTRING_PTR(path), mode, dev)) {
+	rb_sys_fail_path(path);
+    }
+    return INT2FIX(0);
+}
+#else
+#define rb_file_s_mknod rb_f_notimplement
+#endif
+
 #if !defined HAVE_MKFIFO && defined HAVE_MKNOD && defined S_IFIFO
 #define mkfifo(path, mode) mknod(path, (mode)&~S_IFMT|S_IFIFO, 0)
 #define HAVE_MKFIFO
@@ -5958,6 +6020,7 @@ Init_File(void)
     rb_define_singleton_method(rb_cFile, "rename", rb_file_s_rename, 2);
     rb_define_singleton_method(rb_cFile, "umask", rb_file_s_umask, -1);
     rb_define_singleton_method(rb_cFile, "truncate", rb_file_s_truncate, 2);
+    rb_define_singleton_method(rb_cFile, "mknod", rb_file_s_mknod, -1);
     rb_define_singleton_method(rb_cFile, "mkfifo", rb_file_s_mkfifo, -1);
     rb_define_singleton_method(rb_cFile, "expand_path", rb_file_s_expand_path, -1);
     rb_define_singleton_method(rb_cFile, "absolute_path", rb_file_s_absolute_path, -1);
