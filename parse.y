@@ -834,7 +834,7 @@ static void token_info_pop(struct parser_params*, const char *token, size_t len)
 %type <node> mlhs mlhs_head mlhs_basic mlhs_item mlhs_node mlhs_post mlhs_inner
 %type <id>   fsym keyword_variable user_variable sym symbol operation operation2 operation3
 %type <id>   cname fname op f_rest_arg f_block_arg opt_f_block_arg f_norm_arg f_bad_arg
-%type <id>   f_kwrest f_label f_arg_asgn
+%type <id>   f_kwrest f_label f_arg_asgn call_op
 /*%%%*/
 /*%
 %type <val> program reswords then do dot_or_colon
@@ -859,6 +859,7 @@ static void token_info_pop(struct parser_params*, const char *token, size_t len)
 %token tASET		RUBY_TOKEN(ASET)   "[]="
 %token tLSHFT		RUBY_TOKEN(LSHFT)  "<<"
 %token tRSHFT		RUBY_TOKEN(RSHFT)  ">>"
+%token tDOTQ		RUBY_TOKEN(DOTQ)   ".?"
 %token tCOLON2		"::"
 %token tCOLON3		":: at EXPR_BEG"
 %token <id> tOP_ASGN	/* +=, -=  etc. */
@@ -1250,15 +1251,15 @@ stmt		: keyword_alias fitem {lex_state = EXPR_FNAME;} fitem
 			$$ = dispatch3(opassign, $$, $5, $6);
 		    %*/
 		    }
-		| primary_value '.' tIDENTIFIER tOP_ASGN command_call
+		| primary_value call_op tIDENTIFIER tOP_ASGN command_call
 		    {
 			value_expr($5);
-			$$ = new_attr_op_assign($1, '.', $3, $4, $5);
+			$$ = new_attr_op_assign($1, $2, $3, $4, $5);
 		    }
-		| primary_value '.' tCONSTANT tOP_ASGN command_call
+		| primary_value call_op tCONSTANT tOP_ASGN command_call
 		    {
 			value_expr($5);
-			$$ = new_attr_op_assign($1, '.', $3, $4, $5);
+			$$ = new_attr_op_assign($1, $2, $3, $4, $5);
 		    }
 		| primary_value tCOLON2 tCONSTANT tOP_ASGN command_call
 		    {
@@ -1446,16 +1447,16 @@ command		: fcall command_args       %prec tLOWEST
 			$$ = method_add_block($$, $3);
 		    %*/
 		    }
-		| primary_value '.' operation2 command_args	%prec tLOWEST
+		| primary_value call_op operation2 command_args	%prec tLOWEST
 		    {
 		    /*%%%*/
 			$$ = NEW_CALL($1, $3, $4);
 			fixpos($$, $1);
 		    /*%
-			$$ = dispatch4(command_call, $1, ripper_id2sym('.'), $3, $4);
+			$$ = dispatch4(command_call, $1, ripper_id2sym($2), $3, $4);
 		    %*/
 		    }
-		| primary_value '.' operation2 command_args cmd_brace_block
+		| primary_value call_op operation2 command_args cmd_brace_block
 		    {
 		    /*%%%*/
 			block_dup_check($4,$5);
@@ -1463,7 +1464,7 @@ command		: fcall command_args       %prec tLOWEST
 			$$ = $5;
 			fixpos($$, $1);
 		    /*%
-			$$ = dispatch4(command_call, $1, ripper_id2sym('.'), $3, $4);
+			$$ = dispatch4(command_call, $1, ripper_id2sym($2), $3, $4);
 			$$ = method_add_block($$, $5);
 		    %*/
 		   }
@@ -1703,12 +1704,12 @@ mlhs_node	: user_variable
 			$$ = dispatch2(aref_field, $1, escape_Qundef($3));
 		    %*/
 		    }
-		| primary_value '.' tIDENTIFIER
+		| primary_value call_op tIDENTIFIER
 		    {
 		    /*%%%*/
 			$$ = attrset($1, $3);
 		    /*%
-			$$ = dispatch3(field, $1, ripper_id2sym('.'), $3);
+			$$ = dispatch3(field, $1, ripper_id2sym($2), $3);
 		    %*/
 		    }
 		| primary_value tCOLON2 tIDENTIFIER
@@ -1719,12 +1720,12 @@ mlhs_node	: user_variable
 			$$ = dispatch2(const_path_field, $1, $3);
 		    %*/
 		    }
-		| primary_value '.' tCONSTANT
+		| primary_value call_op tCONSTANT
 		    {
 		    /*%%%*/
 			$$ = attrset($1, $3);
 		    /*%
-			$$ = dispatch3(field, $1, ripper_id2sym('.'), $3);
+			$$ = dispatch3(field, $1, ripper_id2sym($2), $3);
 		    %*/
 		    }
 		| primary_value tCOLON2 tCONSTANT
@@ -1794,12 +1795,12 @@ lhs		: user_variable
 			$$ = dispatch2(aref_field, $1, escape_Qundef($3));
 		    %*/
 		    }
-		| primary_value '.' tIDENTIFIER
+		| primary_value call_op tIDENTIFIER
 		    {
 		    /*%%%*/
 			$$ = attrset($1, $3);
 		    /*%
-			$$ = dispatch3(field, $1, ripper_id2sym('.'), $3);
+			$$ = dispatch3(field, $1, ripper_id2sym($2), $3);
 		    %*/
 		    }
 		| primary_value tCOLON2 tIDENTIFIER
@@ -1810,12 +1811,12 @@ lhs		: user_variable
 			$$ = dispatch3(field, $1, ID2SYM(idCOLON2), $3);
 		    %*/
 		    }
-		| primary_value '.' tCONSTANT
+		| primary_value call_op tCONSTANT
 		    {
 		    /*%%%*/
 			$$ = attrset($1, $3);
 		    /*%
-			$$ = dispatch3(field, $1, ripper_id2sym('.'), $3);
+			$$ = dispatch3(field, $1, ripper_id2sym($2), $3);
 		    %*/
 		    }
 		| primary_value tCOLON2 tCONSTANT
@@ -2054,15 +2055,15 @@ arg		: lhs '=' arg
 			$$ = dispatch3(opassign, $1, $5, $6);
 		    %*/
 		    }
-		| primary_value '.' tIDENTIFIER tOP_ASGN arg
+		| primary_value call_op tIDENTIFIER tOP_ASGN arg
 		    {
 			value_expr($5);
-			$$ = new_attr_op_assign($1, '.', $3, $4, $5);
+			$$ = new_attr_op_assign($1, $2, $3, $4, $5);
 		    }
-		| primary_value '.' tCONSTANT tOP_ASGN arg
+		| primary_value call_op tCONSTANT tOP_ASGN arg
 		    {
 			value_expr($5);
-			$$ = new_attr_op_assign($1, '.', $3, $4, $5);
+			$$ = new_attr_op_assign($1, $2, $3, $4, $5);
 		    }
 		| primary_value tCOLON2 tIDENTIFIER tOP_ASGN arg
 		    {
@@ -3638,7 +3639,7 @@ method_call	: fcall paren_args
 			$$ = method_arg(dispatch1(fcall, $1), $2);
 		    %*/
 		    }
-		| primary_value '.' operation2
+		| primary_value call_op operation2
 		    {
 		    /*%%%*/
 			$<num>$ = ruby_sourceline;
@@ -3650,7 +3651,7 @@ method_call	: fcall paren_args
 			$$ = NEW_CALL($1, $3, $5);
 			nd_set_line($$, $<num>4);
 		    /*%
-			$$ = dispatch3(call, $1, ripper_id2sym('.'), $3);
+			$$ = dispatch3(call, $1, ripper_id2sym($2), $3);
 			$$ = method_optarg($$, $5);
 		    %*/
 		    }
@@ -3678,7 +3679,7 @@ method_call	: fcall paren_args
 			$$ = dispatch3(call, $1, ID2SYM(idCOLON2), $3);
 		    %*/
 		    }
-		| primary_value '.'
+		| primary_value call_op
 		    {
 		    /*%%%*/
 			$<num>$ = ruby_sourceline;
@@ -3690,7 +3691,7 @@ method_call	: fcall paren_args
 			$$ = NEW_CALL($1, idCall, $4);
 			nd_set_line($$, $<num>3);
 		    /*%
-			$$ = dispatch3(call, $1, ripper_id2sym('.'),
+			$$ = dispatch3(call, $1, ripper_id2sym($2),
 				       ID2SYM(idCall));
 			$$ = method_optarg($$, $4);
 		    %*/
@@ -5093,7 +5094,7 @@ operation3	: tIDENTIFIER
 		| op
 		;
 
-dot_or_colon	: '.'
+dot_or_colon	: call_op
 		    /*%c%*/
 		    /*%c
 		    { $$ = $<val>1; }
@@ -5103,6 +5104,10 @@ dot_or_colon	: '.'
 		    /*%c
 		    { $$ = $<val>1; }
 		    %*/
+		;
+
+call_op 	: '.' {$$ = '.';}
+		| tDOTQ {$$ = tDOTQ;}
 		;
 
 opt_terms	: /* none */
@@ -8332,6 +8337,10 @@ parser_yylex(struct parser_params *parser)
 	    }
 	    pushback(c);
 	    return tDOT2;
+	}
+	if (c == '?') {
+	    lex_state = EXPR_DOT;
+	    return tDOTQ;
 	}
 	pushback(c);
 	if (c != -1 && ISDIGIT(c)) {
