@@ -13,6 +13,11 @@ with all sufficient information, see the ChangeLog file.
 
 === Language changes
 
+* String interpolation
+
+  * the expression is formatted by using #inspect method when '=' follows the
+    opening brace.
+
 === Core classes updates (outstanding ones only)
 
 * ARGF

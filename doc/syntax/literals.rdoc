@@ -119,6 +119,9 @@ Double-quote strings allow interpolation of other values using
 Any expression may be placed inside the interpolated section, but it's best to
 keep the expression small for readability.
 
+The expression is converted by <tt>to_s</tt> method, unless <tt>=</tt> just
+follows the opening brace, converted by <tt>inspect</tt> method in that case.
+
 Interpolation may be disabled by escaping the "#" character or using
 single-quote strings:
 
