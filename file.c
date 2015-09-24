@@ -4213,7 +4213,6 @@ static VALUE
 rb_file_s_rootname(VALUE klass, VALUE fname)
 {
     const char *name, *root, *end;
-    VALUE rootname;
     rb_encoding *enc;
 
     FilePathStringValue(fname);
@@ -4228,9 +4227,7 @@ rb_file_s_rootname(VALUE klass, VALUE fname)
     else if (root == name + 1) root = name;
 # endif
 #endif
-    rootname = rb_enc_str_new(name, root - name, enc);
-    OBJ_INFECT(rootname, fname);
-    return rootname;
+    return rb_str_subseq(fname, 0, root - name);
 }
 
 /*
