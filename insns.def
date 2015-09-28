@@ -405,7 +405,7 @@ toregexp
     rb_num_t i;
     const VALUE ary = rb_ary_tmp_new(cnt);
     for (i = 0; i < cnt; i++) {
-        rb_ary_store(ary, cnt-i-1, TOPN(i));
+        rb_ary_store(ary, cnt-i-1, rb_obj_as_string(TOPN(i)));
     }
     POPN(cnt);
     val = rb_reg_new_ary(ary, (int)opt);
