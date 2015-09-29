@@ -213,6 +213,8 @@ struct parser_params {
 
     ID cur_arg;
 
+    int end_count;
+
     unsigned int command_start:1;
     unsigned int eofp: 1;
     unsigned int ruby__end__seen: 1;
@@ -5004,7 +5006,6 @@ token_info_push_gen(struct parser_params *parser, const char *token, size_t len)
     token_info *ptinfo;
     const char *t = lex_p - len;
 
-    if (!parser->token_info_enabled) return;
     ptinfo = ALLOC(token_info);
     ptinfo->token = token;
     ptinfo->linenum = ruby_sourceline;
@@ -5035,6 +5036,27 @@ token_info_pop_gen(struct parser_params *parser, const char *token, size_t len)
     }
 
     xfree(ptinfo);
+}
+
+static int
+token_info_pop_upto(struct parser_params *parser, int column)
+{
+    int count = 0;
+    token_info *ptinfo = parser->token_info;
+    while (ptinfo) {
+	void *p = ptinfo;
+	int nonspc = ptinfo->nonspc;
+	int col = ptinfo->column;
+	if (col < column) return 0;
+	ptinfo = ptinfo->next;
+	xfree(p);
+	parser->token_info = ptinfo;
+	if (!nonspc) {
+	    count++;
+	    if (col == column) return count;
+	}
+    }
+    return 0;
 }
 
 static int
@@ -7918,6 +7940,23 @@ parse_ident(struct parser_params *parser, int c, int cmd_state)
     return result;
 }
 
+static int
+super_end_pos(struct parser_params *parser)
+{
+    const char *p = lex_p - 1;
+    static const char end[] = "end";
+    enum {end_len = (int)sizeof(end)-1};
+
+    if (token_info_has_nonspaces(parser, p)) return 0;
+    if (*p++ != '!') return 0;
+    if (p + end_len >= lex_pend) return 0;
+    if (memcmp(p, end, end_len)) return 0;
+    p += end_len;
+    if ((p < lex_pend) && is_identchar(p, lex_pend, current_enc)) return 0;
+    lex_p = p;
+    return token_info_get_column(parser, p - (end_len + 1));
+}
+
 static enum yytokentype
 parser_yylex(struct parser_params *parser)
 {
@@ -7928,6 +7967,11 @@ parser_yylex(struct parser_params *parser)
     enum lex_state_e last_state;
     int fallthru = FALSE;
     int token_seen = parser->token_seen;
+
+    if (parser->end_count > 0) {
+	--parser->end_count;
+	return keyword_end;
+    }
 
     if (lex_strterm) {
 	if (nd_type(lex_strterm) == NODE_HEREDOC) {
@@ -8072,6 +8116,16 @@ parser_yylex(struct parser_params *parser)
 	return c;
 
       case '!':
+	if ((c = super_end_pos(parser)) > 0) {
+	    if (!(c = token_info_pop_upto(parser, c))) {
+		compile_error(PARSER_ARG "no matching token to !end");
+		return 0;
+	    }
+	    else {
+		parser->end_count = --c;
+		return keyword_end;
+	    }
+	}
 	c = nextc();
 	if (IS_AFTER_OPERATOR()) {
 	    SET_LEX_STATE(EXPR_ARG);
