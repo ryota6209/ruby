@@ -4319,6 +4319,7 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 	VALUE asgnflag;
 	LABEL *lfin = NEW_LABEL(line);
 	LABEL *lcfin = NEW_LABEL(line);
+	LABEL *lskip = 0;
 	/*
 	  class C; attr_accessor :c; end
 	  r = C.new
@@ -4362,6 +4363,10 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 	*/
 
 	asgnflag = COMPILE_RECV(ret, "NODE_OP_ASGN2#recv", node);
+	if (node->nd_next->nd_aid) {
+	    lskip = NEW_LABEL(line);
+	    ADD_INSNL(ret, line, skipnil, lskip);
+	}
 	ADD_INSN(ret, line, dup);
 	ADD_SEND(ret, line, vid, INT2FIX(0));
 
@@ -4385,6 +4390,9 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 
 	    ADD_LABEL(ret, lfin);
 	    ADD_INSN(ret, line, pop);
+	    if (lskip) {
+		ADD_LABEL(ret, lskip);
+	    }
 	    if (poped) {
 		/* we can apply more optimize */
 		ADD_INSN(ret, line, pop);
@@ -4392,14 +4400,16 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 	}
 	else {
 	    COMPILE(ret, "NODE_OP_ASGN2 val", node->nd_value);
-	    ADD_SEND(ret, line, node->nd_next->nd_mid,
-		     INT2FIX(1));
+	    ADD_SEND(ret, line, atype, INT2FIX(1));
 	    if (!poped) {
 		ADD_INSN(ret, line, swap);
 		ADD_INSN1(ret, line, topn, INT2FIX(1));
 	    }
 	    ADD_SEND_WITH_FLAG(ret, line, aid, INT2FIX(1), INT2FIX(asgnflag));
 	    ADD_INSN(ret, line, pop);
+	    if (lskip) {
+		ADD_LABEL(ret, lskip);
+	    }
 	}
 	break;
       }
