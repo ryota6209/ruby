@@ -96,6 +96,8 @@ enum node_type {
 #define NODE_FCALL       NODE_FCALL
     NODE_VCALL,
 #define NODE_VCALL       NODE_VCALL
+    NODE_QCALL,
+#define NODE_QCALL       NODE_QCALL
     NODE_SUPER,
 #define NODE_SUPER       NODE_SUPER
     NODE_ZSUPER,

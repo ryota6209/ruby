@@ -4548,6 +4548,7 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 	    }
 	    break;
 	}
+      case NODE_QCALL:
       case NODE_FCALL:
       case NODE_VCALL:{		/* VCALL: variable or call */
 	/*
@@ -4557,6 +4558,7 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 	*/
 	DECL_ANCHOR(recv);
 	DECL_ANCHOR(args);
+	LABEL *lskip = 0;
 	ID mid = node->nd_mid;
 	VALUE argc;
 	unsigned int flag = 0;
@@ -4631,8 +4633,12 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 	}
 #endif
 	/* receiver */
-	if (type == NODE_CALL) {
+	if (type == NODE_CALL || type == NODE_QCALL) {
 	    COMPILE(recv, "recv", node->nd_recv);
+	    if (type == NODE_QCALL) {
+		lskip = NEW_LABEL(line);
+		ADD_INSNL(recv, line, skipnil, lskip);
+	    }
 	}
 	else if (type == NODE_FCALL || type == NODE_VCALL) {
 	    ADD_CALL_RECEIVER(recv, line);
@@ -4662,6 +4668,9 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 
 	ADD_SEND_R(ret, line, mid, argc, parent_block, INT2FIX(flag), keywords);
 
+	if (lskip) {
+	    ADD_LABEL(ret, lskip);
+	}
 	if (poped) {
 	    ADD_INSN(ret, line, pop);
 	}

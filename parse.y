@@ -371,6 +371,9 @@ static int parser_yyerror(struct parser_params*, const char*);
 #define ruby_coverage		(parser->coverage)
 #endif
 
+#define NODE_CALL_Q(q) (((q) == tDOTQ) ? NODE_QCALL : NODE_CALL)
+#define NEW_QCALL(q,r,m,a) NEW_NODE(NODE_CALL_Q(q),r,m,a)
+
 static int yylex(YYSTYPE*, struct parser_params*);
 
 #ifndef RIPPER
@@ -1450,7 +1453,7 @@ command		: fcall command_args       %prec tLOWEST
 		| primary_value call_op operation2 command_args	%prec tLOWEST
 		    {
 		    /*%%%*/
-			$$ = NEW_CALL($1, $3, $4);
+			$$ = NEW_QCALL($2, $1, $3, $4);
 			fixpos($$, $1);
 		    /*%
 			$$ = dispatch4(command_call, $1, ripper_id2sym($2), $3, $4);
@@ -1460,7 +1463,7 @@ command		: fcall command_args       %prec tLOWEST
 		    {
 		    /*%%%*/
 			block_dup_check($4,$5);
-		        $5->nd_iter = NEW_CALL($1, $3, $4);
+		        $5->nd_iter = NEW_QCALL($2, $1, $3, $4);
 			$$ = $5;
 			fixpos($$, $1);
 		    /*%
@@ -3648,7 +3651,7 @@ method_call	: fcall paren_args
 		  opt_paren_args
 		    {
 		    /*%%%*/
-			$$ = NEW_CALL($1, $3, $5);
+			$$ = NEW_QCALL($2, $1, $3, $5);
 			nd_set_line($$, $<num>4);
 		    /*%
 			$$ = dispatch3(call, $1, ripper_id2sym($2), $3);
@@ -3688,7 +3691,7 @@ method_call	: fcall paren_args
 		  paren_args
 		    {
 		    /*%%%*/
-			$$ = NEW_CALL($1, idCall, $4);
+			$$ = NEW_QCALL($2, $1, idCall, $4);
 			nd_set_line($$, $<num>3);
 		    /*%
 			$$ = dispatch3(call, $1, ripper_id2sym($2),
