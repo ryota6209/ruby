@@ -1403,10 +1403,15 @@ opt_mult
 	     BASIC_OP_UNREDEFINED_P(BOP_MULT, FLOAT_REDEFINED_OP_FLAG)) {
 	val = DBL2NUM(RFLOAT_VALUE(recv) * RFLOAT_VALUE(obj));
     }
-    else if (!SPECIAL_CONST_P(recv) && !SPECIAL_CONST_P(obj)) {
-	if (RBASIC_CLASS(recv) == rb_cFloat && RBASIC_CLASS(obj) == rb_cFloat  &&
+    else if (!SPECIAL_CONST_P(recv)) {
+	if (!SPECIAL_CONST_P(obj) &&
+	    RBASIC_CLASS(recv) == rb_cFloat && RBASIC_CLASS(obj) == rb_cFloat  &&
 	    BASIC_OP_UNREDEFINED_P(BOP_MULT, FLOAT_REDEFINED_OP_FLAG)) {
 	    val = DBL2NUM(RFLOAT_VALUE(recv) * RFLOAT_VALUE(obj));
+	}
+	else if (FIXNUM_P(obj) && RBASIC_CLASS(recv) == rb_cString &&
+	    BASIC_OP_UNREDEFINED_P(BOP_MULT, STRING_REDEFINED_OP_FLAG)) {
+	    val = rb_str_times(recv, obj);
 	}
 	else {
 	    goto INSN_LABEL(normal_dispatch);
