@@ -1,5 +1,6 @@
 require "test/unit"
 require "objspace"
+require "json"
 
 class TestObjSpace < Test::Unit::TestCase
   def test_memsize_of
@@ -251,6 +252,37 @@ class TestObjSpace < Test::Unit::TestCase
     assert_match /"embedded":true, "bytesize":11, "value":"hello world", "encoding":"UTF-8"/, info
     assert_match /"file":"#{Regexp.escape __FILE__}", "line":#{line}/, info
     assert_match /"method":"#{loc.base_label}"/, info
+  end
+
+  def test_dump_entries_empty_hash
+    dumped_hash = JSON.parse(ObjectSpace.dump({}))
+    assert_equal [], dumped_hash["entries"]
+  end
+
+  def test_dump_entries_hash
+    # freeze the string, so we will use the same string in the hash..
+    str_key = "Hello world".freeze
+    hash = {}
+    hash[:a] = 1
+    hash[str_key] = -1
+
+    str_key_d = JSON.parse(ObjectSpace.dump(str_key))
+    dumped_hash = JSON.parse(ObjectSpace.dump(hash))
+
+    # make sure we have two entries
+    assert_equal 2, dumped_hash["entries"].length
+
+    # check the first entry
+    first_entry = dumped_hash["entries"][0]
+    assert_equal ":a", first_entry["key"]
+
+    assert_equal "1", first_entry["value"]
+
+    # check the second entry
+    second_entry = dumped_hash["entries"][1]
+    assert_equal str_key_d["address"], second_entry["key"]
+
+    assert_equal "-1", second_entry["value"]
   end
 
   def test_dump_special_consts

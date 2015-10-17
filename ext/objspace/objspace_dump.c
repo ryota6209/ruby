@@ -15,6 +15,7 @@
 #include "internal.h"
 #include "ruby/debug.h"
 #include "ruby/io.h"
+#include "ruby/st.h"
 #include "gc.h"
 #include "node.h"
 #include "vm_core.h"
@@ -31,7 +32,10 @@ struct dump_config {
     VALUE cur_obj;
     VALUE cur_obj_klass;
     size_t cur_obj_references;
+    st_table *seen;
 };
+
+static void dump_object(VALUE obj, struct dump_config *dc);
 
 static void
 dump_append(struct dump_config *dc, const char *format, ...)
@@ -160,6 +164,56 @@ dump_append_special_const(struct dump_config *dc, VALUE value)
     }
 }
 
+struct hash_keys_iter {
+    struct dump_config *dc;
+    int cur_i;
+};
+
+static void
+dump_hash_value(struct dump_config *dc, VALUE value, const char *prefix)
+{
+    dump_append(dc, "\"%s\":", prefix);
+
+    dump_object(value, dc);
+}
+
+static int
+hash_entries_iter(VALUE key, VALUE value, VALUE arg)
+{
+    struct hash_keys_iter *keys_iter = (struct hash_keys_iter *)arg;
+    struct dump_config *dc = keys_iter->dc;
+
+    if (keys_iter->cur_i > 0) {
+	dump_append(keys_iter->dc, ",");
+    }
+
+    dump_append(dc, "{");
+    dump_hash_value(dc, key, "key");
+    dump_append(dc, ",");
+    dump_hash_value(dc, value, "value");
+    dump_append(dc, "}");
+
+    keys_iter->cur_i++;
+    return ST_CONTINUE;
+}
+
+static void
+dump_hash_entries(struct dump_config *dc, VALUE hash)
+{
+    if (RHASH_EMPTY_P(hash)) {
+	dump_append(dc, ", \"entries\": []");
+    }
+    else {
+	struct hash_keys_iter arg;
+	arg.dc = dc;
+	arg.cur_i = 0;
+
+	dump_append(dc, ", \"entries\": [");
+	rb_hash_foreach(hash, hash_entries_iter, (VALUE)&arg);
+	dump_append(dc, "]");
+    }
+}
+
 static void
 reachable_object_i(VALUE ref, void *data)
 {
@@ -197,6 +251,15 @@ dump_object(VALUE obj, struct dump_config *dc)
     rb_io_t *fptr;
     ID flags[RB_OBJ_GC_FLAGS_MAX];
     size_t n, i;
+
+    if (!dc->seen) {
+	dc->seen = st_init_numtable();
+    }
+
+    if (st_insert(dc->seen, (st_data_t)obj, 1)) {
+	dump_append(dc, "\"%p\"", (void *)obj);
+	return;
+    }
 
     if (SPECIAL_CONST_P(obj)) {
 	dump_append_special_const(dc, obj);
@@ -244,6 +307,7 @@ dump_object(VALUE obj, struct dump_config *dc)
 
       case T_HASH:
 	dump_append(dc, ", \"size\":%ld", RHASH_SIZE(obj));
+	dump_hash_entries(dc, obj);
 	if (FL_TEST(obj, HASH_PROC_DEFAULT))
 	    dump_append(dc, ", \"default\":\"%p\"", (void *)RHASH_IFNONE(obj));
 	break;
