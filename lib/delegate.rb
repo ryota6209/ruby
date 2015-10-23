@@ -334,11 +334,20 @@ class SimpleDelegator<Delegator
   end
 end
 
-def Delegator.delegating_block(mid) # :nodoc:
-  lambda do |*args, &block|
-    target = self.__getobj__
-    target.__send__(mid, *args, &block)
-  end
+def Delegator._compile_delegator(mid) # :nodoc:
+  args = /(?<!\A\[\])=\z/ =~ mid ? "arg" : "*args, &block"
+  line_no = __LINE__+1; src = <<-"end;"
+    proc do
+      def #{mid}(#{args})
+        __getobj__.#{mid}(#{args})
+      end
+    end
+  end;
+  RubyVM::InstructionSequence.
+    compile(src, __FILE__, __FILE__, line_no,
+            trace_instruction: false,
+            tailcall_optimization: true,
+           ).eval
 end
 
 #
@@ -391,9 +400,9 @@ def DelegateClass(superclass)
       __raise__ ::ArgumentError, "cannot delegate to self" if self.equal?(obj)
       @delegate_dc_obj = obj
     end
-    methods.each do |method|
-      define_method(method, Delegator.delegating_block(method))
-    end
+  end
+  methods.each do |method|
+    klass.module_eval(&Delegator._compile_delegator(method))
   end
   klass.define_singleton_method :public_instance_methods do |all=true|
     super(all) - superclass.protected_instance_methods
