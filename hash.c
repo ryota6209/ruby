@@ -1342,6 +1342,35 @@ rb_hash_fetch_values(int argc, VALUE *argv, VALUE hash)
     return result;
 }
 
+/*
+ * call-seq:
+ *   hsh.dig(key, ...)                 -> array
+ *
+ * Retrieves the value object corresponding to the each <i>key</i>
+ * objects repeatedly, as far as the value is a Hash.
+ *
+ *   h = { foo: {bar: {baz: 1}}}
+ *
+ *   h.dig(:foo, :bar, :baz)           #=> 1
+ *   h.dig(:foo, :zot)                 #=> nil
+ */
+
+static VALUE
+rb_hash_dig(int argc, VALUE *argv, VALUE hash)
+{
+    st_data_t val;
+
+    rb_check_arity(argc, 1, UNLIMITED_ARGUMENTS);
+    do {
+	if (!RHASH(hash)->ntbl || !st_lookup(RHASH(hash)->ntbl, argv[0], &val)) {
+	    return Qnil;
+	}
+	hash = (VALUE)val;
+    } while (++argv, --argc && RB_TYPE_P(hash, T_HASH));
+    if (!argc) return hash;
+    return rb_funcallv(hash, rb_intern("dig"), argc, argv);
+}
+
 static int
 select_i(VALUE key, VALUE value, VALUE result)
 {
@@ -4083,6 +4112,7 @@ Init_Hash(void)
     rb_define_method(rb_cHash,"values", rb_hash_values, 0);
     rb_define_method(rb_cHash,"values_at", rb_hash_values_at, -1);
     rb_define_method(rb_cHash,"fetch_values", rb_hash_fetch_values, -1);
+    rb_define_method(rb_cHash, "dig", rb_hash_dig, -1);
 
     rb_define_method(rb_cHash,"shift", rb_hash_shift, 0);
     rb_define_method(rb_cHash,"delete", rb_hash_delete_m, 1);
