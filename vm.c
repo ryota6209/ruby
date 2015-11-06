@@ -934,7 +934,7 @@ invoke_block_from_c_0(rb_thread_t *th, const rb_block_t *block,
 	return Qnil;
     }
     else if (LIKELY(RUBY_VM_NORMAL_ISEQ_P(block->iseq))) {
-	const rb_iseq_t *iseq = block->iseq;
+	const rb_iseq_t *iseq = check_iseq(block->iseq);
 	int i, opt_pc;
 	int type = block_proc_is_lambda(block->proc) ? VM_FRAME_MAGIC_LAMBDA : VM_FRAME_MAGIC_BLOCK;
 	VALUE *sp = th->cfp->sp;

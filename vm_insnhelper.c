@@ -2640,3 +2640,14 @@ vm_defined(rb_thread_t *th, rb_control_frame_t *reg_cfp, rb_num_t op_type, VALUE
 	return Qnil;
     }
 }
+
+void ibf_load_iseq_complete(rb_iseq_t *iseq);
+
+static const rb_iseq_t *
+check_iseq(rb_iseq_t *iseq)
+{
+    if (iseq->body == NULL) {
+	ibf_load_iseq_complete(iseq);
+    }
+    return iseq;
+}

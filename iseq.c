@@ -69,30 +69,32 @@ rb_iseq_free(const rb_iseq_t *iseq)
     RUBY_FREE_ENTER("iseq");
 
     if (iseq) {
-	ruby_xfree((void *)iseq->body->iseq_encoded);
-	ruby_xfree((void *)iseq->body->line_info_table);
-	ruby_xfree((void *)iseq->body->local_table);
-	ruby_xfree((void *)iseq->body->is_entries);
+	if (iseq->body) {
+	    ruby_xfree((void *)iseq->body->iseq_encoded);
+	    ruby_xfree((void *)iseq->body->line_info_table);
+	    ruby_xfree((void *)iseq->body->local_table);
+	    ruby_xfree((void *)iseq->body->is_entries);
 
-	if (iseq->body->ci_entries) {
-	    unsigned int i;
-	    struct rb_call_info_with_kwarg *ci_kw_entries = (struct rb_call_info_with_kwarg *)&iseq->body->ci_entries[iseq->body->ci_size];
-	    for (i=0; i<iseq->body->ci_kw_size; i++) {
-		const struct rb_call_info_kw_arg *kw_arg = ci_kw_entries[i].kw_arg;
-		ruby_xfree((void *)kw_arg);
+	    if (iseq->body->ci_entries) {
+		unsigned int i;
+		struct rb_call_info_with_kwarg *ci_kw_entries = (struct rb_call_info_with_kwarg *)&iseq->body->ci_entries[iseq->body->ci_size];
+		for (i=0; i<iseq->body->ci_kw_size; i++) {
+		    const struct rb_call_info_kw_arg *kw_arg = ci_kw_entries[i].kw_arg;
+		    ruby_xfree((void *)kw_arg);
+		}
+		ruby_xfree(iseq->body->ci_entries);
+		ruby_xfree(iseq->body->cc_entries);
 	    }
-	    ruby_xfree(iseq->body->ci_entries);
-	    ruby_xfree(iseq->body->cc_entries);
-	}
-	ruby_xfree((void *)iseq->body->catch_table);
-	ruby_xfree((void *)iseq->body->param.opt_table);
+	    ruby_xfree((void *)iseq->body->catch_table);
+	    ruby_xfree((void *)iseq->body->param.opt_table);
 
-	if (iseq->body->param.keyword != NULL) {
-	    ruby_xfree((void *)iseq->body->param.keyword->default_values);
-	    ruby_xfree((void *)iseq->body->param.keyword);
+	    if (iseq->body->param.keyword != NULL) {
+		ruby_xfree((void *)iseq->body->param.keyword->default_values);
+		ruby_xfree((void *)iseq->body->param.keyword);
+	    }
+	    compile_data_free(ISEQ_COMPILE_DATA(iseq));
+	    ruby_xfree(iseq->body);
 	}
-	compile_data_free(ISEQ_COMPILE_DATA(iseq));
-	ruby_xfree(iseq->body);
     }
     RUBY_FREE_LEAVE("iseq");
 }
@@ -114,9 +116,11 @@ rb_iseq_mark(const rb_iseq_t *iseq)
 	RUBY_MARK_UNLESS_NULL(body->location.absolute_path);
     }
 
-    if (ISEQ_COMPILE_DATA(iseq) != 0) {
+    if (FL_TEST(iseq, ISEQ_NOT_LOADED_YET)) {
+	rb_gc_mark(iseq->aux.loader.obj);
+    }
+    else if (ISEQ_COMPILE_DATA(iseq) != 0) {
 	const struct iseq_compile_data *const compile_data = ISEQ_COMPILE_DATA(iseq);
-
 	RUBY_MARK_UNLESS_NULL(compile_data->mark_ary);
 	RUBY_MARK_UNLESS_NULL(compile_data->err_info);
 	RUBY_MARK_UNLESS_NULL(compile_data->catch_table_ary);
@@ -203,7 +207,7 @@ iseq_memsize(const rb_iseq_t *iseq)
 static rb_iseq_t *
 iseq_alloc(void)
 {
-    rb_iseq_t *iseq = (rb_iseq_t *)rb_imemo_new(imemo_iseq, 0, 0, 0, 0);
+    rb_iseq_t *iseq = iseq_imemo_alloc();
     iseq->body = ZALLOC(struct rb_iseq_constant_body);
     return iseq;
 }
@@ -877,7 +881,11 @@ iseqw_s_compile_option_get(VALUE self)
 static const rb_iseq_t *
 iseqw_check(VALUE iseqw)
 {
-    const rb_iseq_t *iseq = DATA_PTR(iseqw);
+    rb_iseq_t *iseq = DATA_PTR(iseqw);
+
+    if (!iseq->body) {
+	ibf_load_iseq_complete(iseq);
+    }
 
     if (!iseq->body->location.label) {
 	rb_raise(rb_eTypeError, "uninitialized InstructionSequence");
@@ -2304,6 +2312,18 @@ rb_iseqw_line_trace_specify(VALUE iseqval, VALUE pos, VALUE set)
     return data.prev == 1 ? Qtrue : Qfalse;
 }
 
+static VALUE
+iseqw_to_binary_format(VALUE self)
+{
+    return iseq_ibf_dump(iseqw_check(self));
+}
+
+static VALUE
+iseqw_s_from_binary_format(VALUE self, VALUE str)
+{
+    return iseqw_new(iseq_ibf_load(str));
+}
+
 /*
  *  Document-class: RubyVM::InstructionSequence
  *
@@ -2334,6 +2354,9 @@ Init_ISeq(void)
     rb_define_method(rb_cISeq, "disassemble", iseqw_disasm, 0);
     rb_define_method(rb_cISeq, "to_a", iseqw_to_a, 0);
     rb_define_method(rb_cISeq, "eval", iseqw_eval, 0);
+
+    rb_define_method(rb_cISeq, "to_binary_format", iseqw_to_binary_format, 0);
+    rb_define_singleton_method(rb_cISeq, "from_binary_format", iseqw_s_from_binary_format, 1);
 
     /* location APIs */
     rb_define_method(rb_cISeq, "path", iseqw_path, 0);

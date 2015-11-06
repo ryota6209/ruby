@@ -257,10 +257,10 @@ struct rb_call_cache {
 #endif
 
 typedef struct rb_iseq_location_struct {
-    const VALUE path;
-    const VALUE absolute_path;
-    const VALUE base_label;
-    const VALUE label;
+    VALUE path;
+    VALUE absolute_path;
+    VALUE base_label;
+    VALUE label;
     VALUE first_lineno; /* TODO: may be unsigned short */
 } rb_iseq_location_t;
 
@@ -376,7 +376,7 @@ struct rb_iseq_constant_body {
 				      */
     struct rb_call_cache *cc_entries; /* size is ci_size = ci_kw_size */
 
-    const VALUE mark_ary;     /* Array: includes operands which should be GC marked */
+    VALUE mark_ary;     /* Array: includes operands which should be GC marked */
 
     unsigned int local_table_size;
     unsigned int is_size;
@@ -389,10 +389,17 @@ struct rb_iseq_constant_body {
 /* typedef rb_iseq_t is in method.h */
 struct rb_iseq_struct {
     VALUE flags;
-    struct iseq_compile_data *compile_data_; /* used at compile time */
-    struct rb_iseq_constant_body *body;
     VALUE reserved1;
-    VALUE reserved2;
+    struct rb_iseq_constant_body *body;
+
+    union { /* 4, 5 words */
+	struct iseq_compile_data *compile_data; /* used at compile time */
+
+	struct {
+	    VALUE obj;
+	    int index;
+	} loader;
+    } aux;
 };
 
 enum ruby_special_exceptions {

@@ -59,7 +59,19 @@ ISEQ_ORIGINAL_ISEQ_ALLOC(const rb_iseq_t *iseq, long size)
     return (VALUE *)RSTRING_PTR(str);
 }
 
-#define ISEQ_COMPILE_DATA(iseq)       (iseq)->compile_data_
+#define ISEQ_COMPILE_DATA(iseq)       (iseq)->aux.compile_data
+
+static inline rb_iseq_t *
+iseq_imemo_alloc(void)
+{
+    return (rb_iseq_t *)rb_imemo_new(imemo_iseq, 0, 0, 0, 0);
+}
+
+#define ISEQ_NOT_LOADED_YET   IMEMO_FL_USER1
+
+VALUE iseq_ibf_dump(const rb_iseq_t *iseq);
+const rb_iseq_t *iseq_ibf_load(VALUE str);
+void ibf_load_iseq_complete(rb_iseq_t *iseq);
 
 RUBY_SYMBOL_EXPORT_BEGIN
 
