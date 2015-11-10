@@ -4587,7 +4587,13 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 	    ADD_INSN(ret, line, nop);
 	}
 	else {
+	    if (iseq->body->type == ISEQ_TYPE_MAIN) {
+		ADD_ADJUST(ret, line, lstart);
+	    }
 	    ADD_SEQ(ret, ensr);
+	    if (iseq->body->type == ISEQ_TYPE_MAIN) {
+		ADD_ADJUST(ret, line, lstart);
+	    }
 	}
 	ADD_LABEL(ret, lcont);
 
@@ -5398,7 +5404,10 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 	if (is) {
 	    enum iseq_type type = is->body->type;
 
-	    if (type == ISEQ_TYPE_TOP || type == ISEQ_TYPE_MAIN) {
+	    if (type == ISEQ_TYPE_TOP ||
+		type == ISEQ_TYPE_MAIN ||
+		type == ISEQ_TYPE_ENSURE ||
+		0) {
 		ADD_INSN(ret, line, putnil);
 		ADD_INSN(ret, line, leave);
 	    }
@@ -5413,7 +5422,7 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 
 		COMPILE(ret, "return nd_stts (return val)", node->nd_stts);
 
-		if (type == ISEQ_TYPE_METHOD) {
+		if (splabel) {
 		    add_ensure_iseq(ret, iseq, 1);
 		    ADD_TRACE(ret, line, RUBY_EVENT_RETURN);
 		    ADD_INSN(ret, line, leave);
