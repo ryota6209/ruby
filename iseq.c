@@ -1228,7 +1228,7 @@ rb_insn_operand_intern(const rb_iseq_t *iseq,
 {
     const char *types = insn_op_types(insn);
     char type = types[op_no];
-    VALUE ret;
+    VALUE ret = Qundef;
 
     switch (type) {
       case TS_OFFSET:		/* LONG */
