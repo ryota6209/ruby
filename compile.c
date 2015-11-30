@@ -8028,7 +8028,6 @@ ibf_load_iseq(const struct ibf_load *load, const rb_iseq_t *index_iseq)
 	    ibf_load_iseq_complete(iseq);
 #endif /* !ENABLE_LAZY_LOAD */
 	    if (load->iseq) {
-		// rb_gc_register_mark_object((VALUE)iseq);
 		iseq_add_mark_object(load->iseq, (VALUE)iseq);
 	    }
 	    return iseq;
