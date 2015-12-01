@@ -1,3 +1,41 @@
+class RubyVM::InstructionSequence
+  def self.translate i1
+    begin
+      # STDERR.puts i1.inspect
+      d1 = i1.disasm
+      # puts d1
+
+      binary = i1.to_binary_format
+      i2 = RubyVM::InstructionSequence.from_binary_format(binary)
+      d2 = i2.disasm
+
+      if d1 != d2
+        STDERR.puts i1
+        #STDERR.puts i1
+        #STDERR.puts d2
+        if false
+          puts '*' * 200
+          puts d1
+          puts '*' * 200
+          puts d2
+          puts '*' * 200
+        end
+
+        require 'tempfile'
+        t1 = Tempfile.new; t1.puts d1; t1.close
+        t2 = Tempfile.new; t2.puts d2; t2.close
+        system("diff -u #{t1.path} #{t2.path}")
+        exit!
+      end
+    rescue RuntimeError => e
+      # STDERR.puts [e, i1].inspect
+      i1
+    else
+      i1
+    end
+  end
+end
+
 class Thread
   MUTEX_FOR_THREAD_EXCLUSIVE = Mutex.new # :nodoc:
 

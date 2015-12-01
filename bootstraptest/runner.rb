@@ -427,11 +427,19 @@ def make_srcfile(src)
   filename
 end
 
+FILE_DIR = File.expand_path(File.dirname(__FILE__), '')
+
 def get_result_string(src, opt = '')
   if @ruby
     filename = make_srcfile(src)
     begin
-      `#{@ruby} -W0 #{opt} #{filename}`
+      if false
+        driver = ''
+      else
+        driver = File.join(FILE_DIR, 'compile_and_run.rb')
+      end
+      cmd = "#{@ruby} -W0 #{opt} #{driver} #{filename}"
+      `#{cmd}`
     ensure
       raise Interrupt if $? and $?.signaled? && $?.termsig == Signal.list["INT"]
       raise CoreDumpError, "core dumped" if $? and $?.coredump?

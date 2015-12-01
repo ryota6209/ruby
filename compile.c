@@ -6922,19 +6922,27 @@ ibf_dump_id(struct ibf_dump *dump, ID id)
 static ID
 ibf_load_id(const struct ibf_load *load, const ID id_index)
 {
-    ID id = load->id_list[(long)id_index];
+    ID id;
 
-    if (id == 0) {
-	ibf_offset_t *offsets = (ibf_offset_t *)(load->header->id_list_offset + load->buff);
-	const char *id_buff = load->buff + offsets[id_index];
-	if (strlen(id_buff) > 0) {
-	    id = rb_intern(id_buff); /* TODO: complex ID */
-	}
-	else {
-	    id = 0;
-	}
-	load->id_list[(long)id_index] = id;
+    if (id_index == 0) {
+	id = 0;
     }
+    else {
+	id = load->id_list[(long)id_index];
+
+	if (id == 0) {
+	    ibf_offset_t *offsets = (ibf_offset_t *)(load->header->id_list_offset + load->buff);
+	    const char *id_buff = load->buff + offsets[id_index];
+	    if (strlen(id_buff) > 0) {
+		id = rb_intern(id_buff); /* TODO: complex ID */
+	    }
+	    else {
+		id = 0;
+	    }
+	    load->id_list[(long)id_index] = id;
+	}
+    }
+
     return id;
 }
 
@@ -7028,7 +7036,7 @@ ibf_dump_code(struct ibf_dump *dump, const rb_iseq_t *iseq)
 		code[code_index] = ibf_dump_gentry(dump, (const struct rb_global_entry *)op);
 		break;
 	      case TS_FUNCPTR:
-		rb_fatal("unsupported");
+		rb_raise(rb_eRuntimeError, "TS_FUNCPTR is not supported");
 		break;
 	      default:
 		code[code_index] = op;
@@ -7085,7 +7093,7 @@ ibf_load_code(const struct ibf_load *load, const rb_iseq_t *iseq, const struct r
 		code[code_index] = ibf_load_gentry(load, (const struct rb_global_entry *)op);
 		break;
 	      case TS_FUNCPTR:
-		rb_fatal("unsupported");
+		rb_raise(rb_eRuntimeError, "TS_FUNCPTR is not supported");
 		break;
 	      default:
 		/* code[code_index] = op; */
@@ -7135,16 +7143,16 @@ ibf_dump_param_keyword(struct ibf_dump *dump, const rb_iseq_t *iseq)
 
     if (kw) {
 	struct rb_iseq_param_keyword dump_kw = *kw;
-	int num = kw->num + kw->required_num;
-	ID *ids = num > 0 ? ALLOCA_N(ID, num) : NULL;
-	VALUE *dvs = kw->num > 0 ? ALLOCA_N(VALUE, kw->num) : NULL;
+	int dv_num = kw->num - kw->required_num;
+	ID *ids = kw->num > 0 ? ALLOCA_N(ID, kw->num) : NULL;
+	VALUE *dvs = dv_num > 0 ? ALLOCA_N(VALUE, dv_num) : NULL;
 	int i;
 
-	for (i=0; i<num; i++) ids[i] = (ID)ibf_dump_id(dump, kw->table[i]);
-	for (i=0; i<kw->num; i++) dvs[i] = (VALUE)ibf_dump_object(dump, kw->default_values[i]);
+	for (i=0; i<kw->num; i++) ids[i] = (ID)ibf_dump_id(dump, kw->table[i]);
+	for (i=0; i<dv_num; i++) dvs[i] = (VALUE)ibf_dump_object(dump, kw->default_values[i]);
 
-	dump_kw.table = IBF_W(ids, ID, num);
-	dump_kw.default_values = IBF_W(dvs, VALUE, kw->num);
+	dump_kw.table = IBF_W(ids, ID, kw->num);
+	dump_kw.default_values = IBF_W(dvs, VALUE, dv_num);
 	return IBF_W(&dump_kw, struct rb_iseq_param_keyword, 1);
     }
     else {
@@ -7157,15 +7165,16 @@ ibf_load_param_keyword(const struct ibf_load *load, const struct rb_iseq_constan
 {
     if (body->param.keyword) {
 	struct rb_iseq_param_keyword *kw = IBF_R(body->param.keyword, struct rb_iseq_param_keyword, 1);
-	ID *ids = IBF_R(kw->table, ID, kw->num + kw->required_num);
-	VALUE *dvs = IBF_R(kw->default_values, VALUE, kw->num);
+	ID *ids = IBF_R(kw->table, ID, kw->num);
+	int dv_num = kw->num - kw->required_num;
+	VALUE *dvs = IBF_R(kw->default_values, VALUE, dv_num);
 	int i;
 
-	for (i=0; i<kw->num + kw->required_num; i++) {
-	    ids[i] = ibf_load_id(load, kw->table[i]);
-	}
 	for (i=0; i<kw->num; i++) {
-	    dvs[i] = ibf_load_object(load, kw->default_values[i]);
+	    ids[i] = ibf_load_id(load, ids[i]);
+	}
+	for (i=0; i<dv_num; i++) {
+	    dvs[i] = ibf_load_object(load, dvs[i]);
 	}
 
 	kw->table = ids;
@@ -7207,13 +7216,19 @@ static ID *
 ibf_load_local_table(const struct ibf_load *load, const struct rb_iseq_constant_body *body)
 {
     const int size = body->local_size - 1;
-    ID *table = IBF_R(body->local_table, ID, size);
-    int i;
 
-    for (i=0; i<size; i++) {
-	table[i] = ibf_load_id(load, table[i]);
+    if (size > 0) {
+	ID *table = IBF_R(body->local_table, ID, size);
+	int i;
+
+	for (i=0; i<size; i++) {
+	    table[i] = ibf_load_id(load, table[i]);
+	}
+	return table;
     }
-    return table;
+    else {
+	return NULL;
+    }
 }
 
 static struct iseq_catch_table *
@@ -7280,10 +7295,12 @@ ibf_dump_ci_entries(struct ibf_dump *dump, const rb_iseq_t *iseq)
 	int j;
 	VALUE *keywords = ALLOCA_N(VALUE, kw_arg->keyword_len);
 	for (j=0; j<kw_arg->keyword_len; j++) {
-	    keywords[j] = (VALUE)ibf_dump_id(dump, SYM2ID(kw_arg->keywords[j]));
+	    keywords[j] = (VALUE)ibf_dump_object(dump, kw_arg->keywords[j]); /* kw_arg->keywords[n] is Symbol */
 	}
 	dump_ci_kw_entries[i].kw_arg = (struct rb_call_info_kw_arg *)(VALUE)ibf_dump_write(dump, &kw_arg->keyword_len, sizeof(int));
 	ibf_dump_write(dump, keywords, sizeof(VALUE) * kw_arg->keyword_len);
+
+	dump_ci_kw_entries[i].ci.mid = ibf_dump_id(dump, dump_ci_kw_entries[i].ci.mid);
     }
     return (struct rb_call_info *)(VALUE)ibf_dump_write(dump, dump_ci_entries, byte_size);
 }
@@ -7297,13 +7314,23 @@ ibf_load_ci_entries(const struct ibf_load *load, const struct rb_iseq_constant_b
     struct rb_call_info *ci_entries = ibf_load_alloc(load, IBF_OFFSET(body->ci_entries),
 						     sizeof(struct rb_call_info) * body->ci_size +
 						     sizeof(struct rb_call_info_with_kwarg) * body->ci_kw_size);
+    struct rb_call_info_with_kwarg *ci_kw_entries = (struct rb_call_info_with_kwarg *)&ci_entries[ci_size];
 
     for (i=0; i<ci_size; i++) {
 	ci_entries[i].mid = ibf_load_id(load, ci_entries[i].mid);
     }
-    if (ci_kw_size > 0) {
-	// const struct rb_call_info_with_kwarg *ci_kw_entries = (struct rb_call_info_with_kwarg *)&iseq->body->ci_entries[iseq->body->ci_size];
-	rb_bug("...");
+    for (i=0; i<ci_kw_size; i++) {
+	int j;
+	ibf_offset_t kw_arg_offset = IBF_OFFSET(ci_kw_entries[i].kw_arg);
+	const int keyword_len = *(int *)(load->buff + kw_arg_offset);
+	const VALUE *keywords = (VALUE *)(load->buff + kw_arg_offset + sizeof(int));
+	struct rb_call_info_kw_arg *kw_arg = ruby_xmalloc(sizeof(struct rb_call_info_kw_arg) + sizeof(VALUE) * (keyword_len - 1));
+	kw_arg->keyword_len = keyword_len;
+	for (j=0; j<kw_arg->keyword_len; j++) {
+	    kw_arg->keywords[j] = (VALUE)ibf_load_object(load, keywords[j]);
+	}
+	ci_kw_entries[i].kw_arg = kw_arg;
+	ci_kw_entries[i].ci.mid = ibf_load_id(load, ci_kw_entries[i].ci.mid);
     }
 
     return ci_entries;
@@ -7427,7 +7454,7 @@ ibf_dump_id_list_i(st_data_t key, st_data_t val, st_data_t ptr)
     }
     else {
 	const char null[1] = {0};
-	arg->list[i] = ibf_dump_write(arg->dump, null, 0);
+	arg->list[i] = ibf_dump_write(arg->dump, null, 1);
     }
 
     return ST_CONTINUE;
@@ -7464,8 +7491,9 @@ struct ibf_object_header {
 };
 
 enum ibf_object_class_index {
-    IBF_OBJECT_CLASS_STANDARD_ERROR,
-    IBF_OBJECT_CLASS_ARRAY
+    IBF_OBJECT_CLASS_OBJECT,
+    IBF_OBJECT_CLASS_ARRAY,
+    IBF_OBJECT_CLASS_STANDARD_ERROR
 };
 
 struct ibf_object_string {
@@ -7516,11 +7544,14 @@ static void
 ibf_dump_object_class(struct ibf_dump *dump, VALUE obj)
 {
     enum ibf_object_class_index cindex;
-    if (obj == rb_eStandardError) {
-	cindex = IBF_OBJECT_CLASS_STANDARD_ERROR;
+    if (obj == rb_cObject) {
+	cindex = IBF_OBJECT_CLASS_OBJECT;
     }
     else if (obj == rb_cArray) {
 	cindex = IBF_OBJECT_CLASS_ARRAY;
+    }
+    else if (obj == rb_eStandardError) {
+	cindex = IBF_OBJECT_CLASS_STANDARD_ERROR;
     }
     else {
 	rb_obj_info_dump(obj);
@@ -7537,10 +7568,12 @@ ibf_load_object_class(const struct ibf_load *load, const struct ibf_object_heade
     enum ibf_object_class_index cindex = *cindexp;
 
     switch (cindex) {
-      case IBF_OBJECT_CLASS_STANDARD_ERROR:
-	return rb_eStandardError;
+      case IBF_OBJECT_CLASS_OBJECT:
+	return rb_cObject;
       case IBF_OBJECT_CLASS_ARRAY:
 	return rb_cArray;
+      case IBF_OBJECT_CLASS_STANDARD_ERROR:
+	return rb_eStandardError;
     }
 
     rb_bug("ibf_load_object_class: unknown class (%d)", (int)cindex);
@@ -7956,6 +7989,8 @@ iseq_ibf_dump(const rb_iseq_t *iseq)
     dump.obj_list = rb_ary_new(); rb_ary_push(dump.obj_list, Qnil); /* 0th is nil */
     dump.iseq_table = st_init_numtable(); /* need free */
     dump.id_table = st_init_numtable();   /* need free */
+
+    ibf_table_index(dump.id_table, 0); /* id_index:0 is 0 */
 
     if (iseq->body->parent_iseq != NULL || iseq->body->local_iseq != iseq) {
 	rb_raise(rb_eRuntimeError, "should be top of iseq");

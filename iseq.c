@@ -29,6 +29,8 @@
 #define ISEQ_MINOR_VERSION 3
 
 VALUE rb_cISeq;
+static VALUE iseqw_new(const rb_iseq_t *iseq);
+static const rb_iseq_t *iseqw_check(VALUE iseqw);
 
 #define hidden_obj_p(obj) (!SPECIAL_CONST_P(obj) && !RBASIC(obj)->klass)
 
@@ -470,6 +472,13 @@ rb_iseq_new_with_opt(NODE *node, VALUE name, VALUE path, VALUE absolute_path,
     rb_iseq_compile_node(iseq, node);
     cleanup_iseq_build(iseq);
 
+    if (rb_respond_to(rb_cISeq, rb_intern("translate"))) {
+	VALUE v1 = iseqw_new(iseq);
+	VALUE v2 = rb_funcall(rb_cISeq, rb_intern("translate"), 1, v1);
+	if (v1 != v2 && CLASS_OF(v2) == rb_cISeq) {
+	    iseq = (rb_iseq_t *)iseqw_check(v2);
+	}
+    }
     return iseq;
 }
 
@@ -505,8 +514,6 @@ iseq_type_from_sym(VALUE type)
     if (typeid == id_defined_guard) return ISEQ_TYPE_DEFINED_GUARD;
     return (enum iseq_type)-1;
 }
-
-static VALUE iseqw_new(const rb_iseq_t *iseq);
 
 static VALUE
 iseq_load(VALUE data, const rb_iseq_t *parent, VALUE opt)
