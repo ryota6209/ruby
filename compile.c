@@ -6849,6 +6849,15 @@ ibf_dump_write(struct ibf_dump *dump, const void *buff, unsigned int size)
     return pos;
 }
 
+static void
+ibf_dump_overwrite(struct ibf_dump *dump, void *buff, unsigned int size, long offset)
+{
+    VALUE str = dump->str;
+    char *ptr = RSTRING_PTR(str);
+    if (size + offset > RSTRING_LEN(str)) rb_bug("ibf_dump_overwrite: overflow");
+    memcpy(ptr + offset, buff, size);
+}
+
 static void *
 ibf_load_alloc(const struct ibf_load *load, ibf_offset_t offset, int size)
 {
@@ -6861,15 +6870,6 @@ ibf_load_alloc(const struct ibf_load *load, ibf_offset_t offset, int size)
 #define IBF_WV(variable)   ibf_dump_write(dump, &(variable), sizeof(variable))
 #define IBF_WP(b, type, n) ibf_dump_write(dump, (b), sizeof(type) * (n))
 #define IBF_R(val, type, n) (type *)ibf_load_alloc(load, IBF_OFFSET(val), sizeof(type) * (n))
-
-static void
-ibf_dump_overwrite(struct ibf_dump *dump, void *buff, unsigned int size, long offset)
-{
-    VALUE str = dump->str;
-    char *ptr = RSTRING_PTR(str);
-    if (size + offset > RSTRING_LEN(str)) rb_bug("ibf_dump_overwrite: overflow");
-    memcpy(ptr + offset, buff, size);
-}
 
 static int
 ibf_table_lookup(struct st_table *table, st_data_t key)
@@ -7393,7 +7393,7 @@ ibf_load_iseq_each(const struct ibf_load *load, rb_iseq_t *iseq, ibf_offset_t of
     RB_OBJ_WRITE(iseq, &load_body->location.label,         ibf_load_location_str(load, body->location.label));
     load_body->location.first_lineno = body->location.first_lineno;
 
-    RB_OBJ_WRITE(iseq, &load_body->mark_ary, rb_ary_new());
+    RB_OBJ_WRITE(iseq, &load_body->mark_ary, rb_ary_tmp_new(0));
 
     load_body->is_entries      = ZALLOC_N(union iseq_inline_storage_entry, body->is_size);
     load_body->ci_entries      = ibf_load_ci_entries(load, body);
@@ -7524,6 +7524,10 @@ struct ibf_object_bignum {
     BDIGIT digits[1];
 };
 
+enum ibf_object_data_type {
+    IBF_OBJECT_DATA_ENCODING
+};
+
 struct ibf_object_complex_rational {
     long a, b;
 };
@@ -7534,6 +7538,20 @@ struct ibf_object_symbol {
 
 #define IBF_OBJHEADER(offset)     (struct ibf_object_header *)(load->buff + (offset))
 #define IBF_OBJBODY(type, offset) (type *)(load->buff + sizeof(struct ibf_object_header) + (offset))
+
+static void
+ibf_dump_object_unsupported(struct ibf_dump *dump, VALUE obj)
+{
+    rb_obj_info_dump(obj);
+    rb_bug("ibf_dump_object_unsupported: unsupporetd");
+}
+
+static VALUE
+ibf_load_object_unsupported(const struct ibf_load *load, const struct ibf_object_header *header, ibf_offset_t offset)
+{
+    rb_bug("unsupported");
+    return Qnil;
+}
 
 static void
 ibf_dump_object_class(struct ibf_dump *dump, VALUE obj)
@@ -7741,8 +7759,10 @@ ibf_load_object_struct(const struct ibf_load *load, const struct ibf_object_head
     const struct ibf_object_struct_range *range = IBF_OBJBODY(struct ibf_object_struct_range, offset);
     VALUE beg = ibf_load_object(load, range->beg);
     VALUE end = ibf_load_object(load, range->end);
-
-    return rb_range_new(beg, end, range->excl);
+    VALUE obj = rb_range_new(beg, end, range->excl);
+    if (header->internal) rb_obj_hide(obj);
+    if (header->frozen)   rb_obj_freeze(obj);
+    return obj;
 }
 
 static void
@@ -7764,11 +7784,46 @@ ibf_load_object_bignum(const struct ibf_load *load, const struct ibf_object_head
     ssize_t len = sign > 0 ? bignum->slen : -1 * bignum->slen;
     VALUE obj = rb_integer_unpack(bignum->digits, len * 2, 2, 0,
 				  INTEGER_PACK_LITTLE_ENDIAN | (sign == 0 ? INTEGER_PACK_NEGATIVE : 0));
-
     if (header->internal) rb_obj_hide(obj);
     if (header->frozen)   rb_obj_freeze(obj);
-
     return obj;
+}
+
+int rb_data_is_encoding(VALUE obj); /* encoding.c */
+
+static void
+ibf_dump_object_data(struct ibf_dump *dump, VALUE obj)
+{
+    if (rb_data_is_encoding(obj)) {
+	rb_encoding *enc = rb_to_encoding(obj);
+	const char *name = rb_enc_name(enc);
+	enum ibf_object_data_type type = IBF_OBJECT_DATA_ENCODING;
+	long len = strlen(name) + 1;
+	IBF_WV(type);
+	IBF_WV(len);
+	IBF_WP(name, char, strlen(name) + 1);
+    }
+    else {
+	ibf_dump_object_unsupported(dump, obj);
+    }
+}
+
+static VALUE
+ibf_load_object_data(const struct ibf_load *load, const struct ibf_object_header *header, ibf_offset_t offset)
+{
+    const enum ibf_object_data_type *typep = IBF_OBJBODY(enum ibf_object_data_type, offset);
+    /* const long *lenp = IBF_OBJBODY(long, offset + sizeof(enum ibf_object_data_type)); */
+    const char *data = IBF_OBJBODY(char, offset + sizeof(enum ibf_object_data_type) + sizeof(long));
+
+    switch (*typep) {
+      case IBF_OBJECT_DATA_ENCODING:
+	{
+	    VALUE encobj = rb_enc_from_encoding(rb_enc_find(data));
+	    return encobj;
+	}
+    }
+
+    return ibf_load_object_unsupported(load, header, offset);
 }
 
 static void
@@ -7787,18 +7842,11 @@ ibf_load_object_complex_rational(const struct ibf_load *load, const struct ibf_o
     const struct ibf_object_complex_rational *nums = IBF_OBJBODY(struct ibf_object_complex_rational, offset);
     VALUE a = ibf_load_object(load, nums->a);
     VALUE b = ibf_load_object(load, nums->b);
-    VALUE obj;
-
-    if (header->type == T_COMPLEX) {
-	obj = rb_complex_new(a, b);
-    }
-    else {
-	obj = rb_rational_new(a, b);
-    }
+    VALUE obj = header->type == T_COMPLEX ?
+      rb_complex_new(a, b) : rb_rational_new(a, b);
 
     if (header->internal) rb_obj_hide(obj);
     if (header->frozen)   rb_obj_freeze(obj);
-
     return obj;
 }
 
@@ -7817,22 +7865,7 @@ ibf_load_object_symbol(const struct ibf_load *load, const struct ibf_object_head
     const struct ibf_object_symbol *symbol = IBF_OBJBODY(struct ibf_object_symbol, offset);
     VALUE str = ibf_load_object(load, symbol->str);
     ID id = rb_intern_str(str);
-
     return ID2SYM(id);
-}
-
-static void
-ibf_dump_object_unsupported(struct ibf_dump *dump, VALUE obj)
-{
-    rb_obj_info_dump(obj);
-    rb_bug("ibf_dump_object_unsupported: unsupporetd");
-}
-
-static VALUE
-ibf_load_object_unsupported(const struct ibf_load *load, const struct ibf_object_header *header, ibf_offset_t offset)
-{
-    rb_bug("unsupported");
-    return Qnil;
 }
 
 typedef void (*ibf_dump_object_function)(struct ibf_dump *dump, VALUE obj);
@@ -7849,7 +7882,7 @@ static ibf_dump_object_function dump_object_functions[RUBY_T_MASK+1] = {
     ibf_dump_object_struct,      /* T_STRUCT */
     ibf_dump_object_bignum,      /* T_BIGNUM */
     ibf_dump_object_unsupported, /* T_FILE */
-    ibf_dump_object_unsupported, /* T_DATA */
+    ibf_dump_object_data,        /* T_DATA */
     ibf_dump_object_unsupported, /* T_MATCH */
     ibf_dump_object_complex_rational, /* T_COMPLEX */
     ibf_dump_object_complex_rational, /* T_RATIONAL */
@@ -7916,7 +7949,7 @@ static ibf_load_object_function load_object_functions[RUBY_T_MASK+1] = {
     ibf_load_object_struct,      /* T_STRUCT */
     ibf_load_object_bignum,      /* T_BIGNUM */
     ibf_load_object_unsupported, /* T_FILE */
-    ibf_load_object_unsupported, /* T_DATA */
+    ibf_load_object_data,        /* T_DATA */
     ibf_load_object_unsupported, /* T_MATCH */
     ibf_load_object_complex_rational, /* T_COMPLEX */
     ibf_load_object_complex_rational, /* T_RATIONAL */
@@ -7969,7 +8002,7 @@ ibf_load_object(const struct ibf_load *load, VALUE object_index)
 static void
 ibf_dump_object_list(struct ibf_dump *dump, struct ibf_header *header)
 {
-    VALUE list = rb_ary_new();
+    VALUE list = rb_ary_tmp_new(RARRAY_LEN(dump->obj_list));
     int i, size;
 
     for (i=0; i<RARRAY_LEN(dump->obj_list); i++) {
@@ -7995,8 +8028,8 @@ iseq_ibf_dump(const rb_iseq_t *iseq)
     struct ibf_header header;
 
     dump.str = rb_str_new(0, 0);
-    dump.iseq_list = rb_ary_new();
-    dump.obj_list = rb_ary_new(); rb_ary_push(dump.obj_list, Qnil); /* 0th is nil */
+    dump.iseq_list = rb_ary_tmp_new(0);
+    dump.obj_list = rb_ary_tmp_new(1); rb_ary_push(dump.obj_list, Qnil); /* 0th is nil */
     dump.iseq_table = st_init_numtable(); /* need free */
     dump.id_table = st_init_numtable();   /* need free */
 
@@ -8087,8 +8120,8 @@ ibf_setup_load(struct ibf_load *load, VALUE loader_obj, VALUE str)
     load->loader_obj = loader_obj;
     load->buff = StringValuePtr(str);
     load->header = (struct ibf_header *)load->buff;
-    RB_OBJ_WRITE(loader_obj, &load->iseq_list, rb_ary_new());
-    RB_OBJ_WRITE(loader_obj, &load->obj_list, rb_ary_new());
+    RB_OBJ_WRITE(loader_obj, &load->iseq_list, rb_ary_tmp_new(0));
+    RB_OBJ_WRITE(loader_obj, &load->obj_list, rb_ary_tmp_new(0));
     load->id_list = ZALLOC_N(ID, load->header->id_list_size);
     load->iseq = NULL;
 }
