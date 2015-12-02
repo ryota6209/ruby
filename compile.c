@@ -11,6 +11,7 @@
 
 #include "internal.h"
 #include "ruby/re.h"
+#include "encindex.h"
 #include <math.h>
 
 #define USE_INSN_STACK_INCREASE 1
@@ -6931,14 +6932,9 @@ ibf_load_id(const struct ibf_load *load, const ID id_index)
 	id = load->id_list[(long)id_index];
 
 	if (id == 0) {
-	    ibf_offset_t *offsets = (ibf_offset_t *)(load->header->id_list_offset + load->buff);
-	    const char *id_buff = load->buff + offsets[id_index];
-	    if (strlen(id_buff) > 0) {
-		id = rb_intern(id_buff); /* TODO: complex ID */
-	    }
-	    else {
-		id = 0;
-	    }
+	    long *indices = (long *)(load->buff + load->header->id_list_offset);
+	    VALUE str = ibf_load_object(load, indices[id_index]);
+	    id = NIL_P(str) ? 0 : rb_intern_str(str); /* str == nil -> internal junk id */
 	    load->id_list[(long)id_index] = id;
 	}
     }
@@ -7435,7 +7431,7 @@ ibf_dump_iseq_list(struct ibf_dump *dump, struct ibf_header *header)
 
 struct ibf_dump_id_list_i_arg {
     struct ibf_dump *dump;
-    ibf_offset_t *list;
+    long *list;
     int current_i;
 };
 
@@ -7445,16 +7441,14 @@ ibf_dump_id_list_i(st_data_t key, st_data_t val, st_data_t ptr)
     struct ibf_dump_id_list_i_arg *arg = (struct ibf_dump_id_list_i_arg *)ptr;
     int i = (int)val;
     ID id = (ID)key;
-    const char *name = rb_id2name(id);
     assert(arg->current_i == i);
     arg->current_i++;
 
-    if (name) {
-	arg->list[i] = ibf_dump_write(arg->dump, name, strlen(name) + 1); /* TODO: support more types */
+    if (rb_id2name(id)) {
+	arg->list[i] = (long)ibf_dump_object(arg->dump, rb_id2str(id));
     }
     else {
-	const char null[1] = {0};
-	arg->list[i] = ibf_dump_write(arg->dump, null, 1);
+	arg->list[i] = 0;
     }
 
     return ST_CONTINUE;
@@ -7465,13 +7459,13 @@ ibf_dump_id_list(struct ibf_dump *dump, struct ibf_header *header)
 {
     const int size = dump->id_table->num_entries;
     struct ibf_dump_id_list_i_arg arg;
-    arg.list = ALLOCA_N(ibf_offset_t, size);
+    arg.list = ALLOCA_N(long, size);
     arg.dump = dump;
     arg.current_i = 0;
 
     st_foreach(dump->id_table, ibf_dump_id_list_i, (st_data_t)&arg);
 
-    header->id_list_offset = ibf_dump_write(dump, arg.list, sizeof(ibf_offset_t) * size);
+    header->id_list_offset = ibf_dump_write(dump, arg.list, sizeof(long) * size);
     header->id_list_size = size;
 }
 
@@ -7497,13 +7491,14 @@ enum ibf_object_class_index {
 };
 
 struct ibf_object_string {
-    long enc;
+    long encindex;
     long len;
     char ptr[1];
 };
 
 struct ibf_object_regexp {
-    long src;
+    long srcstr;
+    char option;
 };
 
 struct ibf_object_array {
@@ -7597,10 +7592,17 @@ ibf_load_object_float(const struct ibf_load *load, const struct ibf_object_heade
 static void
 ibf_dump_object_string(struct ibf_dump *dump, VALUE obj)
 {
-    long enc = 0;
+    long encindex = (long)rb_enc_get_index(obj);
     long len = RSTRING_LEN(obj);
     const char *ptr = RSTRING_PTR(obj);
-    IBF_WV(enc);
+
+    if (encindex > RUBY_ENCINDEX_BUILTIN_MAX) {
+	rb_encoding *enc = rb_enc_from_index(encindex);
+	const char *enc_name = rb_enc_name(enc);
+	encindex = RUBY_ENCINDEX_BUILTIN_MAX + ibf_dump_object(dump, rb_str_new2(enc_name));
+    }
+
+    IBF_WV(encindex);
     IBF_WV(len);
     IBF_WP(ptr, char, len);
 }
@@ -7609,8 +7611,14 @@ static VALUE
 ibf_load_object_string(const struct ibf_load *load, const struct ibf_object_header *header, ibf_offset_t offset)
 {
     const struct ibf_object_string *string = IBF_OBJBODY(struct ibf_object_string, offset);
-    /* TODO: enc */
     VALUE str = rb_str_new(string->ptr, string->len);
+    int encindex = string->encindex;
+
+    if (encindex > RUBY_ENCINDEX_BUILTIN_MAX) {
+	VALUE enc_name_str = ibf_load_object(load, encindex - RUBY_ENCINDEX_BUILTIN_MAX);
+	encindex = rb_enc_find_index(RSTRING_PTR(enc_name_str));
+    }
+    rb_enc_associate_index(str, encindex);
 
     if (header->internal) rb_obj_hide(str);
     if (header->frozen)   rb_obj_freeze(str);
@@ -7621,17 +7629,19 @@ ibf_load_object_string(const struct ibf_load *load, const struct ibf_object_head
 static void
 ibf_dump_object_regexp(struct ibf_dump *dump, VALUE obj)
 {
-    VALUE srcstr = RREGEXP_SRC(obj);
-    long src_index = (long)ibf_dump_object(dump, srcstr);
-    IBF_WV(src_index);
+    struct ibf_object_regexp regexp;
+    regexp.srcstr = RREGEXP_SRC(obj);
+    regexp.option = (char)rb_reg_options(obj);
+    regexp.srcstr = (long)ibf_dump_object(dump, regexp.srcstr);
+    IBF_WV(regexp);
 }
 
 static VALUE
 ibf_load_object_regexp(const struct ibf_load *load, const struct ibf_object_header *header, ibf_offset_t offset)
 {
     const struct ibf_object_regexp *regexp = IBF_OBJBODY(struct ibf_object_regexp, offset);
-    VALUE srcstr = ibf_load_object(load, regexp->src);
-    VALUE reg = rb_reg_regcomp(srcstr);
+    VALUE srcstr = ibf_load_object(load, regexp->srcstr);
+    VALUE reg = rb_reg_new_str(srcstr, (int)regexp->option);
 
     if (header->internal) rb_obj_hide(reg);
     if (header->frozen)   rb_obj_freeze(reg);
@@ -7739,7 +7749,7 @@ static void
 ibf_dump_object_bignum(struct ibf_dump *dump, VALUE obj)
 {
     ssize_t len = BIGNUM_LEN(obj);
-    ssize_t slen = len > 0 ? len : len * -1;
+    ssize_t slen = BIGNUM_SIGN(obj) > 0 ? len : len * -1;
     BDIGIT *d = BIGNUM_DIGITS(obj);
 
     IBF_WV(slen);

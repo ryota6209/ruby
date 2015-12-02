@@ -1,17 +1,26 @@
 class RubyVM::InstructionSequence
   def self.translate i1
     begin
-      # STDERR.puts i1.inspect
-      d1 = i1.disasm
+      STDERR.puts i1.inspect if ENV['RUBY_VERBOSE']
+      begin
+        d1 = i1.disasm
+      rescue Encoding::CompatibilityError, EncodingError
+        d1 = nil
+      end
       # puts d1
 
       binary = i1.to_binary_format
       i2 = RubyVM::InstructionSequence.from_binary_format(binary)
-      d2 = i2.disasm
+
+      begin
+        d2 = i2.disasm
+      rescue Encoding::CompatibilityError, EncodingError
+        d2 = nil
+      end
 
       if d1 != d2
         STDERR.puts i1
-        #STDERR.puts i1
+        STDERR.puts d1
         #STDERR.puts d2
         if false
           puts '*' * 200
@@ -27,11 +36,11 @@ class RubyVM::InstructionSequence
         system("diff -u #{t1.path} #{t2.path}")
         exit!
       end
-    rescue RuntimeError => e
+    rescue RuntimeError
       # STDERR.puts [e, i1].inspect
       i1
     else
-      i1
+      i2
     end
   end
 end
