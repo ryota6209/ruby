@@ -6786,18 +6786,18 @@ rb_method_for_self_aset(VALUE name, VALUE arg, rb_insn_func_t func)
 
 /* ISeq binary format */
 
-typedef unsigned int ibf_offset_t;
+typedef uint32_t ibf_offset_t;
 #define IBF_OFFSET(ptr) ((ibf_offset_t)(VALUE)(ptr))
 
 struct ibf_header {
     char magic[4]; /* YARB */
-    unsigned int major_version;
-    unsigned int minor_version;
-    unsigned int size;
+    uint32_t major_version;
+    uint32_t minor_version;
+    uint32_t size;
 
-    unsigned int iseq_list_size;
-    unsigned int id_list_size;
-    unsigned int object_list_size;
+    uint32_t iseq_list_size;
+    uint32_t id_list_size;
+    uint32_t object_list_size;
 
     ibf_offset_t iseq_list_offset;
     ibf_offset_t id_list_offset;
@@ -6841,7 +6841,7 @@ ibf_dump_pos(struct ibf_dump *dump)
 }
 
 static ibf_offset_t
-ibf_dump_write(struct ibf_dump *dump, const void *buff, unsigned int size)
+ibf_dump_write(struct ibf_dump *dump, const void *buff, uint32_t size)
 {
     ibf_offset_t pos = ibf_dump_pos(dump);
     rb_str_cat(dump->str, (const char *)buff, size);
@@ -6850,7 +6850,7 @@ ibf_dump_write(struct ibf_dump *dump, const void *buff, unsigned int size)
 }
 
 static void
-ibf_dump_overwrite(struct ibf_dump *dump, void *buff, unsigned int size, long offset)
+ibf_dump_overwrite(struct ibf_dump *dump, void *buff, uint32_t size, long offset)
 {
     VALUE str = dump->str;
     char *ptr = RSTRING_PTR(str);
@@ -6859,7 +6859,7 @@ ibf_dump_overwrite(struct ibf_dump *dump, void *buff, unsigned int size, long of
 }
 
 static void *
-ibf_load_alloc(const struct ibf_load *load, ibf_offset_t offset, int size)
+ibf_load_alloc(const struct ibf_load *load, ibf_offset_t offset, long size)
 {
     void *buff = ruby_xmalloc(size);
     memcpy(buff, load->buff + offset, size);
@@ -6890,7 +6890,7 @@ ibf_table_index(struct st_table *table, st_data_t key)
     int index = ibf_table_lookup(table, key);
 
     if (index < 0) { /* not found */
-	index = (int)table->num_entries;
+	index = rb_long2int(table->num_entries);
 	st_insert(table, key, (st_data_t)index);
     }
 
@@ -6992,7 +6992,7 @@ ibf_dump_code(struct ibf_dump *dump, const rb_iseq_t *iseq)
     code = ALLOCA_N(VALUE, iseq_size);
 
     for (code_index=0; code_index<iseq_size;) {
-	const int insn = orig_code[code_index];
+	const VALUE insn = orig_code[code_index];
 	const char *types = insn_op_types(insn);
 	int op_index;
 
@@ -7058,7 +7058,7 @@ ibf_load_code(const struct ibf_load *load, const rb_iseq_t *iseq, const struct r
     union iseq_inline_storage_entry *is_entries = iseq->body->is_entries;
 
     for (code_index=0; code_index<iseq_size;) {
-	const int insn = code[code_index++];
+	const VALUE insn = code[code_index++];
 	const char *types = insn_op_types(insn);
 	int op_index;
 
@@ -7415,7 +7415,7 @@ ibf_load_iseq_each(const struct ibf_load *load, rb_iseq_t *iseq, ibf_offset_t of
 static void
 ibf_dump_iseq_list(struct ibf_dump *dump, struct ibf_header *header)
 {
-    const int size = RARRAY_LEN(dump->iseq_list);
+    const int size = RARRAY_LENINT(dump->iseq_list);
     ibf_offset_t *list = ALLOCA_N(ibf_offset_t, size);
     int i;
 
@@ -7455,7 +7455,7 @@ ibf_dump_id_list_i(st_data_t key, st_data_t val, st_data_t ptr)
 static void
 ibf_dump_id_list(struct ibf_dump *dump, struct ibf_header *header)
 {
-    const int size = dump->id_table->num_entries;
+    const int size = rb_long2int(dump->id_table->num_entries);
     struct ibf_dump_id_list_i_arg arg;
     arg.list = ALLOCA_N(long, size);
     arg.dump = dump;
@@ -7609,11 +7609,11 @@ static void
 ibf_dump_object_string(struct ibf_dump *dump, VALUE obj)
 {
     long encindex = (long)rb_enc_get_index(obj);
-    long len = RSTRING_LEN(obj);
+    uint32_t len = RSTRING_LENINT(obj);
     const char *ptr = RSTRING_PTR(obj);
 
     if (encindex > RUBY_ENCINDEX_BUILTIN_MAX) {
-	rb_encoding *enc = rb_enc_from_index(encindex);
+	rb_encoding *enc = rb_enc_from_index((int)encindex);
 	const char *enc_name = rb_enc_name(enc);
 	encindex = RUBY_ENCINDEX_BUILTIN_MAX + ibf_dump_object(dump, rb_str_new2(enc_name));
     }
@@ -7628,13 +7628,13 @@ ibf_load_object_string(const struct ibf_load *load, const struct ibf_object_head
 {
     const struct ibf_object_string *string = IBF_OBJBODY(struct ibf_object_string, offset);
     VALUE str = rb_str_new(string->ptr, string->len);
-    int encindex = string->encindex;
+    long encindex = string->encindex;
 
     if (encindex > RUBY_ENCINDEX_BUILTIN_MAX) {
 	VALUE enc_name_str = ibf_load_object(load, encindex - RUBY_ENCINDEX_BUILTIN_MAX);
 	encindex = rb_enc_find_index(RSTRING_PTR(enc_name_str));
     }
-    rb_enc_associate_index(str, encindex);
+    rb_enc_associate_index(str, (int)encindex);
 
     if (header->internal) rb_obj_hide(str);
     if (header->frozen)   rb_obj_freeze(str);
@@ -7766,7 +7766,7 @@ ibf_load_object_struct(const struct ibf_load *load, const struct ibf_object_head
 static void
 ibf_dump_object_bignum(struct ibf_dump *dump, VALUE obj)
 {
-    ssize_t len = BIGNUM_LEN(obj);
+    uint32_t len = BIGNUM_LENINT(obj);
     ssize_t slen = BIGNUM_SIGN(obj) > 0 ? len : len * -1;
     BDIGIT *d = BIGNUM_DIGITS(obj);
 
@@ -7796,10 +7796,10 @@ ibf_dump_object_data(struct ibf_dump *dump, VALUE obj)
 	rb_encoding *enc = rb_to_encoding(obj);
 	const char *name = rb_enc_name(enc);
 	enum ibf_object_data_type type = IBF_OBJECT_DATA_ENCODING;
-	long len = strlen(name) + 1;
+	uint32_t len = rb_long2int(strlen(name) + 1);
 	IBF_WV(type);
 	IBF_WV(len);
-	IBF_WP(name, char, strlen(name) + 1);
+	IBF_WP(name, char, len);
     }
     else {
 	ibf_dump_object_unsupported(dump, obj);
