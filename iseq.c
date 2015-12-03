@@ -472,6 +472,19 @@ rb_iseq_new_with_opt(NODE *node, VALUE name, VALUE path, VALUE absolute_path,
     return iseq;
 }
 
+const rb_iseq_t *
+rb_iseq_load_binary(VALUE fname)
+{
+    if (rb_respond_to(rb_cISeq, rb_intern("load_compiled_file"))) {
+	VALUE iseqv = rb_funcall(rb_cISeq, rb_intern("load_compiled_file"), 1, fname);
+	if (CLASS_OF(iseqv) == rb_cISeq) {
+	    return  iseqw_check(iseqv);
+	}
+    }
+
+    return NULL;
+}
+
 #define CHECK_ARRAY(v)   rb_convert_type((v), T_ARRAY, "Array", "to_ary")
 #define CHECK_HASH(v)    rb_convert_type((v), T_HASH, "Hash", "to_hash")
 #define CHECK_STRING(v)  rb_convert_type((v), T_STRING, "String", "to_str")
