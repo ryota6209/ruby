@@ -7659,7 +7659,7 @@ ibf_load_object_regexp(const struct ibf_load *load, const struct ibf_object_head
 {
     const struct ibf_object_regexp *regexp = IBF_OBJBODY(struct ibf_object_regexp, offset);
     VALUE srcstr = ibf_load_object(load, regexp->srcstr);
-    VALUE reg = rb_reg_new_str(srcstr, (int)regexp->option);
+    VALUE reg = rb_reg_compile(srcstr, (int)regexp->option, NULL, 0);
 
     if (header->internal) rb_obj_hide(reg);
     if (header->frozen)   rb_obj_freeze(reg);
