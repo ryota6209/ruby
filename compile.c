@@ -7354,7 +7354,7 @@ ibf_dump_iseq_each(struct ibf_dump *dump, const rb_iseq_t *iseq)
     dump_body.is_entries =      NULL;
     dump_body.ci_entries =      ibf_dump_ci_entries(dump, iseq);
     dump_body.cc_entries =      NULL;
-    dump_body.mark_ary =        Qnil;
+    dump_body.mark_ary =        ISEQ_FLIP_CNT(iseq);
 
     return ibf_dump_write(dump, &dump_body, sizeof(dump_body));
 }
@@ -7387,13 +7387,13 @@ ibf_load_iseq_each(const struct ibf_load *load, rb_iseq_t *iseq, ibf_offset_t of
     load_body->ci_kw_size = body->ci_kw_size;
     load_body->line_info_size = body->line_info_size;
 
+    RB_OBJ_WRITE(iseq, &load_body->mark_ary, iseq_mark_ary_create((int)body->mark_ary));
+
     RB_OBJ_WRITE(iseq, &load_body->location.path,          ibf_load_location_str(load, body->location.path));
     RB_OBJ_WRITE(iseq, &load_body->location.absolute_path, ibf_load_location_str(load, body->location.absolute_path));
     RB_OBJ_WRITE(iseq, &load_body->location.base_label,    ibf_load_location_str(load, body->location.base_label));
     RB_OBJ_WRITE(iseq, &load_body->location.label,         ibf_load_location_str(load, body->location.label));
     load_body->location.first_lineno = body->location.first_lineno;
-
-    RB_OBJ_WRITE(iseq, &load_body->mark_ary, rb_ary_tmp_new(0));
 
     load_body->is_entries      = ZALLOC_N(union iseq_inline_storage_entry, body->is_size);
     load_body->ci_entries      = ibf_load_ci_entries(load, body);
@@ -7409,8 +7409,6 @@ ibf_load_iseq_each(const struct ibf_load *load, rb_iseq_t *iseq, ibf_offset_t of
     load_body->iseq_encoded    = ibf_load_code(load, iseq, body);
 
     rb_iseq_translate_threaded_code(iseq);
-
-    iseq->variable_body = ZALLOC(struct rb_iseq_variable_body);
 }
 
 
@@ -8037,6 +8035,9 @@ iseq_ibf_dump(const rb_iseq_t *iseq)
 
     if (iseq->body->parent_iseq != NULL || iseq->body->local_iseq != iseq) {
 	rb_raise(rb_eRuntimeError, "should be top of iseq");
+    }
+    if (RTEST(ISEQ_COVERAGE(iseq))) {
+	rb_raise(rb_eRuntimeError, "should not compile with coverage");
     }
 
     ibf_dump_write(&dump, &header, sizeof(header));

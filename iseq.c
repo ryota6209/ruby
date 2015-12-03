@@ -264,16 +264,6 @@ rb_iseq_add_mark_object(const rb_iseq_t *iseq, VALUE obj)
 }
 
 static VALUE
-iseq_mark_ary_create(int flip_cnt)
-{
-    VALUE ary = rb_ary_tmp_new(3);
-    rb_ary_push(ary, Qnil);              /* ISEQ_MARK_ARY_COVERAGE */
-    rb_ary_push(ary, INT2FIX(flip_cnt)); /* ISEQ_MARK_ARY_FLIP_CNT */
-    rb_ary_push(ary, Qnil);              /* ISEQ_MARK_ARY_ORIGINAL_ISEQ */
-    return ary;
-}
-
-static VALUE
 prepare_iseq_build(rb_iseq_t *iseq,
 		   VALUE name, VALUE path, VALUE absolute_path, VALUE first_lineno,
 		   const rb_iseq_t *parent, enum iseq_type type,
