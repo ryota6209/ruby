@@ -123,4 +123,14 @@ class TestEncoding < Test::Unit::TestCase
       }
     end;
   end
+
+  def test_string
+    Encoding.list.each do |e|
+      if e.ascii_compatible?
+        s = e.string("abc")
+        assert_equal(e, s.encoding)
+        assert_equal("abc", s)
+      end
+    end
+  end
 end

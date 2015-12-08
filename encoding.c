@@ -1171,6 +1171,38 @@ enc_names(VALUE self)
 
 /*
  * call-seq:
+ *   enc.string(str, ...) -> string
+ *
+ * Returns a string in this encoding.  The arguments are binary data
+ * or codepoints.
+ *
+ *  Encoding::EUC_JP.string("\xA4\xA2", 0xa4a1) #=> "\x{A4A2}\x{A4A1}"
+ */
+static VALUE
+enc_string(int argc, VALUE *argv, VALUE self)
+{
+    rb_encoding *enc = DATA_PTR(self);
+    VALUE str = rb_enc_str_new(0, 0, enc);
+    int i;
+
+    for (i = 0; i < argc; ++i) {
+	VALUE s = argv[i];
+	if (RB_TYPE_P(s, T_STRING) || !NIL_P(s = rb_check_string_type(s))) {
+	    const char *ptr;
+	    long len;
+	    RSTRING_GETMEM(s, ptr, len);
+	    rb_str_cat(str, ptr, len);
+	}
+	else {
+	    rb_str_concat(str, argv[i]);
+	}
+    }
+
+    return str;
+}
+
+/*
+ * call-seq:
  *   Encoding.list -> [enc1, enc2, ...]
  *
  * Returns the list of loaded encodings.
@@ -1924,6 +1956,7 @@ Init_Encoding(void)
     rb_define_method(rb_cEncoding, "dummy?", enc_dummy_p, 0);
     rb_define_method(rb_cEncoding, "ascii_compatible?", enc_ascii_compatible_p, 0);
     rb_define_method(rb_cEncoding, "replicate", enc_replicate, 1);
+    rb_define_method(rb_cEncoding, "string", enc_string, -1);
     rb_define_singleton_method(rb_cEncoding, "list", enc_list, 0);
     rb_define_singleton_method(rb_cEncoding, "name_list", rb_enc_name_list, 0);
     rb_define_singleton_method(rb_cEncoding, "aliases", rb_enc_aliases, 0);
