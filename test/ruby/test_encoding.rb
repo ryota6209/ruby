@@ -127,7 +127,13 @@ class TestEncoding < Test::Unit::TestCase
   def test_string
     Encoding.list.each do |e|
       if e.ascii_compatible?
+        s = e.string()
+        assert_equal(e, s.encoding)
+        assert_equal("", s)
         s = e.string("abc")
+        assert_equal(e, s.encoding)
+        assert_equal("abc", s)
+        s = e.string("a", 0x62, "c")
         assert_equal(e, s.encoding)
         assert_equal("abc", s)
       end

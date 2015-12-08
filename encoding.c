@@ -1182,12 +1182,22 @@ static VALUE
 enc_string(int argc, VALUE *argv, VALUE self)
 {
     rb_encoding *enc = DATA_PTR(self);
-    VALUE str = rb_enc_str_new(0, 0, enc);
-    int i;
+    VALUE s, str;
+    int i = 0;
 
-    for (i = 0; i < argc; ++i) {
-	VALUE s = argv[i];
-	if (RB_TYPE_P(s, T_STRING) || !NIL_P(s = rb_check_string_type(s))) {
+#define is_str(s) (RB_TYPE_P((s), T_STRING) || !NIL_P(s = rb_check_string_type(s)))
+
+    if (argc == 1 && (s = argv[0], is_str(s))) {
+	str = rb_str_dup(s);
+	rb_enc_associate(str, enc);
+	++i;
+    }
+    else {
+	str = rb_enc_str_new(0, 0, enc);
+    }
+    for (; i < argc; ++i) {
+	s = argv[i];
+	if (is_str(s)) {
 	    const char *ptr;
 	    long len;
 	    RSTRING_GETMEM(s, ptr, len);
