@@ -759,6 +759,12 @@ struct waiting_delete {
     VALUE th;
 };
 
+struct queue_pop_opts {
+    struct timeval timeout;
+    int should_timeout;
+    int should_block;
+};
+
 static VALUE
 queue_delete_from_waiting(struct waiting_delete *p)
 {
@@ -774,14 +780,29 @@ queue_sleep(VALUE arg)
 }
 
 static VALUE
-queue_do_pop(VALUE self, int should_block)
+queue_sleep_timeout(VALUE arg)
+{
+    rb_thread_wait_for(*(struct timeval *)arg);
+    return Qtrue;
+}
+
+static VALUE
+queue_do_pop(VALUE self, struct queue_pop_opts *opts)
 {
     struct waiting_delete args;
+    VALUE (*sleeper)(VALUE) = queue_sleep;
+    VALUE sleeparg = (VALUE)0;
+    VALUE timedout = Qfalse;
+    int should_block = opts->should_block;
+
     args.waiting = GET_QUEUE_WAITERS(self);
     args.th	 = rb_thread_current();
-
+    if (opts->should_timeout) {
+	sleeper = queue_sleep_timeout;
+	sleeparg = (VALUE)&opts->timeout;
+    }
     while (queue_length(self) == 0) {
-	if (!should_block) {
+	if (!should_block || RTEST(timedout)) {
 	    rb_raise(rb_eThreadError, "queue empty");
 	}
 	else if (queue_closed_p(self)) {
@@ -792,22 +813,43 @@ queue_do_pop(VALUE self, int should_block)
 	    assert(queue_closed_p(self) == 0);
 
 	    rb_ary_push(args.waiting, args.th);
-	    rb_ensure(queue_sleep, Qfalse, queue_delete_from_waiting, (VALUE)&args);
+	    timedout = rb_ensure(sleeper, sleeparg, queue_delete_from_waiting, (VALUE)&args);
 	}
     }
 
     return rb_ary_shift(GET_QUEUE_QUE(self));
 }
 
-static int
-queue_pop_should_block(int argc, const VALUE *argv)
+static struct queue_pop_opts *
+queue_pop_args(int argc, const VALUE *argv, struct queue_pop_opts *opts)
 {
-    int should_block = 1;
+    VALUE kwdopt;
+    opts->should_block = 1;
+    opts->should_timeout = 0;
+    if (argc > 0 &&
+	!NIL_P(kwdopt = argv[argc-1]) &&
+	kwdopt != Qtrue &&
+	kwdopt != Qfalse &&
+	!NIL_P(kwdopt = rb_check_hash_type(kwdopt))) {
+	--argc;
+    }
+    else {
+	kwdopt = Qnil;
+    }
     rb_check_arity(argc, 0, 1);
     if (argc > 0) {
-	should_block = !RTEST(argv[0]);
+	opts->should_block = !RTEST(argv[0]);
     }
-    return should_block;
+    if (!NIL_P(kwdopt)) {
+	static ID kwd_ids[1];
+	VALUE args[1];
+	CONST_ID(kwd_ids[0], "timeout");
+	if (rb_get_kwargs(kwdopt, kwd_ids, 0, 1, args) > 0) {
+	    opts->timeout = rb_time_interval(args[0]);
+	    opts->should_timeout = 1;
+	}
+    }
+    return opts;
 }
 
 /*
@@ -827,8 +869,8 @@ queue_pop_should_block(int argc, const VALUE *argv)
 static VALUE
 rb_queue_pop(int argc, VALUE *argv, VALUE self)
 {
-    int should_block = queue_pop_should_block(argc, argv);
-    return queue_do_pop(self, should_block);
+    struct queue_pop_opts opts;
+    return queue_do_pop(self, queue_pop_args(argc, argv, &opts));
 }
 
 /*
@@ -1031,9 +1073,9 @@ rb_szqueue_push(int argc, VALUE *argv, VALUE self)
 }
 
 static VALUE
-szqueue_do_pop(VALUE self, int should_block)
+szqueue_do_pop(VALUE self, struct queue_pop_opts *opts)
 {
-    VALUE retval = queue_do_pop(self, should_block);
+    VALUE retval = queue_do_pop(self, opts);
 
     if (queue_length(self) < GET_SZQUEUE_ULONGMAX(self)) {
 	wakeup_first_thread(GET_SZQUEUE_WAITERS(self));
@@ -1059,8 +1101,8 @@ szqueue_do_pop(VALUE self, int should_block)
 static VALUE
 rb_szqueue_pop(int argc, VALUE *argv, VALUE self)
 {
-    int should_block = queue_pop_should_block(argc, argv);
-    return szqueue_do_pop(self, should_block);
+    struct queue_pop_opts opts;
+    return szqueue_do_pop(self, queue_pop_args(argc, argv, &opts));
 }
 
 /*
