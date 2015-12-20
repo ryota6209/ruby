@@ -765,6 +765,8 @@ struct queue_pop_opts {
     int should_block;
 };
 
+VALUE rb_thread_wait_while(VALUE (*)(VALUE), VALUE, const struct timeval *);
+
 static VALUE
 queue_delete_from_waiting(struct waiting_delete *p)
 {
@@ -779,30 +781,59 @@ queue_sleep(VALUE arg)
     return Qnil;
 }
 
+struct queue_sleep_arg {
+    VALUE self;
+    VALUE result;
+    struct timeval timeout;
+};
+
+static VALUE
+queue_sleeping_p(VALUE arg)
+{
+    struct queue_sleep_arg *p = (void *)arg;
+    VALUE self = p->self;
+
+    if (queue_length(self) > 0) {
+	p->result = rb_ary_shift(GET_QUEUE_QUE(self));
+	return Qfalse;
+    }
+    if (queue_closed_p(self)) {
+	p->result = queue_closed_result(self);
+	return Qfalse;
+    }
+    return Qtrue;
+}
+
 static VALUE
 queue_sleep_timeout(VALUE arg)
 {
-    rb_thread_wait_for(*(struct timeval *)arg);
-    return Qtrue;
+    struct queue_sleep_arg *p = (void *)arg;
+    if (!rb_thread_wait_while(queue_sleeping_p, arg, &p->timeout))
+	rb_raise(rb_eThreadError, "queue empty");
+    return Qnil;
 }
 
 static VALUE
 queue_do_pop(VALUE self, struct queue_pop_opts *opts)
 {
     struct waiting_delete args;
-    VALUE (*sleeper)(VALUE) = queue_sleep;
-    VALUE sleeparg = (VALUE)0;
-    VALUE timedout = Qfalse;
     int should_block = opts->should_block;
 
     args.waiting = GET_QUEUE_WAITERS(self);
     args.th	 = rb_thread_current();
     if (opts->should_timeout) {
-	sleeper = queue_sleep_timeout;
-	sleeparg = (VALUE)&opts->timeout;
+	struct queue_sleep_arg to;
+
+	to.self = self;
+	to.result = Qundef;
+	to.timeout = opts->timeout;
+
+	rb_ary_push(args.waiting, args.th);
+	rb_ensure(queue_sleep_timeout, (VALUE)&to, queue_delete_from_waiting, (VALUE)&args);
+	return to.result;
     }
     while (queue_length(self) == 0) {
-	if (!should_block || RTEST(timedout)) {
+	if (!should_block) {
 	    rb_raise(rb_eThreadError, "queue empty");
 	}
 	else if (queue_closed_p(self)) {
@@ -813,7 +844,7 @@ queue_do_pop(VALUE self, struct queue_pop_opts *opts)
 	    assert(queue_closed_p(self) == 0);
 
 	    rb_ary_push(args.waiting, args.th);
-	    timedout = rb_ensure(sleeper, sleeparg, queue_delete_from_waiting, (VALUE)&args);
+	    rb_ensure(queue_sleep, Qfalse, queue_delete_from_waiting, (VALUE)&args);
 	}
     }
 

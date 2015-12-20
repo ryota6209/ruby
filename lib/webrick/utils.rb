@@ -183,11 +183,7 @@ module WEBrick
             if !wakeup
               @queue.pop
             elsif (wakeup -= now) > 0
-              begin
-                (th = Thread.start {@queue.pop}).join(wakeup)
-              ensure
-                th&.kill&.join
-              end
+              @queue.pop(timeout: wakeup)
             end
             @queue.clear
           end

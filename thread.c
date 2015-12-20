@@ -1172,6 +1172,40 @@ rb_thread_wait_for(struct timeval time)
     sleep_timeval(th, time, 1);
 }
 
+VALUE
+rb_thread_wait_while(VALUE (*cond)(VALUE), VALUE arg, const struct timeval *timeout)
+{
+    rb_thread_t *th = GET_THREAD();
+
+    if (!timeout) {
+	while (cond(arg)) {
+	    sleep_forever(th, 1, 0);
+	}
+    }
+    else {
+	struct timeval limit;
+	limit.tv_usec += timeout->tv_usec;
+	limit.tv_sec += timeout->tv_sec;
+	limit.tv_sec += limit.tv_usec / 1000000;
+	limit.tv_usec %= 1000000;
+	while (cond(arg)) {
+	    struct timeval now;
+	    getclockofday(&now);
+	    if (now.tv_sec > limit.tv_sec) return Qfalse;
+	    if ((now.tv_sec -= limit.tv_sec) == 0) {
+		if (now.tv_usec > limit.tv_usec) return Qfalse;
+	    }
+	    if (now.tv_usec < limit.tv_usec) {
+		now.tv_sec--;
+		now.tv_usec += 100000;
+		now.tv_usec -= limit.tv_usec;
+	    }
+	    sleep_timeval(th, now, 0);
+	}
+    }
+    return Qtrue;
+}
+
 /*
  * CAUTION: This function causes thread switching.
  *          rb_thread_check_ints() check ruby's interrupts.
