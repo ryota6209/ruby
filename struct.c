@@ -184,6 +184,40 @@ rb_struct_s_members_m(VALUE klass)
     return rb_ary_dup(members);
 }
 
+VALUE
+rb_struct_create(VALUE klass, VALUE values, int required_kwargs)
+{
+    VALUE st, members, tmp_ary = 0, *vals;
+    ID *ids;
+    int i, n, m;
+
+    values = rb_hash_dup(rb_convert_type(values, T_HASH, "Hash", "to_hash"));
+    members = rb_struct_s_members(klass);
+    n = RARRAY_LENINT(members);
+    ids = ALLOCV(tmp_ary, ruby_xmalloc2_size(n, sizeof(ID)+sizeof(VALUE)));
+    vals = (VALUE *)(ids + n);
+    for (i = 0; i < n; ++i) {
+	ids[i] = SYM2ID(RARRAY_AREF(members, i));
+    }
+    if (required_kwargs) required_kwargs = n;
+    m = rb_get_kwargs(values, ids, required_kwargs, n - required_kwargs, vals);
+    st = rb_class_new_instance(m, vals, klass);
+    ALLOCV_END(tmp_ary);
+    return st;
+}
+
+static VALUE
+rb_struct_create_m(VALUE klass, VALUE values)
+{
+    return rb_struct_create(klass, values, FALSE);
+}
+
+static VALUE
+rb_struct_create_bang(VALUE klass, VALUE values)
+{
+    return rb_struct_create(klass, values, TRUE);
+}
+
 /*
  *  call-seq:
  *     struct.members    -> array
@@ -306,6 +340,8 @@ setup_struct(VALUE nstr, VALUE members)
     rb_define_singleton_method(nstr, "new", rb_class_new_instance, -1);
     rb_define_singleton_method(nstr, "[]", rb_class_new_instance, -1);
     rb_define_singleton_method(nstr, "members", rb_struct_s_members_m, 0);
+    rb_define_singleton_method(nstr, "create", rb_struct_create_m, 1);
+    rb_define_singleton_method(nstr, "create!", rb_struct_create_bang, 1);
     ptr_members = RARRAY_CONST_PTR(members);
     len = RARRAY_LEN(members);
     for (i=0; i< len; i++) {

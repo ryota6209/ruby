@@ -367,6 +367,15 @@ module TestStruct
     assert_nil(o.dig(:b, 0))
   end
 
+  def test_create
+    point = @Struct.new(:x, :y, :color)
+    pt = point.create(x: 1, y: 2)
+    assert_equal([1, 2, nil], [pt.x, pt.y, pt.color])
+    assert_raise(ArgumentError) {
+      point.create!(x: 1, y: 2)
+    }
+  end
+
   class TopStruct < Test::Unit::TestCase
     include TestStruct
 
