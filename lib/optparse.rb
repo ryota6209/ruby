@@ -1050,14 +1050,15 @@ XXX
   # +width+::  Summary width.
   # +indent+:: Summary indent.
   #
-  def initialize(banner = nil, width = 32, indent = ' ' * 4)
+  def initialize(banner = nil, width = 32, indent = '    ',
+                 officious: true)
     @stack = [DefaultList, List.new, List.new]
     @program_name = nil
     @banner = banner
     @summary_width = width
     @summary_indent = indent
     @default_argv = ARGV
-    add_officious
+    add_officious if officious
     yield self if block_given?
   end
 
