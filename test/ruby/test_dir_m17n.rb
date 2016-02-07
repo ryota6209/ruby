@@ -72,7 +72,8 @@ class TestDir_M17N < Test::Unit::TestCase
         opts = {:encoding => Encoding.default_external} if /mswin|mingw/ =~ RUBY_PLATFORM
         ents = Dir.entries(".", opts)
         filename = "%FF" if /darwin/ =~ RUBY_PLATFORM && ents.include?("%FF")
-        assert_include(ents, filename)
+        assert_include(ents, filename.b)
+        ents.each { |f| assert_predicate f, :valid_encoding? }
       EOS
     }
   end unless /mswin|mingw/ =~ RUBY_PLATFORM

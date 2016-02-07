@@ -959,6 +959,10 @@ rb_external_str_with_enc(VALUE str, rb_encoding *eenc)
 	return str;
     }
     rb_enc_associate_index(str, eidx);
+    if (rb_enc_str_coderange(str) == ENC_CODERANGE_BROKEN) {
+	rb_enc_associate_index(str, rb_ascii8bit_encindex());
+	return str;
+    }
     return rb_str_conv_enc(str, eenc, rb_default_internal_encoding());
 }
 
