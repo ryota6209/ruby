@@ -196,7 +196,7 @@ class TestDir_M17N < Test::Unit::TestCase
         opts = {:encoding => Encoding.default_external} if /mswin|mingw/ =~ RUBY_PLATFORM
         ents = Dir.entries(".", opts)
         if /darwin/ =~ RUBY_PLATFORM
-          filename = filename.encode("utf-8").force_encoding("euc-jp")
+          filename = filename.encode("utf-8").b
         end
         assert_include(ents, filename)
       EOS
@@ -241,7 +241,7 @@ class TestDir_M17N < Test::Unit::TestCase
         opts = {:encoding => Encoding.default_external} if /mswin|mingw/ =~ RUBY_PLATFORM
         ents = Dir.entries(".", opts)
         if /darwin/ =~ RUBY_PLATFORM
-          filename = filename.encode("utf-8", "euc-jp").force_encoding("euc-jp")
+          filename = filename.encode("utf-8").b
         end
         assert_include(ents, filename)
       EOS
@@ -250,7 +250,7 @@ class TestDir_M17N < Test::Unit::TestCase
         opts = {:encoding => Encoding.default_external} if /mswin|mingw/ =~ RUBY_PLATFORM
         ents = Dir.entries(".", opts)
         if /darwin/ =~ RUBY_PLATFORM
-          filename = filename.force_encoding("euc-jp")
+          filename = filename.b
         end
         assert_include(ents, filename)
       EOS
