@@ -1418,6 +1418,7 @@ NORETURN(void rb_bug_context(const void *, const char *fmt, ...));
 /* functions about thread/vm execution */
 RUBY_SYMBOL_EXPORT_BEGIN
 VALUE rb_iseq_eval(const rb_iseq_t *iseq);
+VALUE rb_iseq_eval_in_scope(const rb_iseq_t *iseq, VALUE scope);
 VALUE rb_iseq_eval_main(const rb_iseq_t *iseq);
 RUBY_SYMBOL_EXPORT_END
 int rb_thread_method_id_and_class(rb_thread_t *th, ID *idp, VALUE *klassp);
