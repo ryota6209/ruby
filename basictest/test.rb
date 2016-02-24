@@ -80,7 +80,8 @@ class Progress
   end
 
   module Rotator
-    ROTATOR = %w[- \\ | /]
+    s = ENV['TEST_PROGRESS']
+    ROTATOR = s && !s.empty? ? s.split(//) : %w[- \\ | /]
     BS = "\b" * ROTATOR[0].size
     def passed_string
       "#{BS}#{ROTATOR[(@count += 1) % ROTATOR.size]}"

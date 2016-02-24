@@ -126,7 +126,8 @@ End
   tests = Dir.glob("#{File.dirname($0)}/test_*.rb").sort if tests.empty?
   pathes = tests.map {|path| File.expand_path(path) }
 
-  @progress = %w[- \\ | /]
+  s = ENV['TEST_PROGRESS']
+  @progress = s && !s.empty? ? s.split(//) : %w[- \\ | /]
   @progress_bs = "\b" * @progress[0].size
   @tty = $stderr.tty? if @tty.nil?
   case @color
