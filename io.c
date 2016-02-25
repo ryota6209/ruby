@@ -7296,10 +7296,10 @@ rb_write_error(const char *mesg)
 }
 
 void
-rb_write_error_str(VALUE mesg)
+rb_write_error_str(VALUE err, VALUE mesg)
 {
     /* a stopgap measure for the time being */
-    if (rb_stderr == orig_stderr || RFILE(orig_stderr)->fptr->fd < 0) {
+    if (err == orig_stderr || RFILE(orig_stderr)->fptr->fd < 0) {
 	size_t len = (size_t)RSTRING_LEN(mesg);
 #ifdef _WIN32
 	if (isatty(fileno(stderr))) {
@@ -7313,7 +7313,7 @@ rb_write_error_str(VALUE mesg)
     }
     else {
 	/* may unlock GVL, and  */
-	rb_io_write(rb_stderr, mesg);
+	rb_io_write(err, mesg);
     }
 }
 

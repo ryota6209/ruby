@@ -14,16 +14,17 @@
 #define warn_print(x) rb_write_error(x)
 #endif
 #define warn_print2(x,l) rb_write_error2((x),(l))
-#define warn_print_str(x) rb_write_error_str(x)
+#define warn_print_str(x) rb_write_error_str(output, x)
 
 static VALUE error_pos_str(void);
+static void exc_error_print(VALUE errinfo, VALUE output, rb_thread_t *th);
 
 static void
 error_pos(void)
 {
     VALUE str = error_pos_str();
     if (!NIL_P(str)) {
-	warn_print_str(str);
+	rb_write_error_str(rb_stderr, str);
     }
 }
 
@@ -89,18 +90,31 @@ set_backtrace(VALUE info, VALUE bt)
 static void
 error_print(void)
 {
-    volatile VALUE errat = Qundef;
     rb_thread_t *th = GET_THREAD();
     VALUE errinfo = th->errinfo;
     int raised_flag = th->raised_flag;
-    volatile VALUE eclass = Qundef, e = Qundef;
-    const char *volatile einfo;
-    volatile long elen;
-    VALUE mesg;
 
     if (NIL_P(errinfo))
 	return;
     rb_thread_raised_clear(th);
+    exc_error_print(errinfo, rb_stderr, th);
+    th->errinfo = errinfo;
+    rb_thread_raised_set(th, raised_flag);
+}
+
+static void
+exc_error_print(VALUE errinfo, VALUE output, rb_thread_t *th)
+{
+    volatile VALUE errat = Qundef;
+    volatile VALUE eclass = Qundef, e = Qundef;
+    const char *einfo;
+    long elen;
+    VALUE mesg;
+
+#define CSTR(s) rb_str_new_cstr(s)
+#define CAT(m, s) rb_str_cat_cstr(m, s)
+#define ADD(s) (NIL_P(mesg) ? CSTR(s) : CAT(mesg, (s)))
+#define P(s) warn_print_str(s)
 
     TH_PUSH_TAG(th);
     if (TH_EXEC_TAG() == 0) {
@@ -117,11 +131,10 @@ error_print(void)
     }
     if (NIL_P(errat) || RARRAY_LEN(errat) == 0 ||
 	NIL_P(mesg = RARRAY_AREF(errat, 0))) {
-	error_pos();
+	mesg = error_pos_str();
     }
     else {
-	warn_print_str(mesg);
-	warn_print(": ");
+	mesg = CAT(rb_str_dup(mesg), ": ");
     }
 
     eclass = CLASS_OF(errinfo);
@@ -137,15 +150,16 @@ error_print(void)
 	elen = 0;
     }
     if (eclass == rb_eRuntimeError && elen == 0) {
-	warn_print("unhandled exception\n");
+	P(ADD("unhandled exception\n"));
     }
     else {
 	VALUE epath;
 
+	P(mesg);
 	epath = rb_class_name(eclass);
 	if (elen == 0) {
-	    warn_print_str(epath);
-	    warn_print("\n");
+	    P(epath);
+	    P(rb_default_rs);
 	}
 	else {
 	    const char *tail = 0;
@@ -155,18 +169,24 @@ error_print(void)
 		epath = 0;
 	    if ((tail = memchr(einfo, '\n', elen)) != 0) {
 		len = tail - einfo;
+		P(rb_str_subseq(e, 0, len + !epath));
 		tail++;		/* skip newline */
+		len++;
 	    }
-	    warn_print_str(tail ? rb_str_subseq(e, 0, len) : e);
+	    else {
+		P(e);
+	    }
 	    if (epath) {
-		warn_print(" (");
-		warn_print_str(epath);
-		warn_print(")\n");
+		P(rb_sprintf(" (%"PRIsVALUE")\n", epath));
 	    }
-	    if (tail) {
-		warn_print_str(rb_str_subseq(e, tail - einfo, elen - len - 1));
+	    else if (!tail) {
+		P(rb_default_rs);
 	    }
-	    if (tail ? einfo[elen-1] != '\n' : !epath) warn_print2("\n", 1);
+	    if (tail && len < elen) {
+		mesg = rb_str_subseq(e, len, elen - len);
+		if (einfo[elen-1] != '\n') CAT(mesg, "\n");
+		P(mesg);
+	    }
 	}
     }
 
@@ -182,19 +202,17 @@ error_print(void)
 	for (i = 1; i < len; i++) {
 	    VALUE line = RARRAY_AREF(errat, i);
 	    if (RB_TYPE_P(line, T_STRING)) {
-		warn_print_str(rb_sprintf("\tfrom %"PRIsVALUE"\n", line));
+		P(rb_sprintf("\tfrom %"PRIsVALUE"\n", line));
 	    }
 	    if (skip && i == TRACE_HEAD && len > TRACE_MAX) {
-		warn_print_str(rb_sprintf("\t ... %ld levels...\n",
-					  len - TRACE_HEAD - TRACE_TAIL));
+		P(rb_sprintf("\t ... %ld levels...\n",
+			     len - TRACE_HEAD - TRACE_TAIL));
 		i = len - TRACE_TAIL;
 	    }
 	}
     }
   error:
     TH_POP_TAG();
-    th->errinfo = errinfo;
-    rb_thread_raised_set(th, raised_flag);
 }
 
 void
@@ -301,7 +319,8 @@ error_handle(int ex)
 	warn_print("unexpected throw\n");
 	break;
       case TAG_RAISE: {
-	VALUE errinfo = GET_THREAD()->errinfo;
+	rb_thread_t *th = GET_THREAD();
+	VALUE errinfo = th->errinfo;
 	if (rb_obj_is_kind_of(errinfo, rb_eSystemExit)) {
 	    status = sysexit_status(errinfo);
 	}
@@ -309,8 +328,9 @@ error_handle(int ex)
 		 rb_ivar_get(errinfo, id_signo) != INT2FIX(SIGSEGV)) {
 	    /* no message when exiting by signal */
 	}
-	else {
-	    error_print();
+	else if (!NIL_P(errinfo)) {
+	    exc_error_print(errinfo, rb_stderr, th);
+	    th->errinfo = errinfo;
 	}
 	break;
       }

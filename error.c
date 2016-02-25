@@ -121,7 +121,7 @@ compile_err_append(VALUE mesg)
 	    th->errinfo = err;
 	}
 	rb_str_cat2(mesg, "\n");
-	rb_write_error_str(mesg);
+	rb_write_error_str(rb_stderr, mesg);
     }
 
     /* returned to the parser world */
@@ -185,7 +185,7 @@ compile_warn_print(const char *file, int line, const char *fmt, va_list args)
 
     str = compile_snprintf(NULL, "warning: ", file, line, fmt, args);
     rb_str_cat2(str, "\n");
-    rb_write_error_str(str);
+    rb_write_error_str(rb_stderr, str);
 }
 
 void
@@ -243,7 +243,7 @@ rb_warn(const char *fmt, ...)
     va_start(args, fmt);
     mesg = warning_string(0, fmt, args);
     va_end(args);
-    rb_write_error_str(mesg);
+    rb_write_error_str(rb_stderr, mesg);
 }
 
 void
@@ -257,7 +257,7 @@ rb_enc_warn(rb_encoding *enc, const char *fmt, ...)
     va_start(args, fmt);
     mesg = warning_string(enc, fmt, args);
     va_end(args);
-    rb_write_error_str(mesg);
+    rb_write_error_str(rb_stderr, mesg);
 }
 
 /* rb_warning() reports only in verbose mode */
@@ -272,7 +272,7 @@ rb_warning(const char *fmt, ...)
     va_start(args, fmt);
     mesg = warning_string(0, fmt, args);
     va_end(args);
-    rb_write_error_str(mesg);
+    rb_write_error_str(rb_stderr, mesg);
 }
 
 #if 0
@@ -287,7 +287,7 @@ rb_enc_warning(rb_encoding *enc, const char *fmt, ...)
     va_start(args, fmt);
     mesg = warning_string(enc, fmt, args);
     va_end(args);
-    rb_write_error_str(mesg);
+    rb_write_error_str(rb_stderr, mesg);
 }
 #endif
 
@@ -2281,7 +2281,7 @@ rb_sys_warning(const char *fmt, ...)
     va_end(args);
     rb_str_set_len(mesg, RSTRING_LEN(mesg)-1);
     rb_str_catf(mesg, ": %s\n", strerror(errno_save));
-    rb_write_error_str(mesg);
+    rb_write_error_str(rb_stderr, mesg);
     errno = errno_save;
 }
 
@@ -2301,7 +2301,7 @@ rb_sys_enc_warning(rb_encoding *enc, const char *fmt, ...)
     va_end(args);
     rb_str_set_len(mesg, RSTRING_LEN(mesg)-1);
     rb_str_catf(mesg, ": %s\n", strerror(errno_save));
-    rb_write_error_str(mesg);
+    rb_write_error_str(rb_stderr, mesg);
     errno = errno_save;
 }
 

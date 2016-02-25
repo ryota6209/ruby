@@ -545,7 +545,7 @@ setup_exception(rb_thread_t *th, int tag, volatile VALUE mesg, VALUE cause)
 		e = rb_sprintf("Exception `%"PRIsVALUE"' - %"PRIsVALUE"\n",
 			       rb_obj_class(mesg), e);
 	    }
-	    warn_print_str(e);
+	    rb_write_error_str(rb_stderr, e);
 	}
 	TH_POP_TAG();
 	if (status == TAG_FATAL && th->errinfo == exception_error) {
