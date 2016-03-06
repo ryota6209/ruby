@@ -87,6 +87,16 @@ set_backtrace(VALUE info, VALUE bt)
     rb_funcall(info, rb_intern("set_backtrace"), 1, bt);
 }
 
+static VALUE
+rb_exc_error_print(int argc, VALUE *argv, VALUE errinfo)
+{
+    VALUE output;
+    rb_check_arity(argc, 0, 1);
+    output = (argc > 0) ? argv[0] : rb_stderr;
+    exc_error_print(errinfo, output, GET_THREAD());
+    return errinfo;
+}
+
 static void
 error_print(void)
 {

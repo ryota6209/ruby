@@ -1670,6 +1670,8 @@ Init_eval(void)
 
     rb_vm_register_special_exception(ruby_error_reenter, rb_eFatal, "exception reentered");
 
+    rb_define_method(rb_eException, "display", rb_exc_error_print, -1); /* in eval_error.c */
+
     id_signo = rb_intern_const("signo");
     id_status = rb_intern_const("status");
     id_cause = rb_intern_const("cause");
