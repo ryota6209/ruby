@@ -847,6 +847,19 @@ class TestEncodingConverter < Test::Unit::TestCase
       "&\u3046\u2661&\"'".encode("utf-8", xml: :text))
   end
 
+  def test_xml_ascii_incomatible
+    bug12052 = '[ruby-dev:49493] [Bug #12052]'
+    all_assertions do |a|
+      %w[utf-16be utf-16le utf-32be utf-32le].product(%i[text attr]) do |enc, esc|
+        a.for("#{esc} for #{enc}") do
+          assert_equal("<>".encode(enc, xml: esc),
+                       "<>".encode(enc).encode(enc, xml: esc),
+                       bug12052)
+        end
+      end
+    end
+  end
+
   def test_iso2022jp_invalid_replace
     assert_equal("?x".force_encoding("iso-2022-jp"),
       "\222\xA1x".encode("iso-2022-jp", "stateless-iso-2022-jp", :invalid => :replace))
