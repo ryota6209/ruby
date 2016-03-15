@@ -2322,9 +2322,9 @@ objspace_each_objects(VALUE arg)
 }
 
 static VALUE
-incremental_enable(void)
+incremental_enable(VALUE arg)
 {
-    rb_objspace_t *objspace = &rb_objspace;
+    rb_objspace_t *objspace = (rb_objspace_t *)arg;
 
     objspace->flags.dont_incremental = FALSE;
     return Qnil;
@@ -2383,7 +2383,8 @@ rb_objspace_each_objects(each_obj_callback *callback, void *data)
 	objspace_each_objects((VALUE)&args);
     }
     else {
-	rb_ensure(objspace_each_objects, (VALUE)&args, incremental_enable, Qnil);
+	rb_ensure(objspace_each_objects, (VALUE)&args,
+		  incremental_enable, (VALUE)objspace_each_objects);
     }
 }
 
@@ -4688,7 +4689,7 @@ gc_mark_roots(rb_objspace_t *objspace, const char **categoryp)
     /* mark protected global variables */
     MARK_CHECKPOINT("global_list");
     for (list = global_list; list; list = list->next) {
-	rb_gc_mark_maybe(*list->varptr);
+	gc_mark_maybe(objspace, *list->varptr);
     }
 
     MARK_CHECKPOINT("end_proc");
@@ -4697,7 +4698,7 @@ gc_mark_roots(rb_objspace_t *objspace, const char **categoryp)
     MARK_CHECKPOINT("global_tbl");
     rb_gc_mark_global_tbl();
 
-    if (stress_to_class) rb_gc_mark(stress_to_class);
+    if (stress_to_class) gc_mark(objspace, stress_to_class);
 
     MARK_CHECKPOINT("finish");
 #undef MARK_CHECKPOINT
