@@ -479,7 +479,7 @@ enum gc_mode {
     gc_mode_sweeping
 };
 
-typedef struct rb_objspace {
+struct rb_objspace {
     struct {
 	size_t limit;
 	size_t increase;
@@ -622,7 +622,7 @@ typedef struct rb_objspace {
 #if GC_DEBUG_STRESS_TO_CLASS
     VALUE stress_to_class;
 #endif
-} rb_objspace_t;
+};
 
 
 #ifndef HEAP_PAGE_ALIGN_LOG
@@ -841,9 +841,9 @@ static void gc_sweep_rest(rb_objspace_t *objspace);
 static void gc_sweep_continue(rb_objspace_t *objspace, rb_heap_t *heap);
 #endif
 
-static void gc_mark(rb_objspace_t *objspace, VALUE ptr);
+#define gc_mark rb_objspace_gc_mark
+#define gc_mark_maybe rb_objspace_gc_mark_maybe
 static void gc_mark_ptr(rb_objspace_t *objspace, VALUE ptr);
-static void gc_mark_maybe(rb_objspace_t *objspace, VALUE ptr);
 static void gc_mark_children(rb_objspace_t *objspace, VALUE ptr);
 
 static int gc_mark_stacked_objects_incremental(rb_objspace_t *, size_t count);
@@ -4171,8 +4171,8 @@ rb_mark_tbl(st_table *tbl)
     mark_tbl(&rb_objspace, tbl);
 }
 
-static void
-gc_mark_maybe(rb_objspace_t *objspace, VALUE obj)
+void
+rb_objspace_gc_mark_maybe(rb_objspace_t *objspace, VALUE obj)
 {
     (void)VALGRIND_MAKE_MEM_DEFINED(&obj, sizeof(obj));
     if (is_pointer_to_heap(objspace, (void *)obj)) {
@@ -4323,8 +4323,8 @@ gc_mark_ptr(rb_objspace_t *objspace, VALUE obj)
     }
 }
 
-static void
-gc_mark(rb_objspace_t *objspace, VALUE obj)
+void
+rb_objspace_gc_mark(rb_objspace_t *objspace, VALUE obj)
 {
     if (!is_markable_object(objspace, obj)) return;
     gc_mark_ptr(objspace, obj);
@@ -4684,7 +4684,7 @@ gc_mark_roots(rb_objspace_t *objspace, const char **categoryp)
     mark_current_machine_context(objspace, th);
 
     MARK_CHECKPOINT("encodings");
-    rb_gc_mark_encodings();
+    rb_gc_mark_encodings(objspace);
 
     /* mark protected global variables */
     MARK_CHECKPOINT("global_list");
@@ -4693,10 +4693,10 @@ gc_mark_roots(rb_objspace_t *objspace, const char **categoryp)
     }
 
     MARK_CHECKPOINT("end_proc");
-    rb_mark_end_proc();
+    rb_mark_end_proc(objspace);
 
     MARK_CHECKPOINT("global_tbl");
-    rb_gc_mark_global_tbl();
+    rb_gc_mark_global_tbl(objspace);
 
     if (stress_to_class) gc_mark(objspace, stress_to_class);
 

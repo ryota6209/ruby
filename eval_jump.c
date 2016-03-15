@@ -77,18 +77,18 @@ rb_set_end_proc(void (*func)(VALUE), VALUE data)
 }
 
 void
-rb_mark_end_proc(void)
+rb_mark_end_proc(rb_objspace_t *objspace)
 {
     struct end_proc_data *link;
 
     link = end_procs;
     while (link) {
-	rb_gc_mark(link->data);
+	rb_objspace_gc_mark(objspace, link->data);
 	link = link->next;
     }
     link = ephemeral_end_procs;
     while (link) {
-	rb_gc_mark(link->data);
+	rb_objspace_gc_mark(objspace, link->data);
 	link = link->next;
     }
 }

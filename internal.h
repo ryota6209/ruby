@@ -709,6 +709,8 @@ VALUE rb_gvar_defined(struct rb_global_entry *);
 
 struct vtm; /* defined by timev.h */
 
+typedef struct rb_objspace rb_objspace_t;
+
 /* array.c */
 VALUE rb_ary_last(int, const VALUE *, VALUE);
 void rb_ary_set_len(VALUE, long);
@@ -780,7 +782,7 @@ void Init_ext(void);
 
 /* encoding.c */
 ID rb_id_encoding(void);
-void rb_gc_mark_encodings(void);
+void rb_gc_mark_encodings(rb_objspace_t *);
 rb_encoding *rb_enc_get_from_index(int index);
 rb_encoding *rb_enc_check_str(VALUE str1, VALUE str2);
 int rb_encdb_replicate(const char *alias, const char *orig);
@@ -824,7 +826,7 @@ VALUE rb_get_backtrace(VALUE info);
 
 /* eval_jump.c */
 void rb_call_end_proc(VALUE data);
-void rb_mark_end_proc(void);
+void rb_mark_end_proc(rb_objspace_t *);
 
 /* file.c */
 VALUE rb_home_dir_of(VALUE user, VALUE result);
@@ -1285,7 +1287,7 @@ char *ruby_hdtoa(double d, const char *xdigs, int ndigits, int *decpt, int *sign
 extern rb_encoding OnigEncodingUTF_8;
 
 /* variable.c */
-void rb_gc_mark_global_tbl(void);
+void rb_gc_mark_global_tbl(rb_objspace_t *);
 size_t rb_generic_ivar_memsize(VALUE);
 VALUE rb_search_class_path(VALUE);
 VALUE rb_attr_delete(VALUE, ID);
@@ -1452,6 +1454,8 @@ void rb_gc_verify_internal_consistency(void);
 #define RB_OBJ_GC_FLAGS_MAX 5
 size_t rb_obj_gc_flags(VALUE, ID[], size_t);
 void rb_gc_mark_values(long n, const VALUE *values);
+void rb_objspace_gc_mark(rb_objspace_t *, VALUE);
+void rb_objspace_gc_mark_maybe(rb_objspace_t *, VALUE);
 
 #if IMEMO_DEBUG
 VALUE rb_imemo_new_debug(enum imemo_type type, VALUE v1, VALUE v2, VALUE v3, VALUE v0, const char *file, int line);

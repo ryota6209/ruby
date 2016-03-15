@@ -260,7 +260,7 @@ rb_find_encoding(VALUE enc)
 }
 
 void
-rb_gc_mark_encodings(void)
+rb_gc_mark_encodings(rb_objspace_t *objspace)
 {
 }
 

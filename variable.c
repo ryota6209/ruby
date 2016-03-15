@@ -571,7 +571,7 @@ rb_gvar_readonly_setter(VALUE v, ID id, void *d, struct rb_global_variable *g)
 }
 
 static enum rb_id_table_iterator_result
-mark_global_entry(VALUE v, void *ignored)
+mark_global_entry(VALUE v, void *arg)
 {
     struct rb_global_entry *entry = (struct rb_global_entry *)v;
     struct trace_var *trace;
@@ -580,17 +580,17 @@ mark_global_entry(VALUE v, void *ignored)
     (*var->marker)(var->data);
     trace = var->trace;
     while (trace) {
-	if (trace->data) rb_gc_mark_maybe(trace->data);
+	if (trace->data) rb_objspace_gc_mark_maybe(arg, trace->data);
 	trace = trace->next;
     }
     return ID_TABLE_CONTINUE;
 }
 
 void
-rb_gc_mark_global_tbl(void)
+rb_gc_mark_global_tbl(rb_objspace_t *objspace)
 {
     if (rb_global_tbl)
-        rb_id_table_foreach_values(rb_global_tbl, mark_global_entry, 0);
+	rb_id_table_foreach_values(rb_global_tbl, mark_global_entry, objspace);
 }
 
 static ID
