@@ -2325,6 +2325,17 @@ iseq_specialized_instruction(rb_iseq_t *iseq, INSN *iobj)
 		    break;
 		}
 		break;
+	      case 1:
+		switch (ci->mid) {
+		  case idAREF:
+		    iobj->insn_id = BIN(opt_aref_with);
+		    iobj->operand_size = 3;
+		    iobj->operands = niobj->operands;
+		    iobj->operands[2] = str;
+		    REMOVE_ELEM(&niobj->link);
+		    break;
+		}
+		break;
 	    }
 	}
     }
@@ -4928,25 +4939,6 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 	break;
       }
       case NODE_CALL:
-	/* optimization shortcut
-	 *   obj["literal"] -> opt_aref_with(obj, "literal")
-	 */
-	if (node->nd_mid == idAREF && !private_recv_p(node) && node->nd_args &&
-	    nd_type(node->nd_args) == NODE_ARRAY && node->nd_args->nd_alen == 1 &&
-	    nd_type(node->nd_args->nd_head) == NODE_STR &&
-	    ISEQ_COMPILE_DATA(iseq)->current_block == NULL &&
-	    ISEQ_COMPILE_DATA(iseq)->option->specialized_instruction) {
-	    VALUE str = rb_fstring(node->nd_args->nd_head->nd_lit);
-	    node->nd_args->nd_head->nd_lit = str;
-	    COMPILE(ret, "recv", node->nd_recv);
-	    ADD_INSN3(ret, line, opt_aref_with,
-		      new_callinfo(iseq, idAREF, 1, 0, NULL, FALSE),
-		      NULL/* CALL_CACHE */, str);
-	    if (poped) {
-		ADD_INSN(ret, line, pop);
-	    }
-	    break;
-	}
       case NODE_QCALL:
       case NODE_FCALL:
       case NODE_VCALL:{		/* VCALL: variable or call */
