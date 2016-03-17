@@ -2309,6 +2309,26 @@ iseq_specialized_instruction(rb_iseq_t *iseq, INSN *iobj)
 	}
     }
 
+    if (iobj->insn_id == BIN(putstring) ||
+	(iobj->insn_id == BIN(putobject) && RB_TYPE_P(OPERAND_AT(iobj, 0), T_STRING))) {
+	INSN *niobj = (INSN *)iobj->link.next;
+	VALUE str = OPERAND_AT(iobj, 0);
+	struct rb_call_info *ci = 0;
+	if (niobj && niobj->insn_id == BIN(send) &&
+	    CI_ARGS_SIMPLE_P(ci = CALL_INFO_AT(niobj))) {
+	    switch (ci->orig_argc) {
+	      case 0:
+		switch (ci->mid) {
+		  case idFreeze:
+		    iobj->insn_id = BIN(opt_str_freeze);
+		    REMOVE_ELEM(&niobj->link);
+		    break;
+		}
+		break;
+	    }
+	}
+    }
+
     if (iobj->insn_id == BIN(send)) {
 	struct rb_call_info *ci = (struct rb_call_info *)OPERAND_AT(iobj, 0);
 	const rb_iseq_t *blockiseq = (rb_iseq_t *)OPERAND_AT(iobj, 2);
@@ -4908,21 +4928,6 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 	break;
       }
       case NODE_CALL:
-	/* optimization shortcut
-	 *   "literal".freeze -> opt_str_freeze("literal")
-	 */
-	if (node->nd_recv && nd_type(node->nd_recv) == NODE_STR &&
-	    node->nd_mid == idFreeze && node->nd_args == NULL &&
-	    ISEQ_COMPILE_DATA(iseq)->current_block == NULL &&
-	    ISEQ_COMPILE_DATA(iseq)->option->specialized_instruction) {
-	    VALUE str = rb_fstring(node->nd_recv->nd_lit);
-	    iseq_add_mark_object(iseq, str);
-	    ADD_INSN1(ret, line, opt_str_freeze, str);
-	    if (poped) {
-		ADD_INSN(ret, line, pop);
-	    }
-	    break;
-	}
 	/* optimization shortcut
 	 *   obj["literal"] -> opt_aref_with(obj, "literal")
 	 */
