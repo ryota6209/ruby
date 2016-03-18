@@ -21,6 +21,7 @@
 #define YYERROR_VERBOSE 1
 #define YYSTACK_USE_ALLOCA 0
 
+#define CIRCLED_DIGIT_ONE 0x2460
 #include "ruby/ruby.h"
 #include "ruby/st.h"
 #include "ruby/encoding.h"
@@ -171,7 +172,7 @@ vtable_alloc(struct vtable *prev)
     struct vtable *tbl = ALLOC(struct vtable);
     tbl->pos = 0;
     tbl->capa = 8;
-    tbl->tbl = ALLOC_N(ID, tbl->capa);
+    tbl->tbl = ZALLOC_N(ID, tbl->capa);
     tbl->prev = prev;
     if (VTBL_DEBUG) printf("vtable_alloc: %p\n", (void *)tbl);
     return tbl;
@@ -200,6 +201,7 @@ vtable_add(struct vtable *tbl, ID id)
     if (tbl->pos == tbl->capa) {
         tbl->capa = tbl->capa * 2;
         REALLOC_N(tbl->tbl, ID, tbl->capa);
+	MEMZERO(tbl->tbl+tbl->pos, ID, tbl->capa-tbl->pos);
     }
     tbl->tbl[tbl->pos++] = id;
 }
@@ -499,7 +501,9 @@ static NODE *match_op_gen(struct parser_params*,NODE*,NODE*);
 #define match_op(node1,node2) match_op_gen(parser, (node1), (node2))
 
 static ID  *local_tbl_gen(struct parser_params*);
-#define local_tbl() local_tbl_gen(parser)
+#define local_tbl(a) local_tbl_gen(parser)
+static NODE* new_scope_gen(struct parser_params *parser, NODE *a, NODE *b);
+#define new_scope(a, b) new_scope_gen(parser, (a), (b))
 
 static void fixup_nodes(NODE **);
 
@@ -9119,6 +9123,26 @@ past_dvar_p(struct parser_params *parser, ID id)
 }
 # endif
 
+static int
+circled_number(VALUE s)
+{
+    const char *str;
+    long len;
+    int n;
+    unsigned int c;
+    rb_encoding *enc = rb_enc_get(s);
+
+    if (enc != rb_utf8_encoding()) return -1;
+    RSTRING_GETMEM(s, str, len);
+    if (!len) return -1;
+    c = rb_enc_codepoint_len(str, str+len, &n, enc);
+    if ((long)n != len) return -1;
+    if (c < CIRCLED_DIGIT_ONE) return -1;
+    c -= CIRCLED_DIGIT_ONE - 1;
+    if (c > 20) return -1;
+    return c;
+}
+
 static NODE*
 gettable_gen(struct parser_params *parser, ID id)
 {
@@ -9157,6 +9181,26 @@ gettable_gen(struct parser_params *parser, ID id)
 	    rb_warning1("possible reference to past scope - %"PRIsWARN, rb_id2str(id));
 	}
 # endif
+	if (dyna_in_block()) {
+	    int i = circled_number(rb_id2str(id));
+	    if (i > 0) {
+		id = ID_STATIC_SYM | ID_INTERNAL | (i << ID_SCOPE_SHIFT);
+		if (lvtbl->args->pos) {
+		    compile_error(PARSER_ARG "block parameter exist");
+		    return 0;
+		}
+		if (lvtbl->args->capa < i) {
+		    do lvtbl->args->capa *= 2; while (lvtbl->args->capa < i);
+		    REALLOC_N(lvtbl->args->tbl, ID, lvtbl->args->capa);
+		    MEMZERO(lvtbl->args->tbl+lvtbl->args->pos, ID,
+			    lvtbl->args->capa-lvtbl->args->pos);
+		}
+		if (lvtbl->args->pos < i) {
+		    lvtbl->args->tbl[i-1] = id;
+		}
+		return NEW_DVAR(id);
+	    }
+	}
 	/* method call without arguments */
 	return NEW_VCALL(id);
       case ID_GLOBAL:
@@ -10373,6 +10417,28 @@ local_pop_gen(struct parser_params *parser)
 }
 
 #ifndef RIPPER
+static NODE*
+new_scope_gen(struct parser_params *parser, NODE *a, NODE *b)
+{
+    struct vtable *args;
+    const ID *tbl;
+    if (!a && POINTER_P(args = lvtbl->args) && POINTER_P(tbl = args->tbl)) {
+	int i, n = args->pos;
+	for (i = n; i < args->capa; ++i) {
+	    if (tbl[i]) {
+		n = i + 1;
+	    }
+	}
+	if (n > args->pos) {
+	    struct rb_args_info *ainfo = ZALLOC(struct rb_args_info);
+	    a = NEW_NODE(NODE_ARGS, 0, 0, ainfo);
+	    ainfo->pre_args_num = n;
+	    args->pos = n;
+	}
+    }
+    return NEW_SCOPE(a, b);
+}
+
 static ID*
 local_tbl_gen(struct parser_params *parser)
 {

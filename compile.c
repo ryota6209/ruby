@@ -5317,10 +5317,18 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
 	int lv, idx, ls;
 	debugi("nd_vid", node->nd_vid);
 	if (!poped) {
+	    if ((node->nd_vid & (ID_STATIC_SYM|ID_INTERNAL)) == (ID_STATIC_SYM|ID_INTERNAL) &&
+		(node->nd_vid >> ID_SCOPE_SHIFT) - 1 < 20) {
+		idx = (int)(node->nd_vid >> ID_SCOPE_SHIFT) - 1;
+		ls = iseq->body->local_size;
+		lv = 0;
+		goto dvar_gen;
+	    }
 	    idx = get_dyna_var_idx(iseq, node->nd_vid, &lv, &ls);
 	    if (idx < 0) {
 		rb_compile_bug_str(ERROR_ARGS "unknown dvar (%"PRIsVALUE")", rb_id2str(node->nd_vid));
 	    }
+	  dvar_gen:
 	    ADD_INSN2(ret, line, getlocal, INT2FIX(ls - idx), INT2FIX(lv));
 	}
 	break;
