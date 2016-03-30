@@ -2091,21 +2091,37 @@ int rb_remove_event_hook(rb_event_hook_func_t func);
 
 /* locale insensitive functions */
 
-static inline int rb_isascii(int c){ return '\0' <= c && c <= '\x7f'; }
-static inline int rb_isupper(int c){ return 'A' <= c && c <= 'Z'; }
-static inline int rb_islower(int c){ return 'a' <= c && c <= 'z'; }
-static inline int rb_isalpha(int c){ return rb_isupper(c) || rb_islower(c); }
-static inline int rb_isdigit(int c){ return '0' <= c && c <= '9'; }
-static inline int rb_isalnum(int c){ return rb_isalpha(c) || rb_isdigit(c); }
-static inline int rb_isxdigit(int c){ return rb_isdigit(c) || ('A' <= c && c <= 'F') || ('a' <= c && c <= 'f'); }
-static inline int rb_isblank(int c){ return c == ' ' || c == '\t'; }
-static inline int rb_isspace(int c){ return c == ' ' || ('\t' <= c && c <= '\r'); }
-static inline int rb_iscntrl(int c){ return ('\0' <= c && c < ' ') || c == '\x7f'; }
-static inline int rb_isprint(int c){ return ' ' <= c && c <= '\x7e'; }
-static inline int rb_ispunct(int c){ return !rb_isalnum(c); }
-static inline int rb_isgraph(int c){ return '!' <= c && c <= '\x7e'; }
-static inline int rb_tolower(int c) { return rb_isupper(c) ? (c|0x20) : c; }
-static inline int rb_toupper(int c) { return rb_islower(c) ? (c&0x5f) : c; }
+static inline int rb_isascii0(int c) { return '\0' <= c && c <= '\x7f'; }
+static inline int rb_isupper0(int c) { return 'A' <= c && c <= 'Z'; }
+static inline int rb_islower0(int c) { return 'a' <= c && c <= 'z'; }
+static inline int rb_isalpha0(int c) { return rb_isupper0(c) || rb_islower0(c); }
+static inline int rb_isdigit0(int c) { return '0' <= c && c <= '9'; }
+static inline int rb_isalnum0(int c) { return rb_isalpha0(c) || rb_isdigit0(c); }
+static inline int rb_isxdigit0(int c){ return rb_isdigit0(c) || ('A' <= c && c <= 'F') || ('a' <= c && c <= 'f'); }
+static inline int rb_isblank0(int c) { return c == ' ' || c == '\t'; }
+static inline int rb_isspace0(int c) { return c == ' ' || ('\t' <= c && c <= '\r'); }
+static inline int rb_iscntrl0(int c) { return ('\0' <= c && c < ' ') || c == '\x7f'; }
+static inline int rb_isprint0(int c) { return ' ' <= c && c <= '\x7e'; }
+static inline int rb_ispunct0(int c) { return !rb_isalnum0(c); }
+static inline int rb_isgraph0(int c) { return '!' <= c && c <= '\x7e'; }
+static inline int rb_tolower0(int c) { return rb_isupper0(c) ? (c|0x20) : c; }
+static inline int rb_toupper0(int c) { return rb_islower0(c) ? (c&0x5f) : c; }
+
+#define rb_isascii(c) rb_isascii0(c)
+#define rb_isupper(c) rb_isupper0(c)
+#define rb_islower(c) rb_islower0(c)
+#define rb_isalpha(c) rb_isalpha0(c)
+#define rb_isdigit(c) rb_isdigit0(c)
+#define rb_isalnum(c) rb_isalnum0(c)
+#define rb_isxdigit(c) rb_isxdigit0(c)
+#define rb_isblank(c) rb_isblank0(c)
+#define rb_isspace(c) rb_isspace0(c)
+#define rb_iscntrl(c) rb_iscntrl0(c)
+#define rb_isprint(c) rb_isprint0(c)
+#define rb_ispunct(c) rb_ispunct0(c)
+#define rb_isgraph(c) rb_isgraph0(c)
+#define rb_tolower(c) rb_tolower0(c)
+#define rb_toupper(c) rb_toupper0(c)
 
 #ifndef ISPRINT
 #define ISASCII(c) rb_isascii(c)

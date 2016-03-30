@@ -1958,6 +1958,36 @@ Init_Encoding(void)
 }
 
 /* locale insensitive ctype functions */
+#undef rb_isascii
+#undef rb_isupper
+#undef rb_islower
+#undef rb_isalpha
+#undef rb_isdigit
+#undef rb_isalnum
+#undef rb_isxdigit
+#undef rb_isblank
+#undef rb_isspace
+#undef rb_iscntrl
+#undef rb_isprint
+#undef rb_ispunct
+#undef rb_isgraph
+#undef rb_tolower
+#undef rb_toupper
+int rb_isascii(int c) {return rb_isascii0(c);}
+int rb_isupper(int c) {return rb_isupper0(c);}
+int rb_islower(int c) {return rb_islower0(c);}
+int rb_isalpha(int c) {return rb_isalpha0(c);}
+int rb_isdigit(int c) {return rb_isdigit0(c);}
+int rb_isalnum(int c) {return rb_isalnum0(c);}
+int rb_isxdigit(int c) {return rb_isxdigit0(c);}
+int rb_isblank(int c) {return rb_isblank0(c);}
+int rb_isspace(int c) {return rb_isspace0(c);}
+int rb_iscntrl(int c) {return rb_iscntrl0(c);}
+int rb_isprint(int c) {return rb_isprint0(c);}
+int rb_ispunct(int c) {return rb_ispunct0(c);}
+int rb_isgraph(int c) {return rb_isgraph0(c);}
+int rb_tolower(int c) {return rb_tolower0(c);}
+int rb_toupper(int c) {return rb_toupper0(c);}
 
 void
 rb_enc_foreach_name(int (*func)(st_data_t name, st_data_t idx, st_data_t arg), st_data_t arg)
