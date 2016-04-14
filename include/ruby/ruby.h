@@ -1927,34 +1927,60 @@ RUBY_EXTERN VALUE rb_eMathDomainError;
 RUBY_EXTERN VALUE rb_stdin, rb_stdout, rb_stderr;
 
 static inline VALUE
+rb_class_of_immediate(VALUE obj)
+{
+    if (RB_FIXNUM_P(obj)) return rb_cFixnum;
+    if (RB_FLONUM_P(obj)) return rb_cFloat;
+    if (obj == RUBY_Qtrue)  return rb_cTrueClass;
+    if (RB_STATIC_SYM_P(obj)) return rb_cSymbol;
+    return RBASIC_CLASS(obj);
+}
+
+static inline VALUE
+rb_class_of_falsy(VALUE obj)
+{
+    if (obj) return rb_cNilClass;
+    return rb_cFalseClass;
+}
+
+static inline VALUE
 rb_class_of(VALUE obj)
 {
     if (RB_IMMEDIATE_P(obj)) {
-	if (RB_FIXNUM_P(obj)) return rb_cFixnum;
-	if (RB_FLONUM_P(obj)) return rb_cFloat;
-	if (obj == RUBY_Qtrue)  return rb_cTrueClass;
-	if (RB_STATIC_SYM_P(obj)) return rb_cSymbol;
+	return rb_class_of_immediate(obj);
     }
     else if (!RTEST(obj)) {
-	if (obj == RUBY_Qnil)   return rb_cNilClass;
-	if (obj == RUBY_Qfalse) return rb_cFalseClass;
+	return rb_class_of_falsy(obj);
     }
-    return RBASIC(obj)->klass;
+    return RBASIC_CLASS(obj);
+}
+
+static inline int
+rb_type_immediate(VALUE obj)
+{
+    if (RB_FIXNUM_P(obj)) return RUBY_T_FIXNUM;
+    if (RB_FLONUM_P(obj)) return RUBY_T_FLOAT;
+    if (obj == RUBY_Qtrue)  return RUBY_T_TRUE;
+    if (RB_STATIC_SYM_P(obj)) return RUBY_T_SYMBOL;
+    if (obj == RUBY_Qundef) return RUBY_T_UNDEF;
+    return RB_BUILTIN_TYPE(obj);
+}
+
+static inline VALUE
+rb_type_falsy(VALUE obj)
+{
+    if (obj) return RUBY_T_NIL;
+    return RUBY_T_FALSE;
 }
 
 static inline int
 rb_type(VALUE obj)
 {
     if (RB_IMMEDIATE_P(obj)) {
-	if (RB_FIXNUM_P(obj)) return RUBY_T_FIXNUM;
-        if (RB_FLONUM_P(obj)) return RUBY_T_FLOAT;
-        if (obj == RUBY_Qtrue)  return RUBY_T_TRUE;
-	if (RB_STATIC_SYM_P(obj)) return RUBY_T_SYMBOL;
-	if (obj == RUBY_Qundef) return RUBY_T_UNDEF;
+	return rb_type_immediate(obj);
     }
     else if (!RTEST(obj)) {
-	if (obj == RUBY_Qnil)   return RUBY_T_NIL;
-	if (obj == RUBY_Qfalse) return RUBY_T_FALSE;
+	return rb_type_falsy(obj);
     }
     return RB_BUILTIN_TYPE(obj);
 }
