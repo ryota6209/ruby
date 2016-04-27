@@ -4499,6 +4499,20 @@ int_truncate(int argc, VALUE* argv, VALUE num)
     return rb_int_truncate(num, ndigits);
 }
 
+static VALUE
+int_unpack(int argc, VALUE *argv, VALUE self)
+{
+    int flags = (INTEGER_PACK_MSWORD_FIRST|
+		 INTEGER_PACK_MSBYTE_FIRST);
+    VALUE f = (rb_check_arity(argc, 1, 2) > 1 ? argv[1] : Qnil);
+    VALUE str = argv[0];
+    if (!NIL_P(f)) {
+	flags = NUM2UINT(f);
+    }
+    StringValue(str);
+    return rb_integer_unpack(RSTRING_PTR(str), RSTRING_LEN(str), 1, 0, flags);
+}
+
 /*
  *  Document-class: ZeroDivisionError
  *
@@ -4652,6 +4666,7 @@ Init_Numeric(void)
     rb_cInteger = rb_define_class("Integer", rb_cNumeric);
     rb_undef_alloc_func(rb_cInteger);
     rb_undef_method(CLASS_OF(rb_cInteger), "new");
+    rb_define_singleton_method(rb_cInteger, "unpack", int_unpack, -1);
 
     rb_define_method(rb_cInteger, "to_s", int_to_s, -1);
     rb_define_alias(rb_cInteger, "inspect", "to_s");
@@ -4674,6 +4689,24 @@ Init_Numeric(void)
     rb_define_method(rb_cInteger, "truncate", int_truncate, -1);
     rb_define_method(rb_cInteger, "round", int_round, -1);
     rb_define_method(rb_cInteger, "<=>", int_cmp, 1);
+
+    {
+#define DEFINE_PACK_CONST(name) \
+	rb_define_const(rb_cInteger, #name, INT2FIX(INTEGER_PACK_##name))
+	enum {
+	    INTEGER_PACK_NATIVE = INTEGER_PACK_NATIVE_BYTE_ORDER,
+	    INTEGER_PACK_TWOCOMP = INTEGER_PACK_2COMP
+	};
+	DEFINE_PACK_CONST(BIG_ENDIAN);
+	DEFINE_PACK_CONST(LITTLE_ENDIAN);
+	DEFINE_PACK_CONST(MSWORD_FIRST);
+	DEFINE_PACK_CONST(LSWORD_FIRST);
+	DEFINE_PACK_CONST(MSBYTE_FIRST);
+	DEFINE_PACK_CONST(LSBYTE_FIRST);
+	DEFINE_PACK_CONST(NATIVE_BYTE_ORDER);
+	DEFINE_PACK_CONST(NATIVE);
+	DEFINE_PACK_CONST(TWOCOMP);
+    }
 
     rb_cFixnum = rb_define_class("Fixnum", rb_cInteger);
 
