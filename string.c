@@ -4541,11 +4541,11 @@ get_pat_quoted(VALUE pat, int check)
 }
 
 static long
-rb_pat_search(VALUE pat, VALUE str, long pos, int set_backref_str)
+rb_pat_search(VALUE pat, VALUE str, long pos, int set_backref)
 {
     if (BUILTIN_TYPE(pat) == T_STRING) {
 	pos = rb_strseq_index(str, pat, pos, 1);
-	if (set_backref_str) {
+	if (set_backref >= 0) {
 	    if (pos >= 0) {
 		VALUE match;
 		str = rb_str_new_frozen(str);
@@ -4560,7 +4560,7 @@ rb_pat_search(VALUE pat, VALUE str, long pos, int set_backref_str)
 	return pos;
     }
     else {
-	return rb_reg_search0(pat, str, pos, 0, set_backref_str);
+	return rb_reg_search0(pat, str, pos, 0, set_backref);
     }
 }
 
@@ -4755,6 +4755,7 @@ str_gsub(int argc, VALUE *argv, VALUE str, int bang)
       case 1:
 	RETURN_ENUMERATOR(str, argc, argv);
 	mode = ITER;
+	need_backref = 1;
 	break;
       case 2:
 	repl = argv[1];
@@ -4764,6 +4765,7 @@ str_gsub(int argc, VALUE *argv, VALUE str, int bang)
 	}
 	else {
 	    mode = MAP;
+	    need_backref = 1;
 	}
 	tainted = OBJ_TAINTED_RAW(repl);
 	break;
@@ -4772,7 +4774,7 @@ str_gsub(int argc, VALUE *argv, VALUE str, int bang)
     }
 
     pat = get_pat_quoted(argv[0], 1);
-    beg = rb_pat_search(pat, str, 0, need_backref);
+    beg = rb_pat_search(pat, str, 0, 1);
     if (beg < 0) {
 	if (bang) return Qnil;	/* no match, no substitution */
 	return rb_str_dup(str);

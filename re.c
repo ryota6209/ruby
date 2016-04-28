@@ -1498,7 +1498,7 @@ rb_reg_adjust_startpos(VALUE re, VALUE str, long pos, int reverse)
 
 /* returns byte offset */
 long
-rb_reg_search0(VALUE re, VALUE str, long pos, int reverse, int set_backref_str)
+rb_reg_search0(VALUE re, VALUE str, long pos, int reverse, int set_backref)
 {
     long result;
     VALUE match;
@@ -1509,7 +1509,7 @@ rb_reg_search0(VALUE re, VALUE str, long pos, int reverse, int set_backref_str)
     onig_errmsg_buffer err = "";
 
     if (pos > RSTRING_LEN(str) || pos < 0) {
-	rb_backref_set(Qnil);
+	if (set_backref >= 0) rb_backref_set(Qnil);
 	return -1;
     }
 
@@ -1517,16 +1517,13 @@ rb_reg_search0(VALUE re, VALUE str, long pos, int reverse, int set_backref_str)
     tmpreg = reg != RREGEXP_PTR(re);
     if (!tmpreg) RREGEXP(re)->usecnt++;
 
-    match = rb_backref_get();
-    if (!NIL_P(match)) {
-	if (FL_TEST(match, MATCH_BUSY)) {
-	    match = Qnil;
-	}
-	else {
-	    regs = RMATCH_REGS(match);
-	}
+    if (set_backref >= 0 &&
+	!NIL_P(match = rb_backref_get()) &&
+	!FL_TEST(match, MATCH_BUSY)) {
+	regs = RMATCH_REGS(match);
     }
-    if (NIL_P(match)) {
+    else {
+	match = Qnil;
 	MEMZERO(regs, struct re_registers, 1);
     }
     if (!reverse) {
@@ -1540,25 +1537,30 @@ rb_reg_search0(VALUE re, VALUE str, long pos, int reverse, int set_backref_str)
 			 regs, ONIG_OPTION_NONE);
     if (!tmpreg) RREGEXP(re)->usecnt--;
     if (tmpreg) {
-	if (RREGEXP(re)->usecnt) {
-	    onig_free(reg);
-	}
-	else {
-	    onig_free(RREGEXP_PTR(re));
+	if (!RREGEXP(re)->usecnt) {
+	    regex_t *oldreg = RREGEXP_PTR(re);
 	    RREGEXP_PTR(re) = reg;
+	    reg = oldreg;
 	}
+	onig_free(reg);
     }
     if (result < 0) {
 	if (regs == &regi)
 	    onig_region_free(regs, 0);
 	if (result == ONIG_MISMATCH) {
-	    rb_backref_set(Qnil);
+	    if (set_backref >= 0) rb_backref_set(Qnil);
 	    return result;
 	}
 	else {
 	    onig_error_code_to_str((UChar*)err, (int)result);
 	    rb_reg_raise(RREGEXP_SRC_PTR(re), RREGEXP_SRC_LEN(re), err, re);
 	}
+    }
+
+    if (set_backref < 0) {
+	if (regs == &regi)
+	    onig_region_free(regs, 0);
+	return result;
     }
 
     if (NIL_P(match)) {
@@ -1572,7 +1574,7 @@ rb_reg_search0(VALUE re, VALUE str, long pos, int reverse, int set_backref_str)
 	FL_UNSET(match, FL_TAINT);
     }
 
-    if (set_backref_str) {
+    if (set_backref > 0) {
 	RMATCH(match)->str = rb_str_new4(str);
 	OBJ_INFECT(match, str);
     }
