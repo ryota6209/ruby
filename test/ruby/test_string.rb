@@ -969,6 +969,13 @@ CODE
     assert_not_include(S("foobar"), ?z)
   end
 
+  def test_regexp_include?
+    assert_nil($~)
+    assert_include(S("foobar"), /f/)
+    assert_nil($~)
+    assert_not_include(S("foobar"), /F/)
+  end
+
   def test_index
     assert_equal(0, S("hello").index(?h))
     assert_equal(1, S("hello").index(S("ell")))

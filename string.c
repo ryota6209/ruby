@@ -5292,14 +5292,16 @@ rb_str_reverse_bang(VALUE str)
 
 /*
  *  call-seq:
- *     str.include? other_str   -> true or false
+ *     str.include? str_or_regexp   -> true or false
  *
- *  Returns <code>true</code> if <i>str</i> contains the given string or
- *  character.
+ *  Returns <code>true</code> if <i>str</i> contains the given string,
+ *  character, or regexp.
  *
  *     "hello".include? "lo"   #=> true
  *     "hello".include? "ol"   #=> false
  *     "hello".include? ?h     #=> true
+ *     "hello".include? /H/i   #=> true
+ *     "hello".include? /^e/   #=> false
  */
 
 static VALUE
@@ -5307,8 +5309,7 @@ rb_str_include(VALUE str, VALUE arg)
 {
     long i;
 
-    StringValue(arg);
-    i = rb_str_index(str, arg, 0);
+    i = rb_pat_search(get_pat_quoted(arg, 0), str, 0, -1);
 
     if (i == -1) return Qfalse;
     return Qtrue;
