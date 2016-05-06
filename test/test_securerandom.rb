@@ -184,4 +184,12 @@ end
       assert_equal(idx, @it.send(:gen_random_openssl, idx).size)
     end
   end
+
+  if Random.respond_to?(:random_bytes)
+    class TestSysRandom < self
+      def setup
+        @it = Random
+      end
+    end
+  end
 end
