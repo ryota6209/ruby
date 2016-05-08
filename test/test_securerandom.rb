@@ -185,7 +185,10 @@ end
     end
   end
 
-  if Random.respond_to?(:random_bytes)
+  begin
+    Random.random_bytes
+  rescue NotImplementedError
+  else
     class TestSysRandom < self
       def setup
         @it = Random
