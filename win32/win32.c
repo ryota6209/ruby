@@ -310,74 +310,8 @@ rb_w32_osver(void)
     return osver.dwMajorVersion;
 }
 
-/* simulate flock by locking a range on the file */
-
 /* License: Artistic or GPL */
-#define LK_ERR(f,i) \
-    do {								\
-	if (f)								\
-	    i = 0;							\
-	else {								\
-	    DWORD err = GetLastError();					\
-	    if (err == ERROR_LOCK_VIOLATION || err == ERROR_IO_PENDING)	\
-		errno = EWOULDBLOCK;					\
-	    else if (err == ERROR_NOT_LOCKED)				\
-		i = 0;							\
-	    else							\
-		errno = map_errno(err);					\
-	}								\
-    } while (0)
 #define LK_LEN      ULONG_MAX
-
-/* License: Artistic or GPL */
-static uintptr_t
-flock_winnt(uintptr_t self, int argc, uintptr_t* argv)
-{
-    OVERLAPPED o;
-    int i = -1;
-    const HANDLE fh = (HANDLE)self;
-    const int oper = argc;
-
-    memset(&o, 0, sizeof(o));
-
-    switch(oper) {
-      case LOCK_SH:		/* shared lock */
-	LK_ERR(LockFileEx(fh, 0, 0, LK_LEN, LK_LEN, &o), i);
-	break;
-      case LOCK_EX:		/* exclusive lock */
-	LK_ERR(LockFileEx(fh, LOCKFILE_EXCLUSIVE_LOCK, 0, LK_LEN, LK_LEN, &o), i);
-	break;
-      case LOCK_SH|LOCK_NB:	/* non-blocking shared lock */
-	LK_ERR(LockFileEx(fh, LOCKFILE_FAIL_IMMEDIATELY, 0, LK_LEN, LK_LEN, &o), i);
-	break;
-      case LOCK_EX|LOCK_NB:	/* non-blocking exclusive lock */
-	LK_ERR(LockFileEx(fh,
-			  LOCKFILE_EXCLUSIVE_LOCK|LOCKFILE_FAIL_IMMEDIATELY,
-			  0, LK_LEN, LK_LEN, &o), i);
-	break;
-      case LOCK_UN:		/* unlock lock */
-      case LOCK_UN|LOCK_NB:	/* unlock is always non-blocking, I hope */
-	LK_ERR(UnlockFileEx(fh, 0, LK_LEN, LK_LEN, &o), i);
-	break;
-      default:            /* unknown */
-	errno = EINVAL;
-	break;
-    }
-    return i;
-}
-
-#undef LK_ERR
-
-/* License: Artistic or GPL */
-int
-flock(int fd, int oper)
-{
-    const asynchronous_func_t locker = flock_winnt;
-
-    return rb_w32_asynchronize(locker,
-			      (VALUE)_get_osfhandle(fd), oper, NULL,
-			      (DWORD)-1);
-}
 
 /* License: Ruby's */
 static inline WCHAR *
@@ -7079,6 +7013,88 @@ rb_w32_write_console(uintptr_t strarg, int fd)
     RB_GC_GUARD(str);
     if (wbuffer) free(wbuffer);
     return (long)reslen;
+}
+
+/* License: Artistic or GPL */
+int
+flock(int fd, int oper)
+{
+    DWORD flags, err;
+    OVERLAPPED ol;
+    HANDLE fh;
+    BOOL ret;
+
+    switch (oper) {
+      case LOCK_SH:		/* shared lock */
+	flags = 0;
+	break;
+      case LOCK_EX:		/* exclusive lock */
+	flags = LOCKFILE_EXCLUSIVE_LOCK;
+	break;
+      case LOCK_SH|LOCK_NB:	/* non-blocking shared lock */
+	flags = LOCKFILE_FAIL_IMMEDIATELY;
+	break;
+      case LOCK_EX|LOCK_NB:	/* non-blocking exclusive lock */
+	flags = LOCKFILE_EXCLUSIVE_LOCK|LOCKFILE_FAIL_IMMEDIATELY;
+	break;
+      case LOCK_UN:		/* unlock lock */
+      case LOCK_UN|LOCK_NB:	/* unlock is always non-blocking, I hope */
+	break;
+      default:            /* unknown */
+	errno = EINVAL;
+	return -1;
+    }
+
+    rb_acrt_lowio_lock_fh(fd);
+    fh = (HANDLE)_osfhnd(fd);
+    ret = UnlockFileEx(fh, 0, LK_LEN, LK_LEN, &ol);
+    if (!ret) {
+	err = GetLastError();
+	ret = err == ERROR_NOT_LOCKED;
+	if (!ret) errno = map_errno(err);
+    }
+    if (!(oper & LOCK_UN) && ((ret = setup_overlapped(&ol, fd, FALSE)))) {
+	if ((ret = LockFileEx(fh, flags, 0, LK_LEN, LK_LEN, &ol))) {
+	    CloseHandle(ol.hEvent);
+	}
+	else {
+	    switch (err = GetLastError()) {
+	      case ERROR_IO_PENDING:
+		do {
+		    DWORD wait = rb_w32_wait_events_blocking(&ol.hEvent, 1, INFINITE);
+		    if (wait != WAIT_OBJECT_0) {
+			if (wait == WAIT_OBJECT_0 + 1)
+			    errno = EINTR;
+			else
+			    errno = map_errno(GetLastError());
+			break;
+		    }
+
+		    ret = GetOverlappedResult(fh, &ol, &wait, FALSE);
+		    if (!ret) {
+			err = GetLastError();
+			ret = err == ERROR_IO_INCOMPLETE;
+			if (!ret) {
+			    errno = map_errno(err);
+			    break;
+			}
+		    }
+		} while (!ret);
+		break;
+	      case ERROR_LOCK_VIOLATION:
+		errno = EWOULDBLOCK;
+		break;
+	      default:
+		errno = map_errno(err);
+		break;
+	    }
+	    printf("flock(%d)=>%d\n", fd, errno);
+	    CloseHandle(ol.hEvent);
+	    CancelIo(fh);
+	}
+    }
+    rb_acrt_lowio_unlock_fh(fd);
+    return ret ? 0 : -1;
 }
 
 /* License: Ruby's */
