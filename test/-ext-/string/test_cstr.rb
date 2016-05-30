@@ -152,6 +152,9 @@ class Test_StringCStr < Test::Unit::TestCase
   end
 
   def assert_wchars_term_char(str)
+    if defined?(String::SHARABLE_MIDDLE_SUBSTRING)
+      return if String::SHARABLE_MIDDLE_SUBSTRING
+    end
     result = {}
     WCHARS.map do |enc|
       s = Bug::String.new(str.encode(enc))

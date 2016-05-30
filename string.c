@@ -150,7 +150,7 @@ VALUE rb_cSymbol;
 #define STR_ENC_GET(str) get_encoding(str)
 
 #if !defined SHARABLE_MIDDLE_SUBSTRING
-# define SHARABLE_MIDDLE_SUBSTRING 0
+# define SHARABLE_MIDDLE_SUBSTRING 1
 #endif
 #if !SHARABLE_MIDDLE_SUBSTRING
 #define SHARABLE_SUBSTRING_P(beg, len, end) ((beg) + (len) == (end))
@@ -9696,6 +9696,9 @@ Init_String(void)
 #define rb_intern(str) rb_intern_const(str)
 
     rb_cString  = rb_define_class("String", rb_cObject);
+#if SHARABLE_MIDDLE_SUBSTRING
+    rb_define_const(rb_cString, "SHARABLE_MIDDLE_SUBSTRING", Qtrue);
+#endif
     rb_include_module(rb_cString, rb_mComparable);
     rb_define_alloc_func(rb_cString, empty_str_alloc);
     rb_define_singleton_method(rb_cString, "try_convert", rb_str_s_try_convert, 1);
