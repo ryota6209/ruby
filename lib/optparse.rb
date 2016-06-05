@@ -1658,6 +1658,7 @@ XXX
   def getopts(*args)
     argv = Array === args.first ? args.shift : default_argv
     single_options, *long_options = *args
+    long_options.pop if hash_options = Hash.try_convert(long_options.last)
 
     result = {}
 
@@ -1671,15 +1672,31 @@ XXX
       end
     end if single_options
 
-    long_options.each do |arg|
+    long_options.each do |arg, type|
       arg, desc = arg.split(';', 2)
       opt, val = arg.split(':', 2)
+      rest = [desc, type].compact
       if val
         result[opt] = val.empty? ? nil : val
-        define("--#{opt}=#{result[opt] || "VAL"}", *[desc].compact)
+        define("--#{opt}=#{result[opt] || "VAL"}", *rest)
       else
         result[opt] = false
-        define("--#{opt}", *[desc].compact)
+        define("--#{opt}", *rest)
+      end
+    end
+
+    if hash_options
+      hash_options.each do |arg, type|
+        arg, desc = arg.split(';', 2)
+        opt, val = arg.split(':', 2)
+        rest = [desc, type].compact
+        if val
+          result[opt] = val.empty? ? nil : val
+          define("--#{opt}=#{result[opt] || "VAL"}", *rest)
+        else
+          result[opt] = false
+          define("--#{opt}", *rest)
+        end
       end
     end
 
