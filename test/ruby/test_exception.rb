@@ -368,6 +368,7 @@ end.join
 
   def test_inspect
     assert_equal("#<Exception: Exception>", Exception.new.inspect)
+    assert_equal("#<Exception: nil>", Exception.new(nil).inspect)
 
     e = Class.new(Exception)
     e.class_eval do
@@ -385,6 +386,9 @@ end.join
     end
     e = StandardError.new(s)
     assert_equal("bar", e.to_s)
+
+    e = StandardError.new(nil)
+    assert_equal("nil", e.to_s)
   end
 
   def test_set_backtrace

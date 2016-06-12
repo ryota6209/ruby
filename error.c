@@ -698,10 +698,8 @@ rb_exc_new_str(VALUE etype, VALUE str)
 static VALUE
 exc_initialize(int argc, VALUE *argv, VALUE exc)
 {
-    VALUE arg;
-
-    rb_scan_args(argc, argv, "01", &arg);
-    rb_ivar_set(exc, id_mesg, arg);
+    if (rb_check_arity(argc, 0, 1))
+	rb_ivar_set(exc, id_mesg, argv[0]);
     rb_ivar_set(exc, id_bt, Qnil);
 
     return exc;
@@ -744,9 +742,10 @@ exc_exception(int argc, VALUE *argv, VALUE self)
 static VALUE
 exc_to_s(VALUE exc)
 {
-    VALUE mesg = rb_attr_get(exc, idMesg);
+    VALUE mesg = rb_ivar_lookup(exc, idMesg, Qundef);
 
-    if (NIL_P(mesg)) return rb_class_name(CLASS_OF(exc));
+    if (mesg == Qundef) return rb_class_name(CLASS_OF(exc));
+    if (NIL_P(mesg)) return rb_inspect(mesg);
     return rb_String(mesg);
 }
 
