@@ -117,12 +117,44 @@ round_to_nearest(double x, double s)
     return x;
 }
 
+static double
+round_to_even(double x, double s)
+{
+    double f, d, xs = x * s;
+
+    if (x > 0.0) {
+	f = floor(xs);
+	d = xs - f;
+	if (d > 0.5)
+	    d = 1.0;
+	else if (d == 0.5 || ((double)((f + 0.5) / s) <= x))
+	    d = fmod(f, 2.0);
+	else
+	    d = 0.0;
+	x = f + d;
+    }
+    else if (x < 0.0) {
+	f = ceil(xs);
+	d = f - xs;
+	if (d > 0.5)
+	    d = 1.0;
+	else if (d == 0.5 || ((double)((f - 0.5) / s) >= x))
+	    d = fmod(-f, 2.0);
+	else
+	    d = 0.0;
+	x = f - d;
+    }
+    return x;
+}
+
 static VALUE fix_uminus(VALUE num);
 static VALUE fix_mul(VALUE x, VALUE y);
 static VALUE fix_lshift(long, unsigned long);
 static VALUE fix_rshift(long, unsigned long);
 static VALUE int_pow(long x, unsigned long y);
 static VALUE int_cmp(VALUE x, VALUE y);
+static VALUE int_odd_p(VALUE x);
+static VALUE int_even_p(VALUE x);
 static int int_round_zero_p(VALUE num, int ndigits);
 VALUE rb_int_floor(VALUE num, int ndigits);
 VALUE rb_int_ceil(VALUE num, int ndigits);
@@ -150,6 +182,34 @@ void
 rb_num_zerodiv(void)
 {
     rb_raise(rb_eZeroDivError, "divided by 0");
+}
+
+enum ruby_num_rounding_mode
+rb_num_get_rounding_option(VALUE opts)
+{
+    static ID round_kwds[1];
+    VALUE rounding;
+    const char *s;
+    long l;
+
+    if (!NIL_P(opts)) {
+	if (!round_kwds[0]) {
+	    round_kwds[0] = rb_intern_const("to");
+	}
+	if (!rb_get_kwargs(opts, round_kwds, 0, 1, &rounding)) goto noopt;
+	if (SYMBOL_P(rounding)) rounding = rb_sym2str(rounding);
+	s = StringValueCStr(rounding);
+	l = RSTRING_LEN(rounding);
+	switch (l) {
+	  case 4:
+	    if (strncasecmp(s, "even", 4) == 0)
+		return RUBY_NUM_ROUND_TO_EVEN;
+	    break;
+	}
+	rb_raise(rb_eArgError, "unknown rounding mode: %"PRIsVALUE, rounding);
+    }
+  noopt:
+    return RUBY_NUM_ROUND_DEFAULT;
 }
 
 /* experimental API */
@@ -201,7 +261,6 @@ compare_with_zero(VALUE num, ID mid)
 #define FIXNUM_NEGATIVE_P(num) ((SIGNED_VALUE)(num) < 0)
 #define FIXNUM_ZERO_P(num) ((num) == INT2FIX(0))
 
-#if 0
 static inline int
 int_pos_p(VALUE num)
 {
@@ -213,7 +272,6 @@ int_pos_p(VALUE num)
     }
     return Qnil;
 }
-#endif
 
 static inline int
 int_neg_p(VALUE num)
@@ -1962,6 +2020,22 @@ int_round_zero_p(VALUE num, int ndigits)
     return (-0.415241 * ndigits - 0.125 > bytes);
 }
 
+static SIGNED_VALUE
+int_round_to_even(SIGNED_VALUE x, SIGNED_VALUE y)
+{
+    SIGNED_VALUE z = +(x + y / 2) / y;
+    if ((z * y - x) * 2 == y) {
+	z &= ~1;
+    }
+    return z * y;
+}
+
+static SIGNED_VALUE
+int_round_to_nearest(SIGNED_VALUE x, SIGNED_VALUE y)
+{
+    return (x + y / 2) / y * y;
+}
+
 /*
  * Assumes num is an Integer, ndigits <= 0
  */
@@ -1979,7 +2053,9 @@ rb_int_round(VALUE num, int ndigits)
 	SIGNED_VALUE x = FIX2LONG(num), y = FIX2LONG(f);
 	int neg = x < 0;
 	if (neg) x = -x;
-	x = (x + y / 2) / y * y;
+	x = ROUND_TO(RUBY_NUM_ROUND_DEFAULT,
+		     int_round_to_nearest(x, y),
+		     int_round_to_even(x, y));
 	if (neg) x = -x;
 	return LONG2NUM(x);
     }
@@ -1991,7 +2067,11 @@ rb_int_round(VALUE num, int ndigits)
     r = rb_int_modulo(num, f);
     n = rb_int_minus(num, r);
     r = int_cmp(r, h);
-    if (FIXNUM_POSITIVE_P(r) || (FIXNUM_ZERO_P(r) && !int_neg_p(num))) {
+    if (FIXNUM_POSITIVE_P(r) ||
+	(FIXNUM_ZERO_P(r) &&
+	 ROUND_TO(RUBY_NUM_ROUND_DEFAULT,
+		  int_pos_p(num),
+		  int_odd_p(rb_int_idiv(n, f))))) {
 	n = rb_int_plus(n, f);
     }
     return n;
@@ -2109,21 +2189,25 @@ static VALUE
 flo_round(int argc, VALUE *argv, VALUE num)
 {
     double number, f, x;
+    VALUE nd;
     int ndigits = 0;
 
-    if (rb_check_arity(argc, 0, 1)) {
-	ndigits = NUM2INT(argv[0]);
+    if (rb_scan_args(argc, argv, "01", &nd)) {
+	ndigits = NUM2INT(nd);
     }
     if (ndigits < 0) {
 	return rb_int_round(flo_to_i(num), ndigits);
     }
     number  = RFLOAT_VALUE(num);
     if (ndigits == 0) {
-	return dbl2ival(round(number));
+	x = ROUND_TO(RUBY_NUM_ROUND_DEFAULT,
+		     round(number), round_to_even(number, 1.0));
+	return dbl2ival(x);
     }
     if (float_invariant_round(number, ndigits, &num)) return num;
     f = pow(10, ndigits);
-    x = round_to_nearest(number, f);
+    x = ROUND_TO(RUBY_NUM_ROUND_DEFAULT,
+		 round_to_nearest(number, f), round_to_even(number, f));
     return DBL2NUM(x / f);
 }
 

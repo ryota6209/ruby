@@ -1135,6 +1135,17 @@ VALUE rb_math_sqrt(VALUE);
 void Init_newline(void);
 
 /* numeric.c */
+#ifndef ROUND_DEFAULT
+# define ROUND_DEFAULT RUBY_NUM_ROUND_TO_EVEN
+#endif
+enum ruby_num_rounding_mode {
+    RUBY_NUM_ROUND_NEAREST,
+    RUBY_NUM_ROUND_TO_EVEN,
+    RUBY_NUM_ROUND_DEFAULT = ROUND_DEFAULT
+};
+#define ROUND_TO(mode, nearest, to_even) \
+    ((mode) == RUBY_NUM_ROUND_TO_EVEN ? to_even : nearest)
+
 int rb_num_to_uint(VALUE val, unsigned int *ret);
 VALUE ruby_num_interval_step_size(VALUE from, VALUE to, VALUE step, int excl);
 int ruby_float_step(VALUE from, VALUE to, VALUE step, int excl);
@@ -1153,6 +1164,7 @@ VALUE rb_int2str(VALUE num, int base);
 VALUE rb_dbl_hash(double d);
 VALUE rb_fix_plus(VALUE x, VALUE y);
 VALUE rb_int_ge(VALUE x, VALUE y);
+enum ruby_num_rounding_mode rb_num_get_rounding_option(VALUE opts);
 
 #if USE_FLONUM
 #define RUBY_BIT_ROTL(v, n) (((v) << (n)) | ((v) >> ((sizeof(v) * 8) - n)))

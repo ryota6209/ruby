@@ -1250,7 +1250,7 @@ nurat_truncate(VALUE self)
 }
 
 static VALUE
-nurat_round(VALUE self)
+nurat_round_to_nearest(VALUE self)
 {
     VALUE num, den, neg;
 
@@ -1266,6 +1266,33 @@ nurat_round(VALUE self)
     num = f_add(f_mul(num, TWO), den);
     den = f_mul(den, TWO);
     num = f_idiv(num, den);
+
+    if (neg)
+	num = f_negate(num);
+
+    return num;
+}
+
+static VALUE
+nurat_round_to_even(VALUE self)
+{
+    VALUE num, den, neg, qr;
+
+    get_dat1(self);
+
+    num = dat->num;
+    den = dat->den;
+    neg = f_negative_p(num);
+
+    if (neg)
+	num = f_negate(num);
+
+    num = f_add(f_mul(num, TWO), den);
+    den = f_mul(den, TWO);
+    qr = rb_funcall(num, rb_intern("divmod"), 1, den);
+    num = RARRAY_AREF(qr, 0);
+    if (f_zero_p(RARRAY_AREF(qr, 1)))
+	num = rb_funcall(num, '&', 1, LONG2FIX(((int)~1)));
 
     if (neg)
 	num = f_negate(num);
@@ -1403,7 +1430,10 @@ nurat_truncate_n(int argc, VALUE *argv, VALUE self)
 static VALUE
 nurat_round_n(int argc, VALUE *argv, VALUE self)
 {
-    return f_round_common(argc, argv, self, nurat_round);
+    VALUE (*round_func)(VALUE) =
+	ROUND_TO(RUBY_NUM_ROUND_DEFAULT,
+		 nurat_round_to_nearest, nurat_round_to_even);
+    return f_round_common(argc, argv, self, round_func);
 }
 
 /*
