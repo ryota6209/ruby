@@ -2317,7 +2317,7 @@ ruby_float_step_size(double beg, double end, double unit, int excl)
 	return INFINITY;
     }
     if (err>0.5) err=0.5;
-    if (excl) {
+    if (excl & RANGE_EXCLUDE_END) {
 	if (n<=0) return 0;
 	if (n<1)
 	    n = 0;
@@ -2328,7 +2328,7 @@ ruby_float_step_size(double beg, double end, double unit, int excl)
 	if (n<0) return 0;
 	n = floor(n + err);
     }
-    return n+1;
+    return n+!(excl & RANGE_EXCLUDE_BEG);
 }
 
 int
@@ -2343,7 +2343,7 @@ ruby_float_step(VALUE from, VALUE to, VALUE step, int excl)
 
 	if (isinf(unit)) {
 	    /* if unit is infinity, i*unit+beg is NaN */
-	    if (n) rb_yield(DBL2NUM(beg));
+	    if (n && !(excl & RANGE_EXCLUDE_BEG)) rb_yield(DBL2NUM(beg));
 	}
 	else if (unit == 0) {
 	    VALUE val = DBL2NUM(beg);
@@ -2351,7 +2351,7 @@ ruby_float_step(VALUE from, VALUE to, VALUE step, int excl)
 		rb_yield(val);
 	}
 	else {
-	    for (i=0; i<n; i++) {
+	    for (i=!!(excl & RANGE_EXCLUDE_BEG); i<n; i++) {
 		double d = i*unit+beg;
 		if (unit >= 0 ? end < d : d < end) d = end;
 		rb_yield(DBL2NUM(d));
@@ -2377,7 +2377,10 @@ ruby_num_interval_step_size(VALUE from, VALUE to, VALUE step, int excl)
 	    diff = -diff;
 	    delta = -delta;
 	}
-	if (excl) {
+	if (excl & RANGE_EXCLUDE_BEG) {
+	    delta--;
+	}
+	if (excl & RANGE_EXCLUDE_END) {
 	    delta--;
 	}
 	if (delta < 0) {
@@ -2401,8 +2404,14 @@ ruby_num_interval_step_size(VALUE from, VALUE to, VALUE step, int excl)
 	}
 	if (RTEST(rb_funcall(from, cmp, 1, to))) return INT2FIX(0);
 	result = rb_funcall(rb_funcall(to, '-', 1, from), id_div, 1, step);
-	if (!excl || RTEST(rb_funcall(rb_funcall(from, '+', 1, rb_funcall(result, '*', 1, step)), cmp, 1, to))) {
+	if (!(excl & RANGE_EXCLUDE_END) ||
+	    RTEST(rb_funcall(rb_funcall(from, '+', 1, rb_funcall(result, '*', 1, step)),
+			     cmp, 1, to))) {
 	    result = rb_funcall(result, '+', 1, INT2FIX(1));
+	}
+	if ((excl & RANGE_EXCLUDE_BEG) &&
+	    RTEST(rb_funcall(result, '>', 1, INT2FIX(0)))) {
+	    result = rb_funcall(result, '-', 1, INT2FIX(1));
 	}
 	return result;
     }

@@ -1338,6 +1338,14 @@ struct rb_execarg {
 rb_pid_t rb_fork_ruby(int *status);
 void rb_last_status_clear(void);
 
+/* range.c */
+enum {
+    RANGE_EXCLUDE_END_BIT,
+    RANGE_EXCLUDE_BEG_BIT,
+    RANGE_EXCLUDE_BEG = 1<<RANGE_EXCLUDE_BEG_BIT,
+    RANGE_EXCLUDE_END = 1<<RANGE_EXCLUDE_END_BIT
+};
+
 /* rational.c */
 VALUE rb_rational_plus(VALUE self, VALUE other);
 VALUE rb_lcm(VALUE x, VALUE y);
