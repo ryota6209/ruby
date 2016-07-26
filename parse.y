@@ -929,8 +929,8 @@ static void token_info_pop_gen(struct parser_params*, const char *token, size_t 
 %token tOROP		RUBY_TOKEN(OROP)   "||"
 %token tMATCH		RUBY_TOKEN(MATCH)  "=~"
 %token tNMATCH		RUBY_TOKEN(NMATCH) "!~"
-%token tDOT2		RUBY_TOKEN(DOT2)   ".."
-%token tDOT3		RUBY_TOKEN(DOT3)   "..."
+%token <num> tDOT2	RUBY_TOKEN(DOT2)   ".."
+%token <num> tDOT3	RUBY_TOKEN(DOT3)   "..."
 %token tAREF		RUBY_TOKEN(AREF)   "[]"
 %token tASET		RUBY_TOKEN(ASET)   "[]="
 %token tLSHFT		RUBY_TOKEN(LSHFT)  "<<"
@@ -2072,9 +2072,9 @@ arg		: lhs '=' arg_rhs
 		    /*%%%*/
 			value_expr($1);
 			value_expr($3);
-			$$ = NEW_DOT2($1, $3);
+			$$ = NEW_DOT2($1, $3, $2);
 		    /*%
-			$$ = dispatch2(dot2, $1, $3);
+			$$ = dispatch3(dot2, $1, $3, $2);
 		    %*/
 		    }
 		| arg tDOT3 arg
@@ -2082,9 +2082,9 @@ arg		: lhs '=' arg_rhs
 		    /*%%%*/
 			value_expr($1);
 			value_expr($3);
-			$$ = NEW_DOT3($1, $3);
+			$$ = NEW_DOT3($1, $3, $2);
 		    /*%
-			$$ = dispatch2(dot3, $1, $3);
+			$$ = dispatch3(dot3, $1, $3, $2);
 		    %*/
 		    }
 		| arg '+' arg
@@ -8385,11 +8385,19 @@ parser_yylex(struct parser_params *parser)
       case '.':
 	SET_LEX_STATE(EXPR_BEG);
 	if ((c = nextc()) == '.') {
+	    int excl = 0, token = tDOT2;
 	    if ((c = nextc()) == '.') {
-		return tDOT3;
+		token = tDOT3;
+		c = nextc();
 	    }
-	    pushback(c);
-	    return tDOT2;
+	    if (c == '^') {
+		excl |= RANGE_EXCLUDE_END;
+	    }
+	    else {
+		pushback(c);
+	    }
+	    set_yylval_num(excl);
+	    return token;
 	}
 	pushback(c);
 	if (c != -1 && ISDIGIT(c)) {
@@ -8472,6 +8480,21 @@ parser_yylex(struct parser_params *parser)
             set_yylval_id('^');
 	    SET_LEX_STATE(EXPR_BEG);
 	    return tOP_ASGN;
+	}
+	else if (c == '.' && peek('.')) { /* ^.. */
+	    int excl = RANGE_EXCLUDE_BEG, token = tDOT2;
+	    SET_LEX_STATE(EXPR_BEG);
+	    lex_p++;
+	    if (peek('.')) {
+		lex_p++;
+		token = tDOT3;
+	    }
+	    if (peek('^')) {
+		lex_p++;
+		excl |= RANGE_EXCLUDE_END;
+	    }
+	    set_yylval_num(excl);
+	    return token;
 	}
 	SET_LEX_STATE(IS_AFTER_OPERATOR() ? EXPR_ARG : EXPR_BEG);
 	pushback(c);

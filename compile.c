@@ -3879,6 +3879,19 @@ number_literal_p(NODE *n)
     return (n && nd_type(n) == NODE_LIT && RB_INTEGER_TYPE_P(n->nd_lit));
 }
 
+static int
+exclusive_dots(rb_iseq_t *iseq, NODE *node)
+{
+    int excl = (int)node->nd_state;
+    if (nd_type(node) == NODE_DOT3) {
+	if (excl & RANGE_EXCLUDE_END)
+	    rb_compile_warning(ruby_sourcefile, nd_line(node),
+			       "^ with ... is redundant");
+	excl |= RANGE_EXCLUDE_END;
+    }
+    return excl;
+}
+
 /**
   compile each node
 
@@ -5929,7 +5942,7 @@ iseq_compile_each(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE * node, int poped)
       }
       case NODE_DOT2:
       case NODE_DOT3:{
-	int excl = type == NODE_DOT3;
+	int excl = exclusive_dots(iseq, node);
 	VALUE flag = INT2FIX(excl);
 	NODE *b = node->nd_beg;
 	NODE *e = node->nd_end;
