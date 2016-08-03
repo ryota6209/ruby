@@ -4270,6 +4270,7 @@ Init_zlib(void)
     VALUE mZlib, cZStream, cDeflate, cInflate;
 #if GZIP_SUPPORT
     VALUE cGzipFile, cGzipWriter, cGzipReader;
+    const char *os_name = NULL;
 #endif
 
     mZlib = rb_define_module("Zlib");
@@ -4534,6 +4535,9 @@ Init_zlib(void)
 
     /* The OS code of current host */
     rb_define_const(mZlib, "OS_CODE", INT2FIX(OS_CODE));
+# define rb_define_const(m, name, val) \
+    rb_define_const(m, name, val); \
+    if (INT2FIX(OS_CODE) == val) os_name = name+3
     /* OS code for MSDOS hosts */
     rb_define_const(mZlib, "OS_MSDOS", INT2FIX(OS_MSDOS));
     /* OS code for Amiga hosts */
@@ -4564,7 +4568,9 @@ Init_zlib(void)
     rb_define_const(mZlib, "OS_RISCOS", INT2FIX(OS_RISCOS));
     /* OS code for unknown hosts */
     rb_define_const(mZlib, "OS_UNKNOWN", INT2FIX(OS_UNKNOWN));
+# undef rb_define_const
 
+    if (os_name) rb_define_const(mZlib, "OS", rb_str_new_cstr(os_name));
 #endif /* GZIP_SUPPORT */
 }
 
