@@ -1769,21 +1769,24 @@ fixnum:
  */
 
 static VALUE
-rb_ary_insert(int argc, VALUE *argv, VALUE ary)
+rb_ary_insert_m(int argc, VALUE *argv, VALUE ary)
 {
-    long pos;
-
     rb_check_arity(argc, 1, UNLIMITED_ARGUMENTS);
     rb_ary_modify_check(ary);
     if (argc == 1) return ary;
-    pos = NUM2LONG(argv[0]);
+    return rb_ary_insert(ary, NUM2LONG(argv[0]), argv + 1, argc - 1);
+}
+
+VALUE
+rb_ary_insert(VALUE ary, long pos, const VALUE *elems, int count)
+{
     if (pos == -1) {
 	pos = RARRAY_LEN(ary);
     }
     if (pos < 0) {
 	pos++;
     }
-    rb_ary_splice(ary, pos, 0, argv + 1, argc - 1);
+    rb_ary_splice(ary, pos, 0, elems, count);
     return ary;
 }
 
@@ -6122,7 +6125,7 @@ Init_Array(void)
     rb_define_method(rb_cArray, "pop", rb_ary_pop_m, -1);
     rb_define_method(rb_cArray, "shift", rb_ary_shift_m, -1);
     rb_define_method(rb_cArray, "unshift", rb_ary_unshift_m, -1);
-    rb_define_method(rb_cArray, "insert", rb_ary_insert, -1);
+    rb_define_method(rb_cArray, "insert", rb_ary_insert_m, -1);
     rb_define_method(rb_cArray, "each", rb_ary_each, 0);
     rb_define_method(rb_cArray, "each_index", rb_ary_each_index, 0);
     rb_define_method(rb_cArray, "reverse_each", rb_ary_reverse_each, 0);
