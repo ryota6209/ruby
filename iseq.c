@@ -606,6 +606,13 @@ rb_iseq_load(VALUE data, VALUE parent, VALUE opt)
     return iseq_load(data, RTEST(parent) ? (rb_iseq_t *)parent : NULL, opt);
 }
 
+static int
+ops_set(VALUE name, VALUE func, VALUE parser)
+{
+    rb_parser_add_userop(parser, name, func);
+    return ST_CONTINUE;
+}
+
 rb_iseq_t *
 rb_iseq_compile_with_option(VALUE src, VALUE file, VALUE absolute_path, VALUE line, const struct rb_block *base_block, VALUE opt)
 {
@@ -637,6 +644,13 @@ rb_iseq_compile_with_option(VALUE src, VALUE file, VALUE absolute_path, VALUE li
     {
 	const VALUE parser = rb_parser_new();
 	rb_parser_set_context(parser, base_block, FALSE);
+	if (RB_TYPE_P(opt, T_HASH)) {
+	    VALUE ops = rb_hash_aref(opt, ID2SYM(rb_intern("userops")));
+	    if (!NIL_P(ops)) {
+		Check_Type(ops, T_HASH);
+		rb_hash_foreach(ops, ops_set, parser);
+	    }
+	}
 	node = (*parse)(parser, file, src, ln);
     }
 

@@ -1299,6 +1299,7 @@ VALUE rb_parser_get_yydebug(VALUE);
 VALUE rb_parser_set_yydebug(VALUE, VALUE);
 VALUE rb_parser_set_context(VALUE, const struct rb_block *, int);
 void *rb_parser_load_file(VALUE parser, VALUE name);
+VALUE rb_parser_add_userop(VALUE self, VALUE name, VALUE func);
 int rb_is_const_name(VALUE name);
 int rb_is_class_name(VALUE name);
 int rb_is_global_name(VALUE name);

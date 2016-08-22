@@ -287,6 +287,8 @@ struct parser_params {
 
     ID cur_arg;
 
+    VALUE userop_alist[13];	/* [name, sym, name, sym, ...] */
+
     unsigned int command_start:1;
     unsigned int eofp: 1;
     unsigned int ruby__end__seen: 1;
@@ -395,6 +397,23 @@ static int parser_yyerror(struct parser_params*, const char*);
 #define lambda_beginning_p() (lpar_beg && lpar_beg == paren_nest)
 
 static int yylex(YYSTYPE*, struct parser_params*);
+
+
+#define USEROP_INDEX(c) \
+    ((c) == '!' ? 0 : \
+     (c) == '%' ? 1 : \
+     (c) == '&' ? 2 : \
+     (c) == '*' ? 3 : \
+     (c) == '+' ? 4 : \
+     (c) == '-' ? 5 : \
+     (c) == '/' ? 6 : \
+     (c) == '<' ? 7 : \
+     (c) == '=' ? 8 : \
+     (c) == '>' ? 9 : \
+     (c) == '^' ? 10 : \
+     (c) == '|' ? 11 : \
+     (c) == '~' ? 12 : \
+     -1)
 
 #ifndef RIPPER
 #define yyparse ruby_yyparse
@@ -595,6 +614,7 @@ static VALUE parser_reg_compile(struct parser_params*, VALUE, int, VALUE *);
 
 RUBY_FUNC_EXPORTED VALUE rb_parser_reg_compile(struct parser_params* parser, VALUE str, int options);
 RUBY_FUNC_EXPORTED int rb_reg_fragment_setenc(struct parser_params*, VALUE, int);
+RUBY_FUNC_EXPORTED int rb_parser_userop_token(struct parser_params *, int);
 
 
 static ID formal_argument_gen(struct parser_params*, ID);
@@ -889,6 +909,7 @@ static void token_info_pop_gen(struct parser_params*, const char *token, size_t 
 	keyword__ENCODING__
 
 %token <id>   tIDENTIFIER tFID tGVAR tIVAR tCONSTANT tCVAR tLABEL
+%token <id>   tUSEROP_UNI tUSEROP_BIN
 %token <node> tINTEGER tFLOAT tRATIONAL tIMAGINARY tSTRING_CONTENT tCHAR
 %token <node> tNTH_REF tBACK_REF
 %token <num>  tREGEXP_END
@@ -917,7 +938,7 @@ static void token_info_pop_gen(struct parser_params*, const char *token, size_t 
 %type <node> mlhs mlhs_head mlhs_basic mlhs_item mlhs_node mlhs_post mlhs_inner
 %type <id>   fsym keyword_variable user_variable sym symbol operation operation2 operation3
 %type <id>   cname fname op f_rest_arg f_block_arg opt_f_block_arg f_norm_arg f_bad_arg
-%type <id>   f_kwrest f_label f_arg_asgn call_op call_op2
+%type <id>   f_kwrest f_label f_arg_asgn call_op call_op2  userop_uni userop_bin
 /*%%%*/
 /*%
 %type <val> program reswords then do dot_or_colon
@@ -958,7 +979,7 @@ static void token_info_pop_gen(struct parser_params*, const char *token, size_t 
 %token tAMPER		"&"
 %token tLAMBDA		"->"
 %token tSYMBEG tSTRING_BEG tXSTRING_BEG tREGEXP_BEG tWORDS_BEG tQWORDS_BEG tSYMBOLS_BEG tQSYMBOLS_BEG
-%token tSTRING_DBEG tSTRING_DEND tSTRING_DVAR tSTRING_END tLAMBEG tLABEL_END
+%token tSTRING_DBEG tSTRING_DEND tSTRING_DVAR tSTRING_END tLAMBEG tLABEL_END tUSEROP
 
 /*
  *	precedence table
@@ -977,14 +998,14 @@ static void token_info_pop_gen(struct parser_params*, const char *token, size_t 
 %nonassoc tDOT2 tDOT3
 %left  tOROP
 %left  tANDOP
-%nonassoc  tCMP tEQ tEQQ tNEQ tMATCH tNMATCH
+%nonassoc  tCMP tEQ tEQQ tNEQ tMATCH tNMATCH tUSEROP_BIN
 %left  '>' tGEQ '<' tLEQ
 %left  '|' '^'
 %left  '&'
 %left  tLSHFT tRSHFT
 %left  '+' '-'
 %left  '*' '/' '%'
-%right tUMINUS_NUM tUMINUS
+%right tUMINUS_NUM tUMINUS tUSEROP_UNI
 %right tPOW
 %right '!' '~' tUPLUS
 
@@ -1994,6 +2015,8 @@ op		: '|'		{ ifndef_ripper($$ = '|'); }
 		| tAREF		{ ifndef_ripper($$ = tAREF); }
 		| tASET		{ ifndef_ripper($$ = tASET); }
 		| '`'		{ ifndef_ripper($$ = '`'); }
+		| tUSEROP_UNI	{ ifndef_ripper($$ = yylval.id); }
+		| tUSEROP_BIN	{ ifndef_ripper($$ = yylval.id); }
 		;
 
 reswords	: keyword__LINE__ | keyword__FILE__ | keyword__ENCODING__
@@ -2344,9 +2367,45 @@ arg		: lhs '=' arg_rhs
 			$$ = dispatch3(ifop, $1, $3, $6);
 		    %*/
 		    }
+		| arg userop_bin arg %prec tUSEROP_BIN
+		    {
+		    /*%%%*/
+			$$ = call_bin_op($1, $2, $3);
+		    /*%
+			$$ = dispatch3(binary, $1, $2, $3);
+		    %*/
+		    }
+		| userop_uni arg %prec tUSEROP_UNI
+		    {
+		    /*%%%*/
+			$$ = call_uni_op($2, $1);
+		    /*%
+			$$ = dispatch2(unary, $1, $2);
+		    %*/
+		    }
 		| primary
 		    {
 			$$ = $1;
+		    }
+		;
+
+userop_bin	: tUSEROP_BIN
+		    {
+		    /*%%%*/
+			$$ = yylval.id;
+		    /*%
+			$$ = $1;
+		    %*/
+		    }
+		;
+
+userop_uni	: tUSEROP_UNI
+		    {
+		    /*%%%*/
+			$$ = yylval.id;
+		    /*%
+			$$ = $1;
+		    %*/
 		    }
 		;
 
@@ -7988,6 +8047,15 @@ parser_yylex(struct parser_params *parser)
     int fallthru = FALSE;
     int token_seen = parser->token_seen;
 
+# define RETURN_IF_USEROP(c) \
+    if (parser->userop_alist[USEROP_INDEX(c)]) { \
+	int token = rb_parser_userop_token(parser, USEROP_INDEX(c)); \
+	if (token) { \
+	    SET_LEX_STATE(IS_AFTER_OPERATOR() ? EXPR_ARG : EXPR_BEG); \
+	    return token; \
+	} \
+    }
+
     if (lex_strterm) {
 	int token;
 	if (nd_type(lex_strterm) == NODE_HEREDOC) {
@@ -8106,6 +8174,7 @@ parser_yylex(struct parser_params *parser)
 	return '\n';
 
       case '*':
+	RETURN_IF_USEROP('*');
 	if ((c = nextc()) == '*') {
 	    if ((c = nextc()) == '=') {
                 set_yylval_id(tPOW);
@@ -8148,6 +8217,7 @@ parser_yylex(struct parser_params *parser)
 	return c;
 
       case '!':
+	RETURN_IF_USEROP('!');
 	c = nextc();
 	if (IS_AFTER_OPERATOR()) {
 	    SET_LEX_STATE(EXPR_ARG);
@@ -8198,6 +8268,7 @@ parser_yylex(struct parser_params *parser)
 	    }
 	}
 
+	RETURN_IF_USEROP('=');
 	SET_LEX_STATE(IS_AFTER_OPERATOR() ? EXPR_ARG : EXPR_BEG);
 	if ((c = nextc()) == '=') {
 	    if ((c = nextc()) == '=') {
@@ -8216,6 +8287,7 @@ parser_yylex(struct parser_params *parser)
 	return '=';
 
       case '<':
+	RETURN_IF_USEROP('<');
 	last_state = lex_state;
 	c = nextc();
 	if (c == '<' &&
@@ -8254,6 +8326,7 @@ parser_yylex(struct parser_params *parser)
 	return '<';
 
       case '>':
+	RETURN_IF_USEROP('>');
 	SET_LEX_STATE(IS_AFTER_OPERATOR() ? EXPR_ARG : EXPR_BEG);
 	if ((c = nextc()) == '=') {
 	    return tGEQ;
@@ -8299,6 +8372,7 @@ parser_yylex(struct parser_params *parser)
 	return parse_qmark(parser, space_seen);
 
       case '&':
+	RETURN_IF_USEROP('&');
 	if ((c = nextc()) == '&') {
 	    SET_LEX_STATE(EXPR_BEG);
 	    if ((c = nextc()) == '=') {
@@ -8334,6 +8408,7 @@ parser_yylex(struct parser_params *parser)
 	return c;
 
       case '|':
+	RETURN_IF_USEROP('|');
 	if ((c = nextc()) == '|') {
 	    SET_LEX_STATE(EXPR_BEG);
 	    if ((c = nextc()) == '=') {
@@ -8354,6 +8429,7 @@ parser_yylex(struct parser_params *parser)
 	return '|';
 
       case '+':
+	RETURN_IF_USEROP('+');
 	c = nextc();
 	if (IS_AFTER_OPERATOR()) {
 	    SET_LEX_STATE(EXPR_ARG);
@@ -8382,6 +8458,7 @@ parser_yylex(struct parser_params *parser)
 	return '+';
 
       case '-':
+	RETURN_IF_USEROP('-');
 	c = nextc();
 	if (IS_AFTER_OPERATOR()) {
 	    SET_LEX_STATE(EXPR_ARG);
@@ -8480,6 +8557,7 @@ parser_yylex(struct parser_params *parser)
 	return tSYMBEG;
 
       case '/':
+	RETURN_IF_USEROP('/');
 	if (IS_BEG()) {
 	    lex_strterm = NEW_STRTERM(str_regexp, '/', 0);
 	    return tREGEXP_BEG;
@@ -8500,6 +8578,7 @@ parser_yylex(struct parser_params *parser)
 	return '/';
 
       case '^':
+	RETURN_IF_USEROP('^');
 	if ((c = nextc()) == '=') {
             set_yylval_id('^');
 	    SET_LEX_STATE(EXPR_BEG);
@@ -8519,6 +8598,7 @@ parser_yylex(struct parser_params *parser)
 	return ',';
 
       case '~':
+	RETURN_IF_USEROP('~');
 	if (IS_AFTER_OPERATOR()) {
 	    if ((c = nextc()) != '@') {
 		pushback(c);
@@ -8609,6 +8689,7 @@ parser_yylex(struct parser_params *parser)
 	return '\\';
 
       case '%':
+	RETURN_IF_USEROP('%');
 	return parse_percent(parser, space_seen, last_state);
 
       case '$':
@@ -10761,6 +10842,36 @@ rb_parser_while_loop(VALUE vparser, NODE *node, int chop, int split)
     return scope;
 }
 
+int
+rb_parser_userop_token(struct parser_params *parser, int index)
+{
+    VALUE alist = parser->userop_alist[index];
+    const VALUE *ptr;
+    long i, alen, lexlen;
+    if (!alist) return 0;
+    lexlen = lex_pend - lex_p;
+    ptr = RARRAY_CONST_PTR(alist);
+    alen = RARRAY_LEN(alist);
+    for (i = 0; i + 1 < alen; i += 2) {
+	VALUE name = ptr[i];
+	const char *s = RSTRING_PTR(name);
+	long n = RSTRING_LEN(name);
+	int unary = (s[n-1] == '@');
+	n -= unary;
+	if (--n > lexlen) continue;
+	if (memcmp(s+1, lex_p, n) == 0) {
+#ifdef RIPPER
+	    yylval.val = ptr[i+1];
+#else
+	    yylval.id = SYM2ID(ptr[i+1]);
+#endif
+	    lex_p += n;
+	    return unary ? tUSEROP_UNI : tUSEROP_BIN;
+	}
+    }
+    return 0;
+}
+
 void
 rb_init_parse(void)
 {
@@ -10998,6 +11109,74 @@ rb_parser_set_yydebug(VALUE self, VALUE flag)
     TypedData_Get_Struct(self, struct parser_params, &parser_data_type, parser);
     yydebug = RTEST(flag);
     return flag;
+}
+
+static int
+compare_userop(VALUE key, VALUE elem)
+{
+    const char *kptr = RSTRING_PTR(key);
+    const char *eptr = RSTRING_PTR(elem);
+    long klen = RSTRING_LEN(key);
+    long elen = RSTRING_LEN(elem);
+    int c = memcmp(kptr, eptr, klen < elen ? klen : elen);
+    if (c) return c;
+    return klen == elen ? 0 : klen < elen ? +1 : -1;
+}
+
+VALUE
+rb_parser_add_userop(VALUE self, VALUE name, VALUE func)
+{
+    struct parser_params *parser;
+    const char *str;
+    long i, len;
+    int index;
+    VALUE alist, vals[2];
+
+    TypedData_Get_Struct(self, struct parser_params, &parser_data_type, parser);
+    str = StringValueCStr(name);
+    len = RSTRING_LEN(name);
+    func = rb_to_symbol(func);
+    if (len > 1 && str[len - 1] == '@') --len;
+    if (len == 0 || (index = USEROP_INDEX(str[0])) < 0) {
+      bad_name:
+	rb_raise(rb_eArgError, "bad name as an operator: %"PRIsVALUE, name);
+    }
+    for (i = 1; i < len; ++i) {
+	if (USEROP_INDEX(str[i]) < 0) goto bad_name;
+    }
+    if (!(alist = parser->userop_alist[index])) {
+	parser->userop_alist[index] = alist = rb_ary_tmp_new(2);
+	vals[0] = rb_str_new_frozen(name);
+	vals[1] = func;
+	rb_ary_cat(alist, vals, 2);
+    }
+    else {
+	const VALUE *base = RARRAY_CONST_PTR(alist);
+	long low = 0, high = RARRAY_LEN(alist), mid;
+	int v;
+	VALUE val;
+
+	while (low < high) {
+	    mid = low + ((high - low) / 4) * 2;
+	    val = base[mid];
+	    v = compare_userop(name, val);
+	    if (v == 0) {
+		rb_ary_store(alist, mid+1, func);
+		goto end;
+	    }
+	    if (v < 0) {
+		high = mid;
+	    }
+	    else {
+		low = mid + 2;
+	    }
+	}
+	vals[0] = rb_str_new_frozen(name);
+	vals[1] = func;
+	rb_ary_insert(alist, low, vals, 2);
+    }
+  end:
+    return self;
 }
 
 #ifndef RIPPER
