@@ -3908,7 +3908,84 @@ xstring		: tXSTRING_BEG xstring_contents tSTRING_END
 
 regexp		: tREGEXP_BEG regexp_contents tREGEXP_END
 		    {
-			$$ = new_regexp($2, $3);
+		    /*%%%*/
+			int options = $3;
+			NODE *list, *prev;
+			NODE *node = $2;
+		    /*%
+			VALUE re = $2, opt = $3, src = 0, err;
+			int options = 0;
+		    %*/
+			heredoc_dedent($2);
+			heredoc_indent = 0;
+		    /*%%%*/
+			if (!node) {
+			    node = NEW_LIT(reg_compile(STR_NEW0(), options));
+			}
+			else switch (nd_type(node)) {
+			  case NODE_STR:
+			    {
+				VALUE src = node->nd_lit;
+				nd_set_type(node, NODE_LIT);
+				node->nd_lit = reg_compile(src, options);
+			    }
+			    break;
+			  default:
+			    node = NEW_NODE(NODE_DSTR, STR_NEW0(), 1, NEW_LIST(node));
+			  case NODE_DSTR:
+			    if (options & RE_OPTION_ONCE) {
+				nd_set_type(node, NODE_DREGX_ONCE);
+			    }
+			    else {
+				nd_set_type(node, NODE_DREGX);
+			    }
+			    node->nd_cflag = options & RE_OPTION_MASK;
+			    if (!NIL_P(node->nd_lit)) reg_fragment_check(node->nd_lit, options);
+			    for (list = (prev = node)->nd_next; list; list = list->nd_next) {
+				if (nd_type(list->nd_head) == NODE_STR) {
+				    VALUE tail = list->nd_head->nd_lit;
+				    if (reg_fragment_check(tail, options) && prev && !NIL_P(prev->nd_lit)) {
+					VALUE lit = prev == node ? prev->nd_lit : prev->nd_head->nd_lit;
+					if (!literal_concat0(parser, lit, tail)) {
+					    node = 0;
+					    break;
+					}
+					rb_str_resize(tail, 0);
+					prev->nd_next = list->nd_next;
+					rb_gc_force_recycle((VALUE)list->nd_head);
+					rb_gc_force_recycle((VALUE)list);
+					list = prev;
+				    }
+				    else {
+					prev = list;
+				    }
+                                }
+				else {
+				    prev = 0;
+				}
+                            }
+			    if (!node->nd_next) {
+				VALUE src = node->nd_lit;
+				nd_set_type(node, NODE_LIT);
+				node->nd_lit = reg_compile(src, options);
+			    }
+			    break;
+			}
+			$$ = node;
+		    /*%
+			if (ripper_is_node_yylval(re)) {
+			    $2 = RNODE(re)->nd_rval;
+			    src = RNODE(re)->nd_cval;
+			}
+			if (ripper_is_node_yylval(opt)) {
+			    $3 = RNODE(opt)->nd_rval;
+			    options = (int)RNODE(opt)->nd_tag;
+			}
+			if (src && NIL_P(parser_reg_compile(parser, src, options, &err))) {
+			    compile_error(PARSER_ARG "%"PRIsVALUE, err);
+			}
+			$$ = dispatch2(regexp_literal, $2, $3);
+		    %*/
 		    }
 		;
 
@@ -6353,6 +6430,11 @@ parser_parse_string(struct parser_params *parser, NODE *quote)
     rb_encoding *enc = current_enc;
 
     if (term == STR_TERM_END) return tSTRING_END;
+    if (func == RGXP_TERM_END) {
+	set_yylval_num(regx_options());
+	dispatch_scan_event(tREGEXP_END);
+	return tREGEXP_END;
+    }
     c = nextc();
     if ((func & STR_FUNC_QWORDS) && ISSPACE(c)) {
 	do {c = nextc();} while (ISSPACE(c));
@@ -6424,6 +6506,9 @@ parser_heredoc_identifier(struct parser_params *parser)
       case '`':
 	token = tXSTRING_BEG;
 	func |= str_xquote; goto quoted;
+      case '/':
+	token = tREGEXP_BEG;
+	func |= str_regexp;
 
       quoted:
 	newtok();
@@ -6716,6 +6801,11 @@ parser_here_document(struct parser_params *parser, NODE *here)
     if (was_bol() && whole_match_p(eos, len, indent)) {
 	dispatch_heredoc_end();
 	heredoc_restore(lex_strterm);
+	if (func & STR_FUNC_REGEXP) {
+	    set_yylval_num(regx_options());
+	    dispatch_scan_event(tREGEXP_END);
+	    return tREGEXP_END;
+	} // else
 	return tSTRING_END;
     }
 
@@ -6799,7 +6889,11 @@ parser_here_document(struct parser_params *parser, NODE *here)
 			    yylval.val, str);
 #endif
     heredoc_restore(lex_strterm);
-    lex_strterm = NEW_STRTERM(func, STR_TERM_END, 0);
+    if (func & STR_FUNC_REGEXP) {
+	lex_strterm = NEW_STRTERM(func, -2, 0);
+    } else {
+        lex_strterm = NEW_STRTERM(func, STR_TERM_END, 0);
+    }
     set_yylval_str(str);
     return tSTRING_CONTENT;
 }
