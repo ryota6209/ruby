@@ -3908,7 +3908,7 @@ xstring		: tXSTRING_BEG xstring_contents tSTRING_END
 
 regexp		: tREGEXP_BEG regexp_contents tREGEXP_END
 		    {
-		        $$ = new_regexp(heredoc_dedent($2), $3);
+			$$ = new_regexp(heredoc_dedent($2), $3);
 		    }
 		;
 
@@ -6352,8 +6352,9 @@ parser_parse_string(struct parser_params *parser, NODE *quote)
     int c, space = 0;
     rb_encoding *enc = current_enc;
 
-    if (term == STR_TERM_END)
-        return parser_string_term(parser, func);
+    if (term == STR_TERM_END) {
+	return parser_string_term(parser, func);
+    }
     c = nextc();
     if ((func & STR_FUNC_QWORDS) && ISSPACE(c)) {
 	do {c = nextc();} while (ISSPACE(c));
@@ -6427,7 +6428,7 @@ parser_heredoc_identifier(struct parser_params *parser)
 	func |= str_xquote; goto quoted;
       case '/':
 	token = tREGEXP_BEG;
-	func |= str_regexp;
+	func |= str_regexp; goto quoted;
 
       quoted:
 	newtok();
