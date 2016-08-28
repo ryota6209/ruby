@@ -5580,7 +5580,6 @@ rb_parser_compile_file_path(VALUE vparser, VALUE fname, VALUE file, int start)
 #define STR_FUNC_INDENT 0x20
 #define STR_FUNC_LABEL  0x40
 #define STR_TERM_END    -1
-#define RGXP_TERM_END   -2
 
 enum string_type {
     str_label  = STR_FUNC_LABEL,
@@ -6353,11 +6352,8 @@ parser_parse_string(struct parser_params *parser, NODE *quote)
     int c, space = 0;
     rb_encoding *enc = current_enc;
 
-    if (term == STR_TERM_END) return tSTRING_END;
-    if (term == RGXP_TERM_END) {
-	set_yylval_num(regx_options());
-	dispatch_scan_event(tREGEXP_END);
-	return tREGEXP_END;
+    if (term == STR_TERM_END) {
+      return parser_string_term(parser, func);
     }
     c = nextc();
     if ((func & STR_FUNC_QWORDS) && ISSPACE(c)) {
@@ -6813,11 +6809,7 @@ parser_here_document(struct parser_params *parser, NODE *here)
 			    yylval.val, str);
 #endif
     heredoc_restore(lex_strterm);
-    if (func & STR_FUNC_REGEXP) {
-	lex_strterm = NEW_STRTERM(func, RGXP_TERM_END, 0);
-    } else {
-	lex_strterm = NEW_STRTERM(func, STR_TERM_END, 0);
-    }
+    lex_strterm = NEW_STRTERM(func, STR_TERM_END, 0);
     set_yylval_str(str);
     return tSTRING_CONTENT;
 }
@@ -7992,7 +7984,7 @@ parser_yylex(struct parser_params *parser)
 	int token;
 	if (nd_type(lex_strterm) == NODE_HEREDOC) {
 	    token = here_document(lex_strterm);
-	    if (token == tSTRING_END) {
+	    if (token == tSTRING_END || token == tREGEXP_END) {
 		lex_strterm = 0;
 		SET_LEX_STATE(EXPR_END);
 	    }

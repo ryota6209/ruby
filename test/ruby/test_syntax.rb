@@ -873,6 +873,12 @@ eom
     assert_equal(expected, result)
   end
 
+  def test_regex_x_heredoc
+    expected = eval("/a\n/x")
+    result = eval("<</eos/x\na\neos")
+    assert_equal(expected, result)
+  end
+
   def test_regex_indent_heredoc
     expected = eval("/  a\n/x")
     result = eval("  <<-/eos/x\n  a\n  eos")
@@ -880,8 +886,21 @@ eom
   end
 
   def test_regex_deindent_heredoc
+    expected = eval("/ a\n b\nc\n/x")
+    result = eval("<<~/eos/x\n   a\n   b\n  c\neos")
+    assert_equal(expected, result)
+  end
+
+  # test parser_yylex in heredoc
+  def test_regex_deindent_indent_heredoc
     expected = eval("/a\n b\nc\n/x")
-    result = eval("<<~/eos/x\n  a\n   b\n  c\neos")
+    result = eval("  ret = <<~/eos/x\n    a\n     b\n    c\n  eos\na = 'b'\nret")
+    assert_equal(expected, result)
+  end
+
+  def test_regex_heredoc_continuation
+    expected = eval("//")
+    result = eval("ret = <<~/eos/;a = ret;ret\neos\na")
     assert_equal(expected, result)
   end
 
