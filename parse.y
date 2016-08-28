@@ -6352,9 +6352,8 @@ parser_parse_string(struct parser_params *parser, NODE *quote)
     int c, space = 0;
     rb_encoding *enc = current_enc;
 
-    if (term == STR_TERM_END) {
-      return parser_string_term(parser, func);
-    }
+    if (term == STR_TERM_END)
+        return parser_string_term(parser, func);
     c = nextc();
     if ((func & STR_FUNC_QWORDS) && ISSPACE(c)) {
 	do {c = nextc();} while (ISSPACE(c));
