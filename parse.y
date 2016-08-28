@@ -6720,12 +6720,7 @@ parser_here_document(struct parser_params *parser, NODE *here)
     if (was_bol() && whole_match_p(eos, len, indent)) {
 	dispatch_heredoc_end();
 	heredoc_restore(lex_strterm);
-	if (func & STR_FUNC_REGEXP) {
-	    set_yylval_num(regx_options());
-	    dispatch_scan_event(tREGEXP_END);
-	    return tREGEXP_END;
-	} // else
-	return tSTRING_END;
+	return parser_string_term(parser, func);
     }
 
     if (!(func & STR_FUNC_EXPAND)) {
