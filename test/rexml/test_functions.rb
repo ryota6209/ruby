@@ -164,7 +164,7 @@ module REXMLTests
       }
       good.each do |key, value|
         (0..3).each do |i|
-          xpath = "//b[number(@id) = #{key}(#{i+0.6})]"
+          xpath = "//b[number(@id) = #{key}(#{i+0.5})]"
           assert_equal(value[i], REXML::XPath.match(doc, xpath))
         end
       end

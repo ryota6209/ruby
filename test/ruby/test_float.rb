@@ -660,24 +660,24 @@ class TestFloat < Test::Unit::TestCase
   end
 
   def test_round_even
-    assert_equal(12.0, 12.5.round)
-    assert_equal(14.0, 13.5.round)
+    assert_equal(12.0, 12.5.round(to: :even))
+    assert_equal(14.0, 13.5.round(to: :even))
 
-    assert_equal(2.2, 2.15.round(1))
-    assert_equal(2.2, 2.25.round(1))
-    assert_equal(2.4, 2.35.round(1))
+    assert_equal(2.2, 2.15.round(1, to: :even))
+    assert_equal(2.2, 2.25.round(1, to: :even))
+    assert_equal(2.4, 2.35.round(1, to: :even))
 
-    assert_equal(-2.2, -2.15.round(1))
-    assert_equal(-2.2, -2.25.round(1))
-    assert_equal(-2.4, -2.35.round(1))
+    assert_equal(-2.2, -2.15.round(1, to: :even))
+    assert_equal(-2.2, -2.25.round(1, to: :even))
+    assert_equal(-2.4, -2.35.round(1, to: :even))
 
-    assert_equal(7.1364, 7.13645.round(4))
-    assert_equal(7.1365, 7.1364501.round(4))
-    assert_equal(7.1364, 7.1364499.round(4))
+    assert_equal(7.1364, 7.13645.round(4, to: :even))
+    assert_equal(7.1365, 7.1364501.round(4, to: :even))
+    assert_equal(7.1364, 7.1364499.round(4, to: :even))
 
-    assert_equal(-7.1364, -7.13645.round(4))
-    assert_equal(-7.1365, -7.1364501.round(4))
-    assert_equal(-7.1364, -7.1364499.round(4))
+    assert_equal(-7.1364, -7.13645.round(4, to: :even))
+    assert_equal(-7.1365, -7.1364501.round(4, to: :even))
+    assert_equal(-7.1364, -7.1364499.round(4, to: :even))
   end
 
   def test_Float

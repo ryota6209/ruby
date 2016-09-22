@@ -2040,7 +2040,7 @@ int_round_to_nearest(SIGNED_VALUE x, SIGNED_VALUE y)
  * Assumes num is an Integer, ndigits <= 0
  */
 VALUE
-rb_int_round(VALUE num, int ndigits)
+rb_int_round(VALUE num, int ndigits, enum ruby_num_rounding_mode mode)
 {
     VALUE n, f, h, r;
 
@@ -2053,7 +2053,7 @@ rb_int_round(VALUE num, int ndigits)
 	SIGNED_VALUE x = FIX2LONG(num), y = FIX2LONG(f);
 	int neg = x < 0;
 	if (neg) x = -x;
-	x = ROUND_TO(RUBY_NUM_ROUND_DEFAULT,
+	x = ROUND_TO(mode,
 		     int_round_to_nearest(x, y),
 		     int_round_to_even(x, y));
 	if (neg) x = -x;
@@ -2069,7 +2069,7 @@ rb_int_round(VALUE num, int ndigits)
     r = int_cmp(r, h);
     if (FIXNUM_POSITIVE_P(r) ||
 	(FIXNUM_ZERO_P(r) &&
-	 ROUND_TO(RUBY_NUM_ROUND_DEFAULT,
+	 ROUND_TO(mode,
 		  int_pos_p(num),
 		  int_odd_p(rb_int_idiv(n, f))))) {
 	n = rb_int_plus(n, f);
@@ -2189,24 +2189,26 @@ static VALUE
 flo_round(int argc, VALUE *argv, VALUE num)
 {
     double number, f, x;
-    VALUE nd;
+    VALUE nd, opt;
     int ndigits = 0;
+    enum ruby_num_rounding_mode mode;
 
-    if (rb_scan_args(argc, argv, "01", &nd)) {
+    if (rb_scan_args(argc, argv, "01:", &nd, &opt)) {
 	ndigits = NUM2INT(nd);
     }
+    mode = rb_num_get_rounding_option(opt);
     if (ndigits < 0) {
-	return rb_int_round(flo_to_i(num), ndigits);
+	return rb_int_round(flo_to_i(num), ndigits, mode);
     }
     number  = RFLOAT_VALUE(num);
     if (ndigits == 0) {
-	x = ROUND_TO(RUBY_NUM_ROUND_DEFAULT,
+	x = ROUND_TO(mode,
 		     round(number), round_to_even(number, 1.0));
 	return dbl2ival(x);
     }
     if (float_invariant_round(number, ndigits, &num)) return num;
     f = pow(10, ndigits);
-    x = ROUND_TO(RUBY_NUM_ROUND_DEFAULT,
+    x = ROUND_TO(mode,
 		 round_to_nearest(number, f), round_to_even(number, f));
     return DBL2NUM(x / f);
 }
@@ -4944,16 +4946,19 @@ static VALUE
 int_round(int argc, VALUE* argv, VALUE num)
 {
     int ndigits;
+    int mode;
+    VALUE nd, opt;
 
-    if (!rb_check_arity(argc, 0, 1)) return num;
-    ndigits = NUM2INT(argv[0]);
+    if (!rb_scan_args(argc, argv, "01:", &nd, &opt)) return num;
+    ndigits = NUM2INT(nd);
+    mode = rb_num_get_rounding_option(opt);
     if (ndigits > 0) {
 	return rb_Float(num);
     }
     if (ndigits == 0) {
 	return num;
     }
-    return rb_int_round(num, ndigits);
+    return rb_int_round(num, ndigits, mode);
 }
 
 /*

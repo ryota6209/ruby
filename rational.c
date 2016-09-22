@@ -1430,8 +1430,12 @@ nurat_truncate_n(int argc, VALUE *argv, VALUE self)
 static VALUE
 nurat_round_n(int argc, VALUE *argv, VALUE self)
 {
+    VALUE opt;
+    enum ruby_num_rounding_mode mode = (
+	argc = rb_scan_args(argc, argv, "*:", NULL, &opt),
+	rb_num_get_rounding_option(opt));
     VALUE (*round_func)(VALUE) =
-	ROUND_TO(RUBY_NUM_ROUND_DEFAULT,
+	ROUND_TO(mode,
 		 nurat_round_to_nearest, nurat_round_to_even);
     return f_round_common(argc, argv, self, round_func);
 }
