@@ -153,6 +153,7 @@ static void  VpSetException(unsigned short f);
 static void  VpInternalRound(Real *c, size_t ixDigit, BDIGIT vPrev, BDIGIT v);
 static int   VpLimitRound(Real *c, size_t ixDigit);
 static Real *VpCopy(Real *pv, Real const* const x);
+static void VpFormatSt(char *psz, size_t fFmt, char fill);
 
 #ifdef BIGDECIMAL_ENABLE_VPRINT
 static int VPrint(FILE *fp,const char *cntl_chr,Real *a);
@@ -2087,11 +2088,12 @@ BigDecimal_inspect(VALUE self)
 
     obj = rb_str_new(0, nc+256);
     psz = RSTRING_PTR(obj);
-    sprintf(psz, "#<BigDecimal:%"PRIxVALUE",'", self);
+    sprintf(psz, "#<BigDecimal:");
     tmp = psz + strlen(psz);
-    VpToString(vp, tmp, 10, 0);
+    VpToString(vp, tmp, 0, 0);
+    VpFormatSt(tmp, 10, '_');
     tmp += strlen(tmp);
-    sprintf(tmp, "',%"PRIuSIZE"(%"PRIuSIZE")>", VpPrec(vp)*VpBaseFig(), VpMaxPrec(vp)*VpBaseFig());
+    sprintf(tmp, ",%"PRIuSIZE">", VpPrec(vp)*VpBaseFig());
     rb_str_resize(obj, strlen(psz));
     return obj;
 }
@@ -3384,7 +3386,6 @@ static BDIGIT VpAddAbs(Real *a,Real *b,Real *c);
 static BDIGIT VpSubAbs(Real *a,Real *b,Real *c);
 static size_t VpSetPTR(Real *a, Real *b, Real *c, size_t *a_pos, size_t *b_pos, size_t *c_pos, BDIGIT *av, BDIGIT *bv);
 static int VpNmlz(Real *a);
-static void VpFormatSt(char *psz, size_t fFmt);
 static int VpRdup(Real *m, size_t ind_m);
 
 #ifdef BIGDECIMAL_DEBUG
@@ -5137,7 +5138,7 @@ VPrint(FILE *fp, const char *cntl_chr, Real *a)
 #endif
 
 static void
-VpFormatSt(char *psz, size_t fFmt)
+VpFormatSt(char *psz, size_t fFmt, char fill)
 {
     size_t ie, i, nf = 0;
     char ch;
@@ -5156,7 +5157,7 @@ VpFormatSt(char *psz, size_t fFmt)
 	    memmove(psz + i + 1, psz + i, ie - i + 1);
 	    ++ie;
 	    nf = 0;
-	    psz[i] = ' ';
+	    psz[i] = fill;
 	}
     }
 }
@@ -5305,7 +5306,7 @@ VpToString(Real *a, char *psz, size_t fFmt, int fPlus)
 	*(--psz) = 0;
     }
     sprintf(psz, "E%"PRIdSIZE, ex);
-    if (fFmt) VpFormatSt(pszSav, fFmt);
+    if (fFmt) VpFormatSt(pszSav, fFmt, ' ');
 }
 
 VP_EXPORT void
@@ -5360,7 +5361,7 @@ VpToFString(Real *a, char *psz, size_t fFmt, int fPlus)
     *psz = 0;
     while (psz[-1] == '0') *(--psz) = 0;
     if (psz[-1] == '.') sprintf(psz, "0");
-    if (fFmt) VpFormatSt(pszSav, fFmt);
+    if (fFmt) VpFormatSt(pszSav, fFmt, ' ');
 }
 
 /*
