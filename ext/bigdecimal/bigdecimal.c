@@ -2079,18 +2079,24 @@ BigDecimal_inspect(VALUE self)
     ENTER(5);
     Real *vp;
     volatile VALUE obj;
-    size_t nc;
+    size_t nc, nc2;
+    int fmt;
     char *psz, *tmp;
 
     GUARD_OBJ(vp, GetVpValue(self, 1));
     nc = VpNumOfChars(vp, "E");
+    nc2 = VpNumOfChars(vp, "F");
+    if ((fmt = nc > nc2) != 0) nc = nc2;
     nc += (nc + 9) / 10;
 
     obj = rb_str_new(0, nc+256);
     psz = RSTRING_PTR(obj);
     sprintf(psz, "#<BigDecimal:");
     tmp = psz + strlen(psz);
-    VpToString(vp, tmp, 0, 0);
+    if (fmt)
+	VpToFString(vp, tmp, 0, 0);
+    else
+	VpToString(vp, tmp, 0, 0);
     VpFormatSt(tmp, 10, '_');
     tmp += strlen(tmp);
     sprintf(tmp, ",%"PRIuSIZE">", VpPrec(vp)*VpBaseFig());
