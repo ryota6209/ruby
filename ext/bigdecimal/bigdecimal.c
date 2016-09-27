@@ -1917,6 +1917,8 @@ BigDecimal_ceil(int argc, VALUE *argv, VALUE self)
  *
  * If s ends with an 'F', conventional floating point notation is used.
  *
+ * If s ends with an 'G', shorter form of 'E' and 'F' is used.
+ *
  * Examples:
  *
  *   BigDecimal.new('-123.45678901234567890').to_s('5F')
@@ -1938,7 +1940,7 @@ BigDecimal_to_s(int argc, VALUE *argv, VALUE self)
     volatile VALUE str;
     char  *psz;
     char   ch;
-    size_t nc, mc = 0;
+    size_t nc, nc2, mc = 0;
     VALUE  f;
 
     GUARD_OBJ(vp, GetVpValue(self, 1));
@@ -1960,8 +1962,13 @@ BigDecimal_to_s(int argc, VALUE *argv, VALUE self)
 		    continue;
 		}
 		if (!ISDIGIT(ch)) {
-		    if (ch == 'F' || ch == 'f') {
+		    switch (ch) {
+		      case 'F': case 'f':
 			fmt = 1; /* F format */
+			break;
+		      case 'G': case 'g':
+			fmt = 2; /* G format */
+			break;
 		    }
 		    break;
 		}
@@ -1975,8 +1982,12 @@ BigDecimal_to_s(int argc, VALUE *argv, VALUE self)
     if (fmt) {
 	nc = VpNumOfChars(vp, "F");
     }
-    else {
-	nc = VpNumOfChars(vp, "E");
+    if (fmt != 1) {
+	nc2 = VpNumOfChars(vp, "E");
+	if (!fmt || nc2 < nc) {
+	    nc = nc2;
+	    fmt = 0;
+	}
     }
     if (mc > 0) {
 	nc += (nc + mc - 1) / mc + 1;
