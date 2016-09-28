@@ -1940,7 +1940,7 @@ BigDecimal_to_s(int argc, VALUE *argv, VALUE self)
     volatile VALUE str;
     char  *psz;
     char   ch;
-    size_t nc, nc2, mc = 0;
+    size_t nc = 0, nc2 = 0, mc = 0;
     VALUE  f;
 
     GUARD_OBJ(vp, GetVpValue(self, 1));
@@ -1984,25 +1984,29 @@ BigDecimal_to_s(int argc, VALUE *argv, VALUE self)
     }
     if (fmt != 1) {
 	nc2 = VpNumOfChars(vp, "E");
-	if (!fmt || nc2 < nc) {
-	    nc = nc2;
-	    fmt = 0;
-	}
+	if (nc2 > nc) nc = nc2;
     }
     if (mc > 0) {
 	nc += (nc + mc - 1) / mc + 1;
+	nc2 += (nc2 + mc - 1) / mc + 1;
     }
 
-    str = rb_str_new(0, nc);
+    str = rb_str_new(0, nc+nc2);
     psz = RSTRING_PTR(str);
 
     if (fmt) {
 	VpToFString(vp, psz, mc, fPlus);
+	nc = strlen(psz);
     }
-    else {
-	VpToString (vp, psz, mc, fPlus);
+    if (fmt != 1) {
+	VpToString (vp, psz+nc, mc, fPlus);
+	nc2 = strlen(psz+nc);
+	if (fmt && nc2 < nc) {
+	    memmove(psz, psz+nc, nc2);
+	    nc = nc2;
+	}
     }
-    rb_str_resize(str, strlen(psz));
+    rb_str_resize(str, nc);
     return str;
 }
 
@@ -2091,23 +2095,27 @@ BigDecimal_inspect(VALUE self)
     Real *vp;
     volatile VALUE obj;
     size_t nc, nc2;
-    int fmt;
     char *psz, *tmp;
 
     GUARD_OBJ(vp, GetVpValue(self, 1));
     nc = VpNumOfChars(vp, "E");
     nc2 = VpNumOfChars(vp, "F");
-    if ((fmt = nc > nc2) != 0) nc = nc2;
     nc += (nc + 9) / 10;
+    nc2 += (nc2 + 9) / 10;
 
-    obj = rb_str_new(0, nc+256);
+    obj = rb_str_new(0, nc+nc2+256);
     psz = RSTRING_PTR(obj);
     sprintf(psz, "#<BigDecimal:");
     tmp = psz + strlen(psz);
-    if (fmt)
-	VpToFString(vp, tmp, 0, 0);
-    else
-	VpToString(vp, tmp, 0, 0);
+    VpToFString(vp, tmp, 0, 0);
+    nc = strlen(tmp);
+    VpToString(vp, tmp+nc, 0, 0);
+    nc2 = strlen(tmp+nc);
+    if (nc2 < nc) {
+	memmove(tmp, tmp+nc, nc2);
+	nc = nc2;
+    }
+    tmp[nc] = '\0';
     VpFormatSt(tmp, 10, '_');
     tmp += strlen(tmp);
     sprintf(tmp, ",%"PRIuSIZE">", VpPrec(vp)*VpBaseFig());

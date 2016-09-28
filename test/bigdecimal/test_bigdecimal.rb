@@ -940,6 +940,7 @@ class TestBigDecimal < Test::Unit::TestCase
     assert_equal('-123.45678 90123 45678 9', BigDecimal.new('-123.45678901234567890').to_s('5F'))
     assert_equal('+123.45678901 23456789', BigDecimal.new('123.45678901234567890').to_s('+8F'))
     assert_equal(' 123.4567890123456789', BigDecimal.new('123.45678901234567890').to_s(' F'))
+    assert_equal('123.4567890123456789', BigDecimal.new('123.45678901234567890').to_s('G'))
     assert_equal('0.1234567890123456789E3', BigDecimal.new('123.45678901234567890').to_s)
     assert_equal('0.12345 67890 12345 6789E3', BigDecimal.new('123.45678901234567890').to_s(5))
   end
@@ -965,7 +966,7 @@ class TestBigDecimal < Test::Unit::TestCase
   def test_inspect
     x = BigDecimal.new("1234.5678")
     prec, maxprec = x.precs
-    assert_match(/^#<BigDecimal:0.12345678E4,#{prec}>$/, x.inspect)
+    assert_match(/^#<BigDecimal:1234.5678,#{prec}>$/, x.inspect)
   end
 
   def test_power
