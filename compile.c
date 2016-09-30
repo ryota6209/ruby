@@ -2791,6 +2791,7 @@ compile_flip_flop(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE *node, int again,
 		  LABEL *then_label, LABEL *else_label)
 {
     const int line = nd_line(node);
+    const int excl_end = (int)node->nd_state & RANGE_EXCLUDE_END;
     LABEL *lend = NEW_LABEL(line);
     rb_num_t cnt = ISEQ_FLIP_CNT_INCREMENT(iseq->body->local_iseq)
 	+ VM_SVAR_FLIPFLOP_START;
@@ -2814,7 +2815,12 @@ compile_flip_flop(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE *node, int again,
     ADD_INSNL(ret, line, branchunless, then_label);
     ADD_INSN1(ret, line, putobject, Qfalse);
     ADD_INSN1(ret, line, setspecial, key);
-    ADD_INSNL(ret, line, jump, then_label);
+    if (excl_end) {
+	ADD_INSNL(ret, line, jump, else_label);
+    }
+    else {
+	ADD_INSNL(ret, line, jump, then_label);
+    }
 
     return COMPILE_OK;
 }
