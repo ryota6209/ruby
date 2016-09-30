@@ -547,6 +547,7 @@ class TestRange < Test::Unit::TestCase
 
   def check_bsearch_values(range, search, a)
     from, to = range.begin, range.end
+    bcmp = range.exclude_begin? ? :<= : :<
     cmp = range.exclude_end? ? :< : :<=
     r = nil
 
@@ -578,15 +579,24 @@ class TestRange < Test::Unit::TestCase
     end
 
     a.for "(2) coverage test" do
-      expect = case
-               when search < from
-                 from
-               when search.send(cmp, to)
-                 search
+      expect = if range.exclude_begin?
+                 case
+                 when search.send(cmp, to)
+                   to
+                 when search < from
+                   nil
+                 end
                else
-                 nil
+                 case
+                 when search < from
+                   from
+                 when search.send(cmp, to)
+                   search
+                 else
+                   nil
+                 end
                end
-      assert_equal expect, r
+      assert_equal expect, r, proc {"#{range}, #{search}"}
     end
 
     a.for "(3) uniqueness test" do
