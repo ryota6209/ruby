@@ -59,22 +59,28 @@ class TestRange < Test::Unit::TestCase
     assert_equal(1, (1..2).min)
     assert_equal(nil, (2..1).min)
     assert_equal(1, (1...2).min)
+    assert_equal(2, (1^..2).min)
 
     assert_equal(1.0, (1.0..2.0).min)
     assert_equal(nil, (2.0..1.0).min)
     assert_equal(1, (1.0...2.0).min)
+    assert_raise(TypeError) { (1.0^..2.0).min }
+    assert_raise(TypeError) { (1^..1.5).min }
+    assert_raise(TypeError) { (1.5^..2).min }
 
     assert_equal(0, (0..0).min)
     assert_equal(nil, (0...0).min)
 
     assert_equal([0,1,2], (0..10).min(3))
     assert_equal([0,1], (0..1).min(3))
+    assert_equal([1,2,3], (0^..10).min(3))
   end
 
   def test_max
     assert_equal(2, (1..2).max)
     assert_equal(nil, (2..1).max)
     assert_equal(1, (1...2).max)
+    assert_equal(1, (1..^2).max)
 
     assert_equal(2.0, (1.0..2.0).max)
     assert_equal(nil, (2.0..1.0).max)
@@ -86,9 +92,13 @@ class TestRange < Test::Unit::TestCase
 
     assert_equal(0, (0..0).max)
     assert_equal(nil, (0...0).max)
+    assert_equal(nil, (0..^0).max)
+    assert_equal(nil, (0^..0).max)
+    assert_equal(nil, (0^..^0).max)
 
     assert_equal([10,9,8], (0..10).max(3))
     assert_equal([9,8,7], (0...10).max(3))
+    assert_equal([9,8,7], (0..^10).max(3))
   end
 
   def test_initialize_twice
@@ -108,6 +118,11 @@ class TestRange < Test::Unit::TestCase
     assert_raise(ArgumentError) { (1 .. :a) }
   end
 
+  def test_exclude_begin
+    assert_not_predicate(0..1, :exclude_begin?)
+    assert_predicate(0^..1, :exclude_begin?)
+  end
+
   def test_exclude_end
     assert_not_predicate(0..1, :exclude_end?)
     assert_predicate(0...1, :exclude_end?)
@@ -121,6 +136,7 @@ class TestRange < Test::Unit::TestCase
     assert_not_equal(r, (1..2))
     assert_not_equal(r, (0..2))
     assert_not_equal(r, (0...1))
+    assert_not_equal(r, (0^..1))
     subclass = Class.new(Range)
     assert_equal(r, subclass.new(0,1))
   end
@@ -151,6 +167,14 @@ class TestRange < Test::Unit::TestCase
     a = []
     (0..10).step(2) {|x| a << x }
     assert_equal([0, 2, 4, 6, 8, 10], a)
+
+    a = []
+    (0^..10).step {|x| a << x }
+    assert_equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], a)
+
+    a = []
+    (0^..10).step(2) {|x| a << x }
+    assert_equal([1, 3, 5, 7, 9], a)
 
     assert_raise(ArgumentError) { (0..10).step(-1) { } }
     assert_raise(ArgumentError) { (0..10).step(0) { } }
@@ -581,7 +605,11 @@ class TestRange < Test::Unit::TestCase
     end
 
     a.for "(5) start of range test" do
-      if search <= from
+      case
+      when range.exclude_begin?
+        assert_not_include yielded, from
+        assert_not_equal r, from
+      when search <= from
         assert_include yielded, from
         assert_equal from, r
       end
@@ -604,6 +632,7 @@ class TestRange < Test::Unit::TestCase
         values.combination(2).to_a.product(values).each do |(from, to), search|
           check_bsearch_values(from..to, search, a)
           check_bsearch_values(from...to, search, a)
+          check_bsearch_values(from^..to, search, a)
         end
       end
     end
