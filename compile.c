@@ -2791,30 +2791,54 @@ compile_flip_flop(rb_iseq_t *iseq, LINK_ANCHOR *ret, NODE *node, int again,
 		  LABEL *then_label, LABEL *else_label)
 {
     const int line = nd_line(node);
+    const int excl_beg = (int)node->nd_state & RANGE_EXCLUDE_BEG;
     const int excl_end = (int)node->nd_state & RANGE_EXCLUDE_END;
     LABEL *lend = NEW_LABEL(line);
+    LABEL *lexcl = (again && excl_beg) ? NEW_LABEL(line) : 0;
     rb_num_t cnt = ISEQ_FLIP_CNT_INCREMENT(iseq->body->local_iseq)
 	+ VM_SVAR_FLIPFLOP_START;
     VALUE key = INT2FIX(cnt);
 
+    if (lexcl) ADD_INSN1(ret, line, putobject, Qfalse);
     ADD_INSN2(ret, line, getspecial, key, INT2FIX(0));
     ADD_INSNL(ret, line, branchif, lend);
+    if (lexcl) ADD_INSN(ret, line, pop);
 
     /* *flip == 0 */
     COMPILE(ret, "flip2 beg", node->nd_beg);
     ADD_INSNL(ret, line, branchunless, else_label);
     ADD_INSN1(ret, line, putobject, Qtrue);
+    if (lexcl) ADD_INSN(ret, line, dup);
     ADD_INSN1(ret, line, setspecial, key);
     if (!again) {
-	ADD_INSNL(ret, line, jump, then_label);
+	if (excl_beg)
+	    ADD_INSNL(ret, line, jump, else_label);
+	else
+	    ADD_INSNL(ret, line, jump, then_label);
     }
 
     /* *flip == 1 */
     ADD_LABEL(ret, lend);
     COMPILE(ret, "flip2 end", node->nd_end);
-    ADD_INSNL(ret, line, branchunless, then_label);
+    ADD_INSNL(ret, line, branchunless, (lexcl ? lexcl : then_label));
     ADD_INSN1(ret, line, putobject, Qfalse);
     ADD_INSN1(ret, line, setspecial, key);
+    if (lexcl) {
+	if (excl_end) {
+	    ADD_INSN(ret, line, pop);
+	}
+	else {
+	    ADD_INSNL(ret, line, branchunless, then_label);
+	}
+	ADD_INSNL(ret, line, jump, else_label);
+	ADD_LABEL(ret, lexcl);
+	if (excl_end) {
+	    ADD_INSN(ret, line, pop);
+	}
+	else {
+	    ADD_INSNL(ret, line, branchif, else_label);
+	}
+    }
     if (excl_end) {
 	ADD_INSNL(ret, line, jump, else_label);
     }

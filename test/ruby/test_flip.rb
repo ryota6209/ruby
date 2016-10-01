@@ -5,8 +5,12 @@ class TestFlip < Test::Unit::TestCase
   def test_flip_flop
     assert_equal [4,5], (1..9).select {|n| true if (n==4)..(n==5)}
     assert_equal [4,5], (1..9).select {|n| true if (n==4)...(n==5)}
+    assert_equal [5], (1..9).select {|n| true if (n==4)^..(n==5)}
+    assert_equal [5], (1..9).select {|n| true if (n==4)^...(n==5)}
     assert_equal [4], (1..9).select {|n| true if (n==4)..^(n==5)}
     assert_equal [4], (1..9).select {|n| true if (n==4)...^(n==5)}
+    assert_equal [], (1..9).select {|n| true if (n==4)^..^(n==5)}
+    assert_equal [], (1..9).select {|n| true if (n==4)^...^(n==5)}
 
     assert_equal [2], (1..9).select {|n| true if (n==2)..(n%2).zero?}
     assert_equal [2,3,4], (1..9).select {|n| true if (n==2)...(n%2).zero?}
@@ -14,6 +18,12 @@ class TestFlip < Test::Unit::TestCase
 
     assert_equal [], (1..9).select {|n| true if (n==2)..^(n%2).zero?}
     assert_equal [2,3], (1..9).select {|n| true if (n==2)...^(n%2).zero?}
+
+    assert_equal [], (1..9).select {|n| true if (n==2)^..(n%2).zero?}
+    assert_equal [3,4], (1..9).select {|n| true if (n==2)^...(n%2).zero?}
+
+    assert_equal [], (1..9).select {|n| true if (n==2)^..^(n%2).zero?}
+    assert_equal [3], (1..9).select {|n| true if (n==2)^...^(n%2).zero?}
   end
 
   def test_hidden_key
