@@ -1637,6 +1637,7 @@ VALUE rb_setup_fake_str(struct RString *fake_str, const char *name, long len, rb
 
 /* thread.c (export) */
 int ruby_thread_has_gvl_p(void); /* for ext/fiddle/closure.c */
+int rb_thread_fd_close(int fd);
 
 /* util.c (export) */
 extern const signed char ruby_digit36_to_number_table[];

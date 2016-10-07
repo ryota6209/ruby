@@ -4241,6 +4241,7 @@ fptr_finalize(rb_io_t *fptr, int noraise)
 {
     VALUE err = Qnil;
     int fd = fptr->fd;
+    int inuse;
     FILE *stdio_file = fptr->stdio_file;
     int mode = fptr->mode;
 
@@ -4270,6 +4271,8 @@ fptr_finalize(rb_io_t *fptr, int noraise)
     fptr->stdio_file = 0;
     fptr->mode &= ~(FMODE_READABLE|FMODE_WRITABLE);
 
+    inuse = rb_thread_fd_close(fd);
+
     if (IS_PREP_STDIO(fptr) || fd <= 2) {
 	/* need to keep FILE objects of stdin, stdout and stderr */
     }
@@ -4297,8 +4300,11 @@ fptr_finalize(rb_io_t *fptr, int noraise)
 	else
 	    rb_exc_raise(err);
     }
-    free_io_buffer(&fptr->rbuf);
-    free_io_buffer(&fptr->wbuf);
+
+    if (!inuse) {
+	free_io_buffer(&fptr->rbuf);
+	free_io_buffer(&fptr->wbuf);
+    }
     clear_codeconv(fptr);
 }
 
@@ -4380,7 +4386,6 @@ static rb_io_t *
 io_close_fptr(VALUE io)
 {
     rb_io_t *fptr;
-    int fd;
     VALUE write_io;
     rb_io_t *write_fptr;
 
@@ -4396,8 +4401,6 @@ io_close_fptr(VALUE io)
     if (!fptr) return 0;
     if (fptr->fd < 0) return 0;
 
-    fd = fptr->fd;
-    rb_thread_fd_close(fd);
     rb_io_fptr_cleanup(fptr, FALSE);
     return fptr;
 }

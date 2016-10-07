@@ -2165,19 +2165,23 @@ rb_threadptr_reset_raised(rb_thread_t *th)
     return 1;
 }
 
-void
+int
 rb_thread_fd_close(int fd)
 {
     rb_vm_t *vm = GET_THREAD()->vm;
     rb_thread_t *th = 0;
+    int inuse = FALSE;
 
     list_for_each(&vm->living_threads, th, vmlt_node) {
 	if (th->waiting_fd == fd) {
 	    VALUE err = th->vm->special_exceptions[ruby_error_closed_stream];
 	    rb_threadptr_pending_interrupt_enque(th, err);
 	    rb_threadptr_interrupt(th);
+	    inuse = TRUE;
 	}
     }
+
+    return inuse;
 }
 
 /*
