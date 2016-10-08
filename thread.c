@@ -1426,6 +1426,9 @@ rb_thread_io_blocking_region(rb_blocking_function_t *func, void *data1, int fd)
 	    val = func(data1);
 	    saved_errno = errno;
 	}, ubf_select, th, FALSE);
+
+	/* TODO: check func() */
+	RUBY_VM_CHECK_INTS_BLOCKING(th);
     }
     TH_POP_TAG();
 
@@ -1435,8 +1438,6 @@ rb_thread_io_blocking_region(rb_blocking_function_t *func, void *data1, int fd)
     if (state) {
 	TH_JUMP_TAG(th, state);
     }
-    /* TODO: check func() */
-    RUBY_VM_CHECK_INTS_BLOCKING(th);
 
     errno = saved_errno;
 
