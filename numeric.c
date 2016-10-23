@@ -204,6 +204,12 @@ rb_num_get_rounding_option(VALUE opts)
 	  case 4:
 	    if (strncasecmp(s, "even", 4) == 0)
 		return RUBY_NUM_ROUND_TO_EVEN;
+	    if (strncasecmp(s, "near", 4) == 0)
+		return RUBY_NUM_ROUND_NEAREST;
+	    break;
+	  case 7:
+	    if (strncasecmp(s, "nearest", 7) == 0)
+		return RUBY_NUM_ROUND_NEAREST;
 	    break;
 	}
 	rb_raise(rb_eArgError, "unknown rounding mode: %"PRIsVALUE, rounding);

@@ -680,6 +680,27 @@ class TestFloat < Test::Unit::TestCase
     assert_equal(-7.1364, -7.1364499.round(4, to: :even))
   end
 
+  def test_round_nearest
+    assert_equal(13.0, 12.5.round(to: :nearest))
+    assert_equal(14.0, 13.5.round(to: :nearest))
+
+    assert_equal(2.2, 2.15.round(1, to: :nearest))
+    assert_equal(2.3, 2.25.round(1, to: :nearest))
+    assert_equal(2.4, 2.35.round(1, to: :nearest))
+
+    assert_equal(-2.2, -2.15.round(1, to: :nearest))
+    assert_equal(-2.3, -2.25.round(1, to: :nearest))
+    assert_equal(-2.4, -2.35.round(1, to: :nearest))
+
+    assert_equal(7.1365, 7.13645.round(4, to: :nearest))
+    assert_equal(7.1365, 7.1364501.round(4, to: :nearest))
+    assert_equal(7.1364, 7.1364499.round(4, to: :nearest))
+
+    assert_equal(-7.1365, -7.13645.round(4, to: :nearest))
+    assert_equal(-7.1365, -7.1364501.round(4, to: :nearest))
+    assert_equal(-7.1364, -7.1364499.round(4, to: :nearest))
+  end
+
   def test_Float
     assert_in_delta(0.125, Float("0.1_2_5"), 0.00001)
     assert_in_delta(0.125, "0.1_2_5__".to_f, 0.00001)

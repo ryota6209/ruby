@@ -136,6 +136,27 @@ class TestMathn < Test::Unit::TestCase
       assert_equal((-12/5), (-12/5).round(2, to: :even))
       assert_equal(( -5/2), ( -5/2).round(2, to: :even))
       assert_equal((-13/5), (-13/5).round(2, to: :even))
+
+      assert_equal( 3, ( 13/5).round(to: :nearest))
+      assert_equal( 3, (  5/2).round(to: :nearest))
+      assert_equal( 2, ( 12/5).round(to: :nearest))
+      assert_equal(-2, (-12/5).round(to: :nearest))
+      assert_equal(-3, ( -5/2).round(to: :nearest))
+      assert_equal(-3, (-13/5).round(to: :nearest))
+
+      assert_equal( 3, ( 13/5).round(0, to: :nearest))
+      assert_equal( 3, (  5/2).round(0, to: :nearest))
+      assert_equal( 2, ( 12/5).round(0, to: :nearest))
+      assert_equal(-2, (-12/5).round(0, to: :nearest))
+      assert_equal(-3, ( -5/2).round(0, to: :nearest))
+      assert_equal(-3, (-13/5).round(0, to: :nearest))
+
+      assert_equal(( 13/5), ( 13/5).round(2, to: :nearest))
+      assert_equal((  5/2), (  5/2).round(2, to: :nearest))
+      assert_equal(( 12/5), ( 12/5).round(2, to: :nearest))
+      assert_equal((-12/5), (-12/5).round(2, to: :nearest))
+      assert_equal(( -5/2), ( -5/2).round(2, to: :nearest))
+      assert_equal((-13/5), (-13/5).round(2, to: :nearest))
     EOS
   end
 end
