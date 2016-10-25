@@ -138,7 +138,12 @@ module OpenURI
     OpenURI.check_options(options)
 
     if /\Arb?(?:\Z|:([^:]+))/ =~ mode
-      encoding, = $1,Encoding.find($1) if $1
+      if encoding = $1
+        if encoding.sub!(/\Abom\|/i, '') and !(bom = /\Autf-/i.match?(encoding))
+          warn "BOM with non-UTF encoding %s is nonsense"
+        end
+        Encoding.find(encoding)
+      end
       mode = nil
     end
 
@@ -149,7 +154,30 @@ module OpenURI
     end
 
     io = open_loop(uri, options)
-    io.set_encoding(encoding) if encoding
+    if encoding
+      if bom
+        pos = 0
+        case io.read(4)
+        when /\A\xef\xbb\xbf/n
+          encoding = Encoding::UTF_8
+          pos = 3
+        when /\A\0\0\xfe\xff/n
+          encoding = Encoding::UTF_32BE
+          pos = 4
+        when /\A\xfe\xff/n
+          encoding = Encoding::UTF_16BE
+          pos = 2
+        when /\xff\xfe\0\0/n
+          encoding = Encoding::UTF_32LE
+          pos = 4
+        when /\xff\xfe/n
+          encoding = Encoding::UTF_16LE
+          pos = 2
+        end
+        io.pos = pos
+      end
+      io.set_encoding(encoding)
+    end
     if block_given?
       begin
         yield io

@@ -868,5 +868,20 @@ class TestOpenURI < Test::Unit::TestCase
     }
   end
 
+  %W[UTF-8 UTF-16LE UTF-16BE UTF-32LE UTF-32BE].each do |enc|
+    enc = Encoding.find(enc)
+    define_method("test_BOM:#{enc}") do
+      body = "\u{feff}foo".encode(enc).b
+      with_http {|srv, dr, url|
+        srv.mount_proc("/foo", lambda { |req, res| res.body = body } )
+        open("#{url}/foo", "r:bom|utf-8") {|f|
+          assert_equal(enc, f.external_encoding)
+          body = f.read
+          assert_equal(enc, body.encoding)
+          assert_equal("foo".encode(enc), body)
+        }
+      }
+    end
+  end
 end
 
