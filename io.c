@@ -5298,7 +5298,7 @@ extract_binmode(VALUE opthash, int *fmode)
     }
 }
 
-static void
+void
 rb_io_extract_modeenc(VALUE *vmode_p, VALUE *vperm_p, VALUE opthash,
         int *oflags_p, int *fmode_p, convconfig_t *convconfig_p)
 {

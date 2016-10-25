@@ -185,10 +185,13 @@ strio_initialize(int argc, VALUE *argv, VALUE self)
 static VALUE
 strio_init(int argc, VALUE *argv, struct StringIO *ptr, VALUE self)
 {
-    VALUE string, mode;
+    VALUE string, mode, opt;
     int trunc = 0;
+    int pos = 0;
+    rb_encoding *encoding = 0;
 
-    switch (rb_scan_args(argc, argv, "02", &string, &mode)) {
+    argc = rb_scan_args(argc, argv, "02:", &string, &mode, &opt);
+    switch (argc) {
       case 2:
 	if (FIXNUM_P(mode)) {
 	    int flags = FIX2INT(mode);
@@ -204,6 +207,31 @@ strio_init(int argc, VALUE *argv, struct StringIO *ptr, VALUE self)
 	if ((ptr->flags & FMODE_WRITABLE) && OBJ_FROZEN(string)) {
 	    rb_syserr_fail(EACCES, 0);
 	}
+	if (ptr->flags & FMODE_SETENC_BY_BOM) {
+	    long len;
+	    const char *ptr;
+	    RSTRING_GETMEM(string, ptr, len);
+#define MATCH_BOM(bom) (len >= (pos = rb_strlen_lit(bom)) && \
+			memcmp(ptr, bom, pos) == 0)
+	    if (MATCH_BOM("\xEF\xBB\xBF")) {
+		encoding = rb_utf8_encoding();
+	    }
+	    else if (MATCH_BOM("\x00\x00\xFF\xFE")) {
+		encoding = rb_enc_find("UTF-32BE");
+	    }
+	    else if (MATCH_BOM("\xFE\xFF\x00\x00")) {
+		encoding = rb_enc_find("UTF-32LE");
+	    }
+	    else if (MATCH_BOM("\xFF\xFE")) {
+		encoding = rb_enc_find("UTF-16BE");
+	    }
+	    else if (MATCH_BOM("\xFE\xFF")) {
+		encoding = rb_enc_find("UTF-16LE");
+	    }
+	    else {
+		pos = 0;
+	    }
+	}
 	if (trunc) {
 	    rb_str_resize(string, 0);
 	}
@@ -218,8 +246,8 @@ strio_init(int argc, VALUE *argv, struct StringIO *ptr, VALUE self)
 	break;
     }
     ptr->string = string;
-    ptr->enc = 0;
-    ptr->pos = 0;
+    ptr->enc = encoding;
+    ptr->pos = pos;
     ptr->lineno = 0;
     RBASIC(self)->flags |= (ptr->flags & FMODE_READWRITE) * (STRIO_READABLE / FMODE_READABLE);
     return self;

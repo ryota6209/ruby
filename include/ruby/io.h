@@ -59,6 +59,19 @@ PACKED_STRUCT_UNALIGNED(struct rb_io_buffer_t {
 });
 typedef struct rb_io_buffer_t rb_io_buffer_t;
 
+/*
+ * enc  enc2 read action                      write action
+ * NULL NULL force_encoding(default_external) write the byte sequence of str
+ * e1   NULL force_encoding(e1)               convert str.encoding to e1
+ * e1   e2   convert from e2 to e1            convert str.encoding to e2
+ */
+typedef struct rb_io_enc_t {
+    rb_encoding *enc;
+    rb_encoding *enc2;
+    int ecflags;
+    VALUE ecopts;
+} rb_io_enc_t;
+
 typedef struct rb_io_t {
     FILE *stdio_file;		/* stdio ptr for read/write if available */
     int fd;                     /* file descriptor */
@@ -72,18 +85,7 @@ typedef struct rb_io_t {
 
     VALUE tied_io_for_writing;
 
-    /*
-     * enc  enc2 read action                      write action
-     * NULL NULL force_encoding(default_external) write the byte sequence of str
-     * e1   NULL force_encoding(e1)               convert str.encoding to e1
-     * e1   e2   convert from e2 to e1            convert str.encoding to e2
-     */
-    struct rb_io_enc_t {
-        rb_encoding *enc;
-        rb_encoding *enc2;
-        int ecflags;
-        VALUE ecopts;
-    } encs;
+    rb_io_enc_t encs;
 
     rb_econv_t *readconv;
     rb_io_buffer_t cbuf;
@@ -148,6 +150,7 @@ int rb_io_wait_writable(int);
 int rb_wait_for_single_fd(int fd, int events, struct timeval *tv);
 void rb_io_set_nonblock(rb_io_t *fptr);
 int rb_io_extract_encoding_option(VALUE opt, rb_encoding **enc_p, rb_encoding **enc2_p, int *fmode_p);
+void rb_io_extract_modeenc(VALUE *vmode_p, VALUE *vperm_p, VALUE opthash, int *oflags_p, int *fmode_p, rb_io_enc_t *convconfig_p);
 ssize_t rb_io_bufwrite(VALUE io, const void *buf, size_t size);
 
 /* compatibility for ruby 1.8 and older */
