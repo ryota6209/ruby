@@ -156,6 +156,24 @@ class TestProcess < Test::Unit::TestCase
 
   TRUECOMMAND = [RUBY, '-e', '']
 
+  def test_spawn
+    pid = nil
+    IO.pipe {|r, w|
+      pid = assert_nothing_raised {
+        Process.spawn(RUBY, '-egets', :in => r, w => :close)
+      }
+      r.close
+      w.close
+      assert_nil(pid.exited?)
+      status = pid.wait
+      assert_not_nil(status)
+      pid = nil
+      assert_predicate(status, :success?)
+    }
+  ensure
+    Process.wait(pid) if pid
+  end
+
   def test_execopts_opts
     assert_nothing_raised {
       Process.wait Process.spawn(*TRUECOMMAND, {})

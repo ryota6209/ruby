@@ -15,6 +15,7 @@
 #include "ruby/io.h"
 #include "ruby/thread.h"
 #include "ruby/util.h"
+#include "ruby/debug.h"
 #include "vm_core.h"
 
 #include <stdio.h>
@@ -535,9 +536,14 @@ pst_pid(VALUE st)
 }
 
 static void
-pst_message(VALUE str, rb_pid_t pid, int status)
+pst_message_pid(VALUE str, rb_pid_t pid)
 {
     rb_str_catf(str, "pid %ld", (long)pid);
+}
+
+static void
+pst_message_status(VALUE str, int status)
+{
     if (WIFSTOPPED(status)) {
 	int stopsig = WSTOPSIG(status);
 	const char *signame = ruby_signal_name(stopsig);
@@ -568,6 +574,12 @@ pst_message(VALUE str, rb_pid_t pid, int status)
 #endif
 }
 
+static void
+pst_message(VALUE str, rb_pid_t pid, int status)
+{
+    pst_message_pid(str, pid);
+    pst_message_status(str, status);
+}
 
 /*
  *  call-seq:
@@ -859,6 +871,9 @@ pst_wcoredump(VALUE st)
 #endif
 }
 
+
+static VALUE rb_cProcessPID;
+
 struct waitpid_arg {
     rb_pid_t pid;
     int flags;
@@ -917,6 +932,226 @@ rb_waitpid(rb_pid_t pid, int *st, int flags)
 	rb_last_status_set(*st, result);
     }
     return result;
+}
+
+static int
+pid_wait_nohang(rb_pid_t pid)
+{
+    rb_pid_t ret = do_waitpid(pid, 0, WNOHANG);
+    if (ret > 0) return 1;
+    if (ret < 0 && errno != EINTR) return -1;
+    return 0;
+}
+
+static void
+postponed_reap(void *ptr)
+{
+    VALUE orphan_pids = (VALUE)ptr;
+    long i;
+    for (i = 0; i < RARRAY_LEN(orphan_pids); ++i) {
+	VALUE v = RARRAY_AREF(orphan_pids, i);
+	if (!NIL_P(v) && pid_wait_nohang(NUM2PIDT(v))) {
+	    rb_ary_delete_at(orphan_pids, i);
+	}
+    }
+}
+
+static void
+pid_mark(void *ptr)
+{
+    VALUE v = (VALUE)ptr;
+    rb_gc_mark(v);
+}
+
+static void
+pid_reap(void *ptr)
+{
+    VALUE v = (VALUE)ptr;
+    if (RB_INTEGER_TYPE_P(v) && !pid_wait_nohang(NUM2PIDT(v))) {
+	VALUE orphan_pids = rb_attr_get(rb_cProcessPID, id_pid);
+	rb_ary_push(orphan_pids, v);
+	rb_postponed_job_register_one(0, postponed_reap, (void *)orphan_pids);
+    }
+}
+
+static const rb_data_type_t process_pid_type = {
+    "Process::PID",
+    {pid_mark, pid_reap, 0},
+    0, 0, RUBY_TYPED_FREE_IMMEDIATELY
+};
+
+/*
+ *  call-seq:
+ *     pid.to_i     -> integer
+ *     pid.to_int   -> integer
+ *
+ *  Returns the _pid_ as a <code>Integer</code>.
+ *
+ *     pid = fork { exit }        #=> #<Process::PID 26566>
+ *     pid.to_i                   #=> 26566
+ */
+
+static VALUE
+pid_to_i(VALUE self)
+{
+    VALUE v = (VALUE)DATA_PTR(self);
+    if (!RB_INTEGER_TYPE_P(v)) {
+	v = rb_ivar_get(v, id_pid);
+    }
+    return v;
+}
+
+
+/*
+ *  call-seq:
+ *     pid.to_s   -> string
+ *
+ *  Show pid and exit status as a string.
+ *
+ *    pid = spawn("false")
+ *    p pid.to_s         #=> "pid 12766 exit 1"
+ *
+ */
+
+static VALUE
+pid_to_s(int argc, VALUE *argv, VALUE self)
+{
+    VALUE v = (VALUE)DATA_PTR(self);
+    int base = (rb_check_arity(argc, 0, 1) ?
+		NUM2INT(argv[0]) : 10);
+
+    if (RB_INTEGER_TYPE_P(v)) {
+	return rb_int2str(v, base);
+    }
+    else {
+	return pst_to_s(v);
+    }
+}
+
+
+/*
+ *  call-seq:
+ *     pid.inspect   -> string
+ *
+ *  Show pid and exit status as a string.
+ *
+ *    pid = spawn("false")
+ *    p pid         #=> "pid 12766 exit 1"
+ *
+ */
+
+static VALUE
+pid_inspect(VALUE self)
+{
+    VALUE v = (VALUE)DATA_PTR(self);
+
+    if (RB_INTEGER_TYPE_P(v)) {
+	VALUE str = rb_sprintf("#<%s: ", rb_class2name(CLASS_OF(self)));
+	pst_message_pid(str, NUM2PIDT(v));
+	rb_str_cat2(str, ">");
+	return str;
+    }
+    else {
+	return pst_inspect(v);
+    }
+}
+
+
+/*
+ *  call-seq:
+ *     pid == other   -> true or false
+ *
+ *  Returns +true+ if the integer value of _pid_
+ *  equals <em>other</em>.
+ */
+
+static VALUE
+pid_equal(VALUE pid1, VALUE pid2)
+{
+    if (pid1 == pid2) return Qtrue;
+    return rb_equal(pid_to_i(pid1), pid2);
+}
+
+
+/*
+ *  call-seq:
+ *     pid <=> other   -> integer or nil
+ *
+ *  Compares with <em>other</em>.
+ */
+
+static VALUE
+pid_cmp(VALUE pid1, VALUE pid2)
+{
+    if (pid1 == pid2) return INT2FIX(0);
+    return rb_invcmp(pid_to_i(pid1), pid2);
+}
+
+
+/*
+ *  call-seq:
+ *     pid.coerce(other)   -> [other, integer]
+ *
+ *  Coerces to <em>other</em>.
+ */
+
+static VALUE
+pid_coerce(VALUE self, VALUE other)
+{
+    if (RB_INTEGER_TYPE_P(other))
+	return rb_assoc_new(other, pid_to_i(self));
+    return Qnil;
+}
+
+
+/*
+ *  call-seq:
+ *     pid.wait(flags=0)   -> Process::Status or nil
+ *
+ *  Returns <code>Process::Status</code> if the process terminated.
+ *  See Process.wait.
+ */
+
+static VALUE
+pid_wait(int argc, VALUE *argv, VALUE self)
+{
+    VALUE v = (VALUE)DATA_PTR(self);
+    int status, flags = 0;
+    rb_pid_t pid;
+
+    if (rb_check_arity(argc, 0, 1) && !NIL_P(argv[0])) {
+	flags = NUM2UINT(argv[0]);
+    }
+    if (RB_INTEGER_TYPE_P(v)) {
+	if ((pid = rb_waitpid(NUM2PIDT(v), &status, flags)) < 0)
+	    rb_sys_fail(0);
+	if (pid == 0) {
+	    rb_last_status_clear();
+	    return Qnil;
+	}
+	v = rb_last_status_get();
+	DATA_PTR(self) = (void *)v;
+    }
+    return v;
+}
+
+
+/*
+ *  call-seq:
+ *     pid.exited?   -> Process::status or nil
+ *
+ *  Returns <code>Process::Status</code> if the process terminated and
+ *  already waited.
+ */
+
+static VALUE
+pid_exited_p(VALUE self)
+{
+    VALUE v = (VALUE)DATA_PTR(self);
+
+    if (RB_INTEGER_TYPE_P(v))
+	return Qnil;
+    return v;
 }
 
 
@@ -3696,6 +3931,7 @@ static VALUE
 rb_f_fork(VALUE obj)
 {
     rb_pid_t pid;
+    VALUE pidobj = rb_data_typed_object_wrap(rb_cProcessPID, 0, &process_pid_type);
 
     switch (pid = rb_fork_ruby(NULL)) {
       case 0:
@@ -3712,7 +3948,8 @@ rb_f_fork(VALUE obj)
 	return Qnil;
 
       default:
-	return PIDT2NUM(pid);
+	DATA_PTR(pidobj) = (void *)PIDT2NUM(pid);
+	return pidobj;
     }
 }
 #else
@@ -4346,6 +4583,9 @@ rb_f_spawn(int argc, VALUE *argv)
     char errmsg[CHILD_ERRMSG_BUFLEN] = { '\0' };
     VALUE execarg_obj, fail_str;
     struct rb_execarg *eargp;
+#if defined(HAVE_WORKING_FORK) || defined(HAVE_SPAWNV)
+    VALUE pidobj = rb_data_typed_object_wrap(rb_cProcessPID, 0, &process_pid_type);
+#endif
 
     execarg_obj = rb_execarg_new(argc, argv, TRUE);
     eargp = rb_execarg_get(execarg_obj);
@@ -4360,7 +4600,8 @@ rb_f_spawn(int argc, VALUE *argv)
 	rb_syserr_fail_str(err, fail_str);
     }
 #if defined(HAVE_WORKING_FORK) || defined(HAVE_SPAWNV)
-    return PIDT2NUM(pid);
+    DATA_PTR(pidobj) = (void *)PIDT2NUM(pid);
+    return pidobj;
 #else
     return Qnil;
 #endif
@@ -7622,6 +7863,19 @@ InitVM_process(void)
     rb_define_method(rb_cProcessStatus, "exitstatus", pst_wexitstatus, 0);
     rb_define_method(rb_cProcessStatus, "success?", pst_success_p, 0);
     rb_define_method(rb_cProcessStatus, "coredump?", pst_wcoredump, 0);
+
+    rb_cProcessPID = rb_define_class_under(rb_mProcess, "PID", rb_cData);
+    rb_include_module(rb_cProcessPID, rb_mComparable);
+    rb_define_method(rb_cProcessPID, "==", pid_equal, 1);
+    rb_define_method(rb_cProcessPID, "<=>", pid_cmp, 1);
+    rb_define_method(rb_cProcessPID, "coerce", pid_coerce, 1);
+    rb_define_method(rb_cProcessPID, "to_s", pid_to_s, -1);
+    rb_define_method(rb_cProcessPID, "inspect", pid_inspect, 0);
+    rb_define_method(rb_cProcessPID, "to_i", pid_to_i, 0);
+    rb_define_method(rb_cProcessPID, "to_int", pid_to_i, 0);
+    rb_define_method(rb_cProcessPID, "wait", pid_wait, -1);
+    rb_define_method(rb_cProcessPID, "exited?", pid_exited_p, 0);
+    rb_ivar_set(rb_cProcessPID, id_pid, rb_ary_tmp_new(1));
 
     rb_define_module_function(rb_mProcess, "pid", get_pid, 0);
     rb_define_module_function(rb_mProcess, "ppid", get_ppid, 0);
