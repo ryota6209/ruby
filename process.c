@@ -607,6 +607,7 @@ pst_to_s(VALUE st)
     return str;
 }
 
+static VALUE pst_inspect0(VALUE st, VALUE k);
 
 /*
  *  call-seq:
@@ -622,18 +623,24 @@ pst_to_s(VALUE st)
 static VALUE
 pst_inspect(VALUE st)
 {
+    return pst_inspect0(st, CLASS_OF(st));
+}
+
+static VALUE
+pst_inspect0(VALUE st, VALUE k)
+{
     rb_pid_t pid;
     int status;
     VALUE vpid, str;
 
     vpid = pst_pid(st);
     if (NIL_P(vpid)) {
-        return rb_sprintf("#<%s: uninitialized>", rb_class2name(CLASS_OF(st)));
+        return rb_sprintf("#<%"PRIsVALUE": uninitialized>", k);
     }
     pid = NUM2PIDT(vpid);
     status = PST2INT(st);
 
-    str = rb_sprintf("#<%s: ", rb_class2name(CLASS_OF(st)));
+    str = rb_sprintf("#<%"PRIsVALUE": ", k);
     pst_message(str, pid, status);
     rb_str_cat2(str, ">");
     return str;
@@ -980,6 +987,20 @@ static const rb_data_type_t process_pid_type = {
     0, 0, RUBY_TYPED_FREE_IMMEDIATELY
 };
 
+
+static VALUE
+pid_s_alloc(VALUE klass)
+{
+    return rb_data_typed_object_wrap(rb_cProcessPID, 0, &process_pid_type);
+}
+
+static VALUE
+pid_init(VALUE self, VALUE num)
+{
+    DATA_PTR(self) = (void *)num;
+    return self;
+}
+
 /*
  *  call-seq:
  *     pid.to_i     -> integer
@@ -1044,15 +1065,18 @@ static VALUE
 pid_inspect(VALUE self)
 {
     VALUE v = (VALUE)DATA_PTR(self);
-
+    VALUE k = CLASS_OF(self);
     if (RB_INTEGER_TYPE_P(v)) {
-	VALUE str = rb_sprintf("#<%s: ", rb_class2name(CLASS_OF(self)));
+	VALUE str = rb_sprintf("#<%"PRIsVALUE": ", k);
 	pst_message_pid(str, NUM2PIDT(v));
 	rb_str_cat2(str, ">");
 	return str;
     }
+    else if (rb_obj_is_kind_of(v, rb_cProcessStatus)) {
+	return pst_inspect0(v, k);
+    }
     else {
-	return pst_inspect(v);
+	return rb_sprintf("#<%"PRIsVALUE": %+"PRIsVALUE">", k, v);
     }
 }
 
@@ -3931,7 +3955,7 @@ static VALUE
 rb_f_fork(VALUE obj)
 {
     rb_pid_t pid;
-    VALUE pidobj = rb_data_typed_object_wrap(rb_cProcessPID, 0, &process_pid_type);
+    VALUE pidobj = pid_s_alloc(rb_cProcessPID);
 
     switch (pid = rb_fork_ruby(NULL)) {
       case 0:
@@ -4584,7 +4608,7 @@ rb_f_spawn(int argc, VALUE *argv)
     VALUE execarg_obj, fail_str;
     struct rb_execarg *eargp;
 #if defined(HAVE_WORKING_FORK) || defined(HAVE_SPAWNV)
-    VALUE pidobj = rb_data_typed_object_wrap(rb_cProcessPID, 0, &process_pid_type);
+    VALUE pidobj = pid_s_alloc(rb_cProcessPID);
 #endif
 
     execarg_obj = rb_execarg_new(argc, argv, TRUE);
@@ -7864,8 +7888,10 @@ InitVM_process(void)
     rb_define_method(rb_cProcessStatus, "success?", pst_success_p, 0);
     rb_define_method(rb_cProcessStatus, "coredump?", pst_wcoredump, 0);
 
-    rb_cProcessPID = rb_define_class_under(rb_mProcess, "PID", rb_cData);
+    rb_cProcessPID = rb_define_class_under(rb_mProcess, "PID", rb_cNumeric);
     rb_include_module(rb_cProcessPID, rb_mComparable);
+    rb_define_alloc_func(rb_cProcessPID, pid_s_alloc);
+    rb_define_method(rb_cProcessPID, "initialize", pid_init, 1);
     rb_define_method(rb_cProcessPID, "==", pid_equal, 1);
     rb_define_method(rb_cProcessPID, "<=>", pid_cmp, 1);
     rb_define_method(rb_cProcessPID, "coerce", pid_coerce, 1);
