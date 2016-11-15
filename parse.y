@@ -7996,6 +7996,17 @@ parser_yylex(struct parser_params *parser)
 	      case '\13': /* '\v' */
 		space_seen = 1;
 		break;
+	      case '?':
+		dispatch_delayed_token(tIGNORED_NL);
+		if (IS_lex_state(EXPR_ARG|EXPR_END)) {
+		    c = peekc();
+		    pushback('?');
+		    if (c == -1 || ISSPACE(c)) {
+			dispatch_scan_event(tSP);
+			goto retry;
+		    }
+		}
+		goto backward_line;
 	      case '&':
 	      case '.': {
 		dispatch_delayed_token(tIGNORED_NL);
@@ -8005,6 +8016,7 @@ parser_yylex(struct parser_params *parser)
 		    goto retry;
 		}
 	      }
+	      backward_line:
 	      default:
 		--ruby_sourceline;
 		lex_nextline = lex_lastline;
