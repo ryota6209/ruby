@@ -22,6 +22,7 @@
 #define YYSTACK_USE_ALLOCA 0
 
 #include "ruby/ruby.h"
+#include "ruby/math.h"
 #include "ruby/st.h"
 #include "ruby/encoding.h"
 #include "internal.h"

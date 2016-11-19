@@ -493,6 +493,10 @@ struct RBignum {
           : (RBASIC(b)->flags &= ~BIGNUM_SIGN_BIT))
 #define BIGNUM_POSITIVE_P(b) BIGNUM_SIGN(b)
 #define BIGNUM_NEGATIVE_P(b) (!BIGNUM_SIGN(b))
+#undef RBIGNUM_POSITIVE_P
+#undef RBIGNUM_NEGATIVE_P
+#define RBIGNUM_POSITIVE_P(b) BIGNUM_POSITIVE_P(b)
+#define RBIGNUM_NEGATIVE_P(b) BIGNUM_NEGATIVE_P(b)
 #define BIGNUM_NEGATE(b) (RBASIC(b)->flags ^= BIGNUM_SIGN_BIT)
 
 #define BIGNUM_EMBED_FLAG FL_USER2
@@ -1121,36 +1125,11 @@ extern const char ruby_initial_load_paths[];
 /* localeinit.c */
 int Init_enc_set_filesystem_encoding(void);
 
-/* math.c */
-VALUE rb_math_atan2(VALUE, VALUE);
-VALUE rb_math_cos(VALUE);
-VALUE rb_math_cosh(VALUE);
-VALUE rb_math_exp(VALUE);
-VALUE rb_math_hypot(VALUE, VALUE);
-VALUE rb_math_log(int argc, const VALUE *argv);
-VALUE rb_math_sin(VALUE);
-VALUE rb_math_sinh(VALUE);
-VALUE rb_math_sqrt(VALUE);
-
 /* newline.c */
 void Init_newline(void);
 
 /* numeric.c */
 
-#define FIXNUM_POSITIVE_P(num) ((SIGNED_VALUE)(num) > (SIGNED_VALUE)INT2FIX(0))
-#define FIXNUM_NEGATIVE_P(num) ((SIGNED_VALUE)(num) < 0)
-#define FIXNUM_ZERO_P(num) ((num) == INT2FIX(0))
-
-#define INT_NEGATIVE_P(x) (FIXNUM_P(x) ? FIXNUM_NEGATIVE_P(x) : BIGNUM_NEGATIVE_P(x))
-
-#ifndef ROUND_DEFAULT
-# define ROUND_DEFAULT RUBY_NUM_ROUND_HALF_EVEN
-#endif
-enum ruby_num_rounding_mode {
-    RUBY_NUM_ROUND_HALF_UP,
-    RUBY_NUM_ROUND_HALF_EVEN,
-    RUBY_NUM_ROUND_DEFAULT = ROUND_DEFAULT
-};
 #define ROUND_TO(mode, even, up) \
     ((mode) == RUBY_NUM_ROUND_HALF_EVEN ? even : \
      up)
@@ -1159,38 +1138,6 @@ enum ruby_num_rounding_mode {
 #define ROUND_CALL(mode, name, args) \
     ROUND_TO(mode, name##_half_even args, \
 	     name##_half_up args)
-
-int rb_num_to_uint(VALUE val, unsigned int *ret);
-VALUE ruby_num_interval_step_size(VALUE from, VALUE to, VALUE step, int excl);
-int ruby_float_step(VALUE from, VALUE to, VALUE step, int excl);
-double ruby_float_mod(double x, double y);
-int rb_num_negative_p(VALUE);
-VALUE rb_int_succ(VALUE num);
-VALUE rb_int_pred(VALUE num);
-VALUE rb_int_uminus(VALUE num);
-VALUE rb_float_uminus(VALUE num);
-VALUE rb_int_plus(VALUE x, VALUE y);
-VALUE rb_int_minus(VALUE x, VALUE y);
-VALUE rb_int_mul(VALUE x, VALUE y);
-VALUE rb_int_idiv(VALUE x, VALUE y);
-VALUE rb_int_modulo(VALUE x, VALUE y);
-VALUE rb_int_round(VALUE num, int ndigits, enum ruby_num_rounding_mode mode);
-VALUE rb_int2str(VALUE num, int base);
-VALUE rb_dbl_hash(double d);
-VALUE rb_fix_plus(VALUE x, VALUE y);
-VALUE rb_int_ge(VALUE x, VALUE y);
-enum ruby_num_rounding_mode rb_num_get_rounding_option(VALUE opts);
-double rb_int_fdiv_double(VALUE x, VALUE y);
-VALUE rb_int_pow(VALUE x, VALUE y);
-VALUE rb_float_pow(VALUE x, VALUE y);
-VALUE rb_int_cmp(VALUE x, VALUE y);
-VALUE rb_int_equal(VALUE x, VALUE y);
-VALUE rb_int_divmod(VALUE x, VALUE y);
-VALUE rb_int_and(VALUE x, VALUE y);
-VALUE rb_int_lshift(VALUE x, VALUE y);
-VALUE rb_int_div(VALUE x, VALUE y);
-VALUE rb_int_abs(VALUE num);
-VALUE rb_float_abs(VALUE flt);
 
 #if USE_FLONUM
 #define RUBY_BIT_ROTL(v, n) (((v) << (n)) | ((v) >> ((sizeof(v) * 8) - n)))
@@ -1377,14 +1324,6 @@ struct rb_execarg {
 
 rb_pid_t rb_fork_ruby(int *status);
 void rb_last_status_clear(void);
-
-/* rational.c */
-VALUE rb_rational_uminus(VALUE self);
-VALUE rb_rational_plus(VALUE self, VALUE other);
-VALUE rb_lcm(VALUE x, VALUE y);
-VALUE rb_rational_reciprocal(VALUE x);
-VALUE rb_cstr_to_rat(const char *, int);
-VALUE rb_rational_abs(VALUE self);
 
 /* re.c */
 VALUE rb_reg_compile(VALUE str, int options, const char *sourcefile, int sourceline);
@@ -1651,7 +1590,6 @@ int rb_gc_for_fd(int err);
 void rb_write_error_str(VALUE mesg);
 
 /* numeric.c (export) */
-VALUE rb_int_positive_pow(long x, unsigned long y);
 
 /* process.c (export) */
 int rb_exec_async_signal_safe(const struct rb_execarg *e, char *errmsg, size_t errmsg_buflen);

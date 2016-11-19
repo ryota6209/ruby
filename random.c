@@ -60,6 +60,7 @@ The original copyright notice follows.
 */
 
 #include "internal.h"
+#include "ruby/math.h"
 
 #include <limits.h>
 #ifdef HAVE_UNISTD_H

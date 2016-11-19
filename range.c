@@ -10,6 +10,7 @@
 **********************************************************************/
 
 #include "internal.h"
+#include "ruby/math.h"
 #include "id.h"
 
 #ifdef HAVE_FLOAT_H

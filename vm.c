@@ -9,6 +9,7 @@
 **********************************************************************/
 
 #include "internal.h"
+#include "ruby/math.h"
 #include "ruby/vm.h"
 #include "ruby/st.h"
 

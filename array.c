@@ -12,6 +12,7 @@
 **********************************************************************/
 
 #include "internal.h"
+#include "ruby/math.h"
 #include "ruby/util.h"
 #include "ruby/st.h"
 #include "probes.h"

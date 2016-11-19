@@ -12,6 +12,7 @@
 **********************************************************************/
 
 #include "internal.h"
+#include "ruby/math.h"
 #include "ruby/re.h"
 #include "encindex.h"
 #include "probes.h"

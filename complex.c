@@ -12,6 +12,7 @@
 #endif
 #include <math.h>
 #include "internal.h"
+#include "ruby/math.h"
 
 #define NDEBUG
 #include "ruby_assert.h"

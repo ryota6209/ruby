@@ -13,6 +13,7 @@
 # define _USE_MATH_DEFINES 1
 #endif
 #include "internal.h"
+#include "ruby/math.h"
 #include <float.h>
 #include <math.h>
 #include <errno.h>
@@ -65,6 +66,12 @@ VALUE rb_eMathDomainError;
 static VALUE
 math_atan2(VALUE unused_obj, VALUE y, VALUE x)
 {
+    return rb_math_atan2(y, x);
+}
+
+VALUE
+rb_math_atan2(VALUE y, VALUE x)
+{
     double dx, dy;
     dx = Get_Double(x);
     dy = Get_Double(y);
@@ -110,6 +117,12 @@ math_atan2(VALUE unused_obj, VALUE y, VALUE x)
 static VALUE
 math_cos(VALUE unused_obj, VALUE x)
 {
+    return rb_math_cos(x);
+}
+
+VALUE
+rb_math_cos(VALUE x)
+{
     return DBL2NUM(cos(Get_Double(x)));
 }
 
@@ -130,6 +143,12 @@ math_cos(VALUE unused_obj, VALUE x)
 
 static VALUE
 math_sin(VALUE unused_obj, VALUE x)
+{
+    return rb_math_sin(x);
+}
+
+VALUE
+rb_math_sin(VALUE x)
 {
     return DBL2NUM(sin(Get_Double(x)));
 }
@@ -152,6 +171,12 @@ math_sin(VALUE unused_obj, VALUE x)
 static VALUE
 math_tan(VALUE unused_obj, VALUE x)
 {
+    return rb_math_tan(x);
+}
+
+VALUE
+rb_math_tan(VALUE x)
+{
     return DBL2NUM(tan(Get_Double(x)));
 }
 
@@ -171,6 +196,12 @@ math_tan(VALUE unused_obj, VALUE x)
 
 static VALUE
 math_acos(VALUE unused_obj, VALUE x)
+{
+    return rb_math_acos(x);
+}
+
+VALUE
+rb_math_acos(VALUE x)
 {
     double d;
 
@@ -196,6 +227,12 @@ math_acos(VALUE unused_obj, VALUE x)
 static VALUE
 math_asin(VALUE unused_obj, VALUE x)
 {
+    return rb_math_asin(x);
+}
+
+VALUE
+rb_math_asin(VALUE x)
+{
     double d;
 
     d = Get_Double(x);
@@ -219,6 +256,12 @@ math_asin(VALUE unused_obj, VALUE x)
 
 static VALUE
 math_atan(VALUE unused_obj, VALUE x)
+{
+    return rb_math_atan(x);
+}
+
+VALUE
+rb_math_atan(VALUE x)
 {
     return DBL2NUM(atan(Get_Double(x)));
 }
@@ -248,6 +291,12 @@ cosh(double x)
 static VALUE
 math_cosh(VALUE unused_obj, VALUE x)
 {
+    return rb_math_cosh(x);
+}
+
+VALUE
+rb_math_cosh(VALUE x)
+{
     return DBL2NUM(cosh(Get_Double(x)));
 }
 
@@ -275,6 +324,12 @@ sinh(double x)
 
 static VALUE
 math_sinh(VALUE unused_obj, VALUE x)
+{
+    return rb_math_sinh(x);
+}
+
+VALUE
+rb_math_sinh(VALUE x)
 {
     return DBL2NUM(sinh(Get_Double(x)));
 }
@@ -311,6 +366,12 @@ tanh(double x)
 static VALUE
 math_tanh(VALUE unused_obj, VALUE x)
 {
+    return rb_math_tanh(x);
+}
+
+VALUE
+rb_math_tanh(VALUE x)
+{
     return DBL2NUM(tanh(Get_Double(x)));
 }
 
@@ -330,6 +391,12 @@ math_tanh(VALUE unused_obj, VALUE x)
 
 static VALUE
 math_acosh(VALUE unused_obj, VALUE x)
+{
+    return rb_math_acosh(x);
+}
+
+VALUE
+rb_math_acosh(VALUE x)
 {
     double d;
 
@@ -356,6 +423,12 @@ math_acosh(VALUE unused_obj, VALUE x)
 static VALUE
 math_asinh(VALUE unused_obj, VALUE x)
 {
+    return rb_math_asinh(x);
+}
+
+VALUE
+rb_math_asinh(VALUE x)
+{
     return DBL2NUM(asinh(Get_Double(x)));
 }
 
@@ -375,6 +448,12 @@ math_asinh(VALUE unused_obj, VALUE x)
 
 static VALUE
 math_atanh(VALUE unused_obj, VALUE x)
+{
+    return rb_math_atanh(x);
+}
+
+VALUE
+rb_math_atanh(VALUE x)
 {
     double d;
 
@@ -405,6 +484,12 @@ math_atanh(VALUE unused_obj, VALUE x)
 
 static VALUE
 math_exp(VALUE unused_obj, VALUE x)
+{
+    return rb_math_exp(x);
+}
+
+VALUE
+rb_math_exp(VALUE x)
 {
     return DBL2NUM(exp(Get_Double(x)));
 }
@@ -450,6 +535,12 @@ static double math_log1(VALUE x);
 
 static VALUE
 math_log(int argc, const VALUE *argv, VALUE unused_obj)
+{
+    return rb_math_log(argc, argv);
+}
+
+VALUE
+rb_math_log(int argc, const VALUE *argv)
 {
     VALUE x, base;
     double d;
@@ -525,6 +616,12 @@ extern double log2(double);
 static VALUE
 math_log2(VALUE unused_obj, VALUE x)
 {
+    return rb_math_log2(x);
+}
+
+VALUE
+rb_math_log2(VALUE x)
+{
     size_t numbits;
     double d = get_double_rshift(x, &numbits);
 
@@ -554,6 +651,12 @@ math_log2(VALUE unused_obj, VALUE x)
 
 static VALUE
 math_log10(VALUE unused_obj, VALUE x)
+{
+    return rb_math_log10(x);
+}
+
+VALUE
+rb_math_log10(VALUE x)
 {
     size_t numbits;
     double d = get_double_rshift(x, &numbits);
@@ -675,6 +778,12 @@ rb_math_sqrt(VALUE x)
 static VALUE
 math_cbrt(VALUE unused_obj, VALUE x)
 {
+    return rb_math_cbrt(x);
+}
+
+VALUE
+rb_math_cbrt(VALUE x)
+{
     return DBL2NUM(cbrt(Get_Double(x)));
 }
 
@@ -691,6 +800,12 @@ math_cbrt(VALUE unused_obj, VALUE x)
 
 static VALUE
 math_frexp(VALUE unused_obj, VALUE x)
+{
+    return rb_math_frexp(x);
+}
+
+VALUE
+rb_math_frexp(VALUE x)
 {
     double d;
     int exp;
@@ -712,6 +827,12 @@ math_frexp(VALUE unused_obj, VALUE x)
 static VALUE
 math_ldexp(VALUE unused_obj, VALUE x, VALUE n)
 {
+    return rb_math_ldexp(x, n);
+}
+
+VALUE
+rb_math_ldexp(VALUE x, VALUE n)
+{
     return DBL2NUM(ldexp(Get_Double(x), NUM2INT(n)));
 }
 
@@ -727,6 +848,12 @@ math_ldexp(VALUE unused_obj, VALUE x, VALUE n)
 
 static VALUE
 math_hypot(VALUE unused_obj, VALUE x, VALUE y)
+{
+    return rb_math_hypot(x, y);
+}
+
+VALUE
+rb_math_hypot(VALUE x, VALUE y)
 {
     return DBL2NUM(hypot(Get_Double(x), Get_Double(y)));
 }
@@ -748,6 +875,12 @@ math_hypot(VALUE unused_obj, VALUE x, VALUE y)
 static VALUE
 math_erf(VALUE unused_obj, VALUE x)
 {
+    return rb_math_erf(x);
+}
+
+VALUE
+rb_math_erf(VALUE x)
+{
     return DBL2NUM(erf(Get_Double(x)));
 }
 
@@ -767,6 +900,12 @@ math_erf(VALUE unused_obj, VALUE x)
 
 static VALUE
 math_erfc(VALUE unused_obj, VALUE x)
+{
+    return rb_math_erfc(x);
+}
+
+VALUE
+rb_math_erfc(VALUE x)
 {
     return DBL2NUM(erfc(Get_Double(x)));
 }
@@ -849,6 +988,12 @@ ruby_lgamma_r(const double d, int *sign)
 static VALUE
 math_gamma(VALUE unused_obj, VALUE x)
 {
+    return rb_math_gamma(x);
+}
+
+VALUE
+rb_math_gamma(VALUE x)
+{
     static const double fact_table[] = {
         /* fact(0) */ 1.0,
         /* fact(1) */ 1.0,
@@ -908,6 +1053,12 @@ math_gamma(VALUE unused_obj, VALUE x)
 static VALUE
 math_lgamma(VALUE unused_obj, VALUE x)
 {
+    return rb_math_lgamma(x);
+}
+
+VALUE
+rb_math_lgamma(VALUE x)
+{
     double d;
     int sign=1;
     VALUE v;
@@ -920,40 +1071,6 @@ math_lgamma(VALUE unused_obj, VALUE x)
     v = DBL2NUM(lgamma_r(d, &sign));
     return rb_assoc_new(v, INT2FIX(sign));
 }
-
-
-#define exp1(n) \
-VALUE \
-rb_math_##n(VALUE x)\
-{\
-    return math_##n(0, x);\
-}
-
-#define exp2(n) \
-VALUE \
-rb_math_##n(VALUE x, VALUE y)\
-{\
-    return math_##n(0, x, y);\
-}
-
-exp2(atan2)
-exp1(cos)
-exp1(cosh)
-exp1(exp)
-exp2(hypot)
-
-VALUE
-rb_math_log(int argc, const VALUE *argv)
-{
-    return math_log(argc, argv, 0);
-}
-
-exp1(sin)
-exp1(sinh)
-#if 0
-exp1(sqrt)
-#endif
-
 
 /*
  *  Document-class: Math::DomainError

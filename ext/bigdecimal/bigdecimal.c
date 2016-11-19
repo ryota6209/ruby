@@ -12,6 +12,7 @@
 #endif
 #include "bigdecimal.h"
 #include "ruby/util.h"
+#include "ruby/math.h"
 
 #ifndef BIGDECIMAL_DEBUG
 # define NDEBUG
@@ -24,7 +25,6 @@
 #include <string.h>
 #include <errno.h>
 #include <math.h>
-#include "math.h"
 
 #ifdef HAVE_IEEEFP_H
 #include <ieeefp.h>
@@ -1711,11 +1711,24 @@ BigDecimal_round(int argc, VALUE *argv, VALUE self)
     int    iLoc = 0;
     VALUE  vLoc;
     VALUE  vRound;
+    VALUE  opts;
     size_t mx, pl;
 
     unsigned short sw = VpGetRoundMode();
 
-    switch (rb_scan_args(argc, argv, "02", &vLoc, &vRound)) {
+    argc = rb_scan_args(argc, argv, "02:", &vLoc, &vRound, &opts);
+    if (!NIL_P(opts)) {
+	rb_check_arity(argc, 0, 1);
+	switch (rb_num_get_rounding_option(opts)) {
+	  case RUBY_NUM_ROUND_HALF_EVEN:
+	    sw = VP_ROUND_HALF_EVEN;
+	    break;
+	  case RUBY_NUM_ROUND_HALF_UP:
+	    sw = VP_ROUND_HALF_UP;
+	    break;
+	}
+    }
+    switch (argc) {
       case 0:
 	iLoc = 0;
 	break;

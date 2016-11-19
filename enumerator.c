@@ -13,6 +13,7 @@
 ************************************************/
 
 #include "internal.h"
+#include "ruby/math.h"
 
 /*
  * Document-class: Enumerator

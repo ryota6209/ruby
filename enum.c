@@ -10,6 +10,7 @@
 **********************************************************************/
 
 #include "internal.h"
+#include "ruby/math.h"
 #include "ruby/util.h"
 #include "id.h"
 
