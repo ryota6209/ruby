@@ -5103,7 +5103,7 @@ ripper_yylval_id(ID x)
 # define set_yylval_num(x) (yylval.val = ripper_new_yylval((x), 0, 0))
 # define set_yylval_id(x)  (void)(x)
 # define set_yylval_name(x) (void)(yylval.val = ripper_yylval_id(x))
-# define set_yylval_literal(x) (void)(x)
+# define set_yylval_literal(x) (yylval.val = (x))
 # define set_yylval_node(x) (void)(x)
 # define yylval_id() yylval.id
 #endif
@@ -7547,7 +7547,7 @@ parse_qmark(struct parser_params *parser)
 	tokadd(c);
     }
     tokfix();
-    set_yylval_str(STR_NEW3(tok(), toklen(), enc, 0));
+    set_yylval_literal(rb_fstring(STR_NEW3(tok(), toklen(), enc, 0)));
     SET_LEX_STATE(EXPR_END);
     return tCHAR;
 }

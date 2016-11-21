@@ -93,6 +93,9 @@ class TestRubyLiteral < Test::Unit::TestCase
 
     assert_equal "ab", eval("?a 'b'")
     assert_equal "a\nb", eval("<<A 'b'\na\nA")
+
+    assert_same ?a, ?a
+    assert_predicate ?a, :frozen?
   end
 
   def test_dstring
