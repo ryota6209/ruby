@@ -8845,6 +8845,13 @@ literal_concat_gen(struct parser_params *parser, NODE *head, NODE *tail)
 	    }
 	    rb_gc_force_recycle((VALUE)tail);
 	}
+	else if (htype == NODE_LIT) {
+	    rb_str_update(tail->nd_lit, 0L, 0L, lit);
+	    tail->nd_lit = rb_fstring(tail->nd_lit);
+	    nd_set_type(tail, htype);
+	    rb_gc_force_recycle((VALUE)head);
+	    return tail;
+	}
 	else {
 	    list_append(head, tail);
 	}
@@ -8857,6 +8864,17 @@ literal_concat_gen(struct parser_params *parser, NODE *head, NODE *tail)
 	    tail->nd_lit = head->nd_lit;
 	    rb_gc_force_recycle((VALUE)head);
 	    head = tail;
+	}
+	else if (htype == NODE_LIT) {
+	    lit = head->nd_lit;
+	    if (NIL_P(tail->nd_lit)) {
+		tail->nd_lit = lit;
+	    }
+	    else {
+		rb_str_update(tail->nd_lit, 0L, 0L, lit);
+	    }
+	    rb_gc_force_recycle((VALUE)head);
+	    return tail;
 	}
 	else if (NIL_P(tail->nd_lit)) {
 	  append:
@@ -8881,7 +8899,7 @@ literal_concat_gen(struct parser_params *parser, NODE *head, NODE *tail)
 	break;
 
       case NODE_EVSTR:
-	if (htype == NODE_STR) {
+	if (htype == NODE_STR || htype == NODE_LIT) {
 	    nd_set_type(head, NODE_DSTR);
 	    head->nd_alen = 1;
 	}
