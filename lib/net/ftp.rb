@@ -165,26 +165,24 @@ module Net
     end
 
     # :call-seq:
-    #    Net::FTP.new(host = nil, options = {})
+    #    Net::FTP.new(host = nil, **options)
     #
     # Creates and returns a new +FTP+ object. If a +host+ is given, a connection
     # is made.
     #
-    # +options+ is an option hash, each key of which is a symbol.
-    #
-    # The available options are:
+    # The available keyword options are:
     #
     # port::      Port number (default value is 21)
-    # ssl::       If options[:ssl] is true, then an attempt will be made
+    # ssl::       If +ssl+ is true, then an attempt will be made
     #             to use SSL (now TLS) to connect to the server.  For this
     #             to work OpenSSL [OSSL] and the Ruby OpenSSL [RSSL]
-    #             extensions need to be installed.  If options[:ssl] is a
+    #             extensions need to be installed.  If +ssl+ is a
     #             hash, it's passed to OpenSSL::SSL::SSLContext#set_params
     #             as parameters.
     # private_data_connection::  If true, TLS is used for data connections.
-    #                            Default: +true+ when options[:ssl] is true.
-    # username::  Username for login.  If options[:username] is the string
-    #             "anonymous" and the options[:password] is +nil+,
+    #                            Default: +true+ when +ssl+ is true.
+    # username::  Username for login.  If +username+ is the string
+    #             "anonymous" and the +password+ is +nil+,
     #             "anonymous@" is used as a password.
     # password::  Password for login.
     # account::   Account information for ACCT.
@@ -197,67 +195,50 @@ module Net
     # debug_mode::  When +true+, all traffic to and from the server is
     #               written to +$stdout+.  Default: +false+.
     #
-    def initialize(host = nil, user_or_options = {}, passwd = nil, acct = nil)
+    def initialize(host = nil, user = nil, passwd = nil, acct = nil,
+                   port: nil, username: user, password: passwd, account: acct,
+                   ssl: nil, private_data_connection: (true if ssl),
+                   passive: @@default_passive, debug_mode: false,
+                   open_timeout: nil, read_timeout: 60)
       super()
-      begin
-        options = user_or_options.to_hash
-      rescue NoMethodError
-        # for backward compatibility
-        options = {}
-        options[:username] = user_or_options
-        options[:password] = passwd
-        options[:account] = acct
-      end
       @host = nil
-      if options[:ssl]
+      if ssl
         unless defined?(OpenSSL::SSL)
           raise "SSL extension not installed"
         end
-        ssl_params = options[:ssl] == true ? {} : options[:ssl]
+        ssl_params = ssl == true ? {} : ssl
         @ssl_context = SSLContext.new
         @ssl_context.set_params(ssl_params)
         if defined?(VerifyCallbackProc)
           @ssl_context.verify_callback = VerifyCallbackProc
         end
         @ssl_session = nil
-        if options[:private_data_connection].nil?
-          @private_data_connection = true
-        else
-          @private_data_connection = options[:private_data_connection]
-        end
+        @private_data_connection = private_data_connection
       else
         @ssl_context = nil
-        if options[:private_data_connection]
+        if private_data_connection
           raise ArgumentError,
             "private_data_connection can be set to true only when ssl is enabled"
         end
       end
       @binary = true
-      if options[:passive].nil?
-        @passive = @@default_passive
-      else
-        @passive = options[:passive]
-      end
-      if options[:debug_mode].nil?
-        @debug_mode = false
-      else
-        @debug_mode = options[:debug_mode]
-      end
+      @passive = passive
+      @debug_mode = debug_mode
       @resume = false
       @bare_sock = @sock = NullSocket.new
       @logged_in = false
-      @open_timeout = options[:open_timeout]
-      @read_timeout = options[:read_timeout] || 60
+      @open_timeout = open_timeout
+      @read_timeout = read_timeout
       if host
-        if options[:port]
-          connect(host, options[:port] || FTP_PORT)
+        if port
+          connect(host, port || FTP_PORT)
         else
           # spec/rubyspec/library/net/ftp/initialize_spec.rb depends on
           # the number of arguments passed to connect....
           connect(host)
         end
-        if options[:username]
-          login(options[:username], options[:password], options[:account])
+        if username
+          login(username, password, account)
         end
       end
     end
