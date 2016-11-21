@@ -96,6 +96,10 @@ class TestRubyLiteral < Test::Unit::TestCase
 
     assert_same ?a, ?a
     assert_predicate ?a, :frozen?
+
+    assert_equal "foo", ?foo
+    assert_same ?foo, ?foo
+    assert_predicate ?foo, :frozen?
   end
 
   def test_dstring

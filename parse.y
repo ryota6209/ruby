@@ -7509,7 +7509,6 @@ parse_qmark(struct parser_params *parser)
 		rb_warn1("invalid character syntax; use ?\\%c", WARN_I(c2));
 	    }
 	}
-      ternary:
 	pushback(c);
 	SET_LEX_STATE(EXPR_VALUE);
 	return '?';
@@ -7519,9 +7518,13 @@ parse_qmark(struct parser_params *parser)
     if (!parser_isascii()) {
 	if (tokadd_mbchar(c) == -1) return 0;
     }
-    else if ((rb_enc_isalnum(c, current_enc) || c == '_') &&
-	     lex_p < lex_pend && is_identchar(lex_p, lex_pend, current_enc)) {
-	goto ternary;
+    else if (rb_enc_isalnum(c, current_enc) || c == '_') {
+	const char *start = lex_p - 1;
+	while (lex_p < lex_pend && is_identchar(lex_p, lex_pend, current_enc)) {
+	    lex_p++;
+	    lex_p += parser_precise_mbclen();
+	}
+	tokcopy((int)(lex_p - start));
     }
     else if (c == '\\') {
 	if (peek('u')) {
