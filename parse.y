@@ -7208,7 +7208,9 @@ parser_prepare(struct parser_params *parser)
 #define IS_LABEL_POSSIBLE() (\
 	(IS_lex_state(EXPR_LABEL|EXPR_ENDFN) && !cmd_state) || \
 	IS_ARG())
-#define IS_LABEL_SUFFIX(n) (peek_n(':',(n)) && !peek_n(':', (n)+1))
+#define IS_LABEL_SUFFIX(n) (\
+	peek_n(':',(n)) && \
+	(!peek_n(':', (n)+1) || peek_n('\'', (n)+2) || peek_n('"', (n)+2)))
 #define IS_AFTER_OPERATOR() IS_lex_state(EXPR_FNAME | EXPR_DOT)
 
 #ifndef RIPPER

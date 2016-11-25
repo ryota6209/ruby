@@ -920,6 +920,10 @@ eom
     assert_equal(:ok, result)
   end
 
+  def test_symbol_after_keyword
+    assert_equal({foo: :bar}, eval("{foo::'bar'}"))
+  end
+
   private
 
   def not_label(x) @result = x; @not_label ||= nil end
