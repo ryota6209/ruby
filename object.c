@@ -352,7 +352,7 @@ rb_obj_clone2(int argc, VALUE *argv, VALUE obj)
     if (!NIL_P(opt)) {
 	rb_get_kwargs(opt, keyword_ids, 0, 1, kwargs);
 	kwfreeze = kwargs[0];
-	if (kwfreeze != Qundef && kwfreeze != Qtrue && kwfreeze != Qfalse) {
+	if (!UNDEF_P(kwfreeze) && kwfreeze != Qtrue && kwfreeze != Qfalse) {
 	    rb_raise(rb_eArgError, "unexpected value for freeze: %s",
 		     rb_builtin_class_name(kwfreeze));
 	}
@@ -2596,7 +2596,7 @@ convert_type(VALUE val, const char *tname, const char *method, int raise)
     }
     if (!m) m = rb_intern(method);
     r = rb_check_funcall(val, m, 0, 0);
-    if (r == Qundef) {
+    if (UNDEF_P(r)) {
 	if (raise) {
 	    const char *msg = i < IMPLICIT_CONVERSIONS ?
 		"no implicit conversion of" : "can't convert";

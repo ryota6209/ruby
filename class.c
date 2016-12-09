@@ -37,7 +37,7 @@ rb_class_subclass_add(VALUE super, VALUE klass)
 {
     rb_subclass_entry_t *entry, *head;
 
-    if (super && super != Qundef) {
+    if (super && !UNDEF_P(super)) {
 	entry = ALLOC(rb_subclass_entry_t);
 	entry->klass = klass;
 	entry->next = NULL;
@@ -396,7 +396,7 @@ rb_singleton_class_clone_and_attach(VALUE obj, VALUE attach)
 	    arg.klass = clone;
 	    rb_id_table_foreach(RCLASS_CONST_TBL(klass), clone_const_i, &arg);
 	}
-	if (attach != Qundef) {
+	if (!UNDEF_P(attach)) {
 	    rb_singleton_class_attached(clone, attach);
 	}
 	RCLASS_M_TBL_INIT(clone);

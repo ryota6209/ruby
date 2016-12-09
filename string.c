@@ -332,7 +332,7 @@ register_fstring(VALUE str)
 	ret = str;
 	st_update(frozen_strings, (st_data_t)str,
 		  fstr_update_callback, (st_data_t)&ret);
-    } while (ret == Qundef);
+    } while (UNDEF_P(ret));
 
     assert(OBJ_FROZEN(ret));
     assert(!FL_TEST_RAW(ret, STR_FAKESTR));
@@ -1432,10 +1432,10 @@ rb_str_init(int argc, VALUE *argv, VALUE str)
 	rb_get_kwargs(opt, keyword_ids, 0, 2, kwargs);
 	venc = kwargs[0];
 	vcapa = kwargs[1];
-	if (venc != Qundef && !NIL_P(venc)) {
+	if (!UNDEF_P(venc) && !NIL_P(venc)) {
 	    enc = rb_to_encoding(venc);
 	}
-	if (vcapa != Qundef && !NIL_P(vcapa)) {
+	if (!UNDEF_P(vcapa) && !NIL_P(vcapa)) {
 	    long capa = NUM2LONG(vcapa);
 	    long len = 0;
 	    int termlen = enc ? rb_enc_mbminlen(enc) : 1;
@@ -7409,7 +7409,7 @@ rb_str_enumerate_lines(int argc, VALUE *argv, VALUE str, int wantarray)
 	    keywords[0] = rb_intern_const("chomp");
 	}
 	rb_get_kwargs(opts, keywords, 0, 1, &chomp);
-	chomp = (chomp != Qundef && RTEST(chomp));
+	chomp = (!UNDEF_P(chomp) && RTEST(chomp));
     }
 
     if (rb_block_given_p()) {

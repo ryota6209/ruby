@@ -90,10 +90,10 @@ rb_threadptr_error_print(rb_thread_t *volatile th, volatile VALUE errinfo)
     if (TH_EXEC_TAG() == 0) {
 	errat = rb_get_backtrace(errinfo);
     }
-    else if (errat == Qundef) {
+    else if (UNDEF_P(errat)) {
 	errat = Qnil;
     }
-    else if (eclass == Qundef || e != Qundef) {
+    else if (UNDEF_P(eclass) || !UNDEF_P(e)) {
 	goto error;
     }
     else {
@@ -109,8 +109,8 @@ rb_threadptr_error_print(rb_thread_t *volatile th, volatile VALUE errinfo)
     }
 
     eclass = CLASS_OF(errinfo);
-    if (eclass != Qundef &&
-	(e = rb_check_funcall(errinfo, rb_intern("message"), 0, 0)) != Qundef &&
+    if (!UNDEF_P(eclass) &&
+	!UNDEF_P(e = rb_check_funcall(errinfo, rb_intern("message"), 0, 0)) &&
 	(RB_TYPE_P(e, T_STRING) || !NIL_P(e = rb_check_string_type(e)))) {
 	einfo = RSTRING_PTR(e);
 	elen = RSTRING_LEN(e);

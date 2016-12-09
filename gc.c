@@ -4621,7 +4621,7 @@ gc_mark_stacked_objects(rb_objspace_t *objspace, int incremental, size_t count)
 #endif
 
     while (pop_mark_stack(mstack, &obj)) {
-	if (obj == Qundef) continue; /* skip */
+	if (UNDEF_P(obj)) continue; /* skip */
 
 	if (RGENGC_CHECK_MODE && !RVALUE_MARKED(obj)) {
 	    rb_bug("gc_mark_stacked_objects: %s is not marked.", obj_info(obj));
@@ -6619,9 +6619,9 @@ gc_start_internal(int argc, VALUE *argv, VALUE self)
 
 	rb_get_kwargs(opt, keyword_ids, 0, 3, kwvals);
 
-	if (kwvals[0] != Qundef) full_mark = RTEST(kwvals[0]);
-	if (kwvals[1] != Qundef) immediate_mark = RTEST(kwvals[1]);
-	if (kwvals[2] != Qundef) immediate_sweep = RTEST(kwvals[2]);
+	if (!UNDEF_P(kwvals[0])) full_mark = RTEST(kwvals[0]);
+	if (!UNDEF_P(kwvals[1])) immediate_mark = RTEST(kwvals[1]);
+	if (!UNDEF_P(kwvals[2])) immediate_sweep = RTEST(kwvals[2]);
     }
 
     garbage_collect(objspace, full_mark, immediate_mark, immediate_sweep, GPR_FLAG_METHOD);

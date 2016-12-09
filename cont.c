@@ -1037,7 +1037,7 @@ rollback_ensure_stack(VALUE self,rb_ensure_list_t *current,rb_ensure_entry_t *ta
     /* push ensure stack */
     while (i--) {
 	func = (VALUE (*)(ANYARGS)) lookup_rollback_func(target[i].e_proc);
-	if ((VALUE)func != Qundef) {
+	if ((VALUE)!UNDEF_P(func)) {
 	    (*func)(target[i].data2);
 	}
     }
@@ -1403,7 +1403,7 @@ fiber_store(rb_fiber_t *next_fib, rb_thread_t *th)
 	/* restored */
 	fib = th->fiber;
 	if (fib->cont.argc == -1) rb_exc_raise(fib->cont.value);
-	if (next_fib->cont.value == Qundef) {
+	if (UNDEF_P(next_fib->cont.value)) {
 	    cont_restore_0(&next_fib->cont, &next_fib->cont.value);
 	    rb_bug("rb_fiber_resume: unreachable");
 	}

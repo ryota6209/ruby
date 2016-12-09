@@ -282,7 +282,7 @@ vm_stack_dump_each(rb_thread_t *th, rb_control_frame_t *cfp)
 
 	ptr = vm_base_ptr(cfp);
 	for (; ptr < sp; ptr++, i++) {
-	    if (*ptr == Qundef) {
+	    if (*UNDEF_P(ptr)) {
 		rstr = rb_str_new2("undef");
 	    }
 	    else {

@@ -291,7 +291,7 @@ compare_with_zero(VALUE num, ID mid)
 {
     VALUE zero = INT2FIX(0);
     VALUE r = rb_check_funcall(num, mid, 1, &zero);
-    if (r == Qundef) {
+    if (UNDEF_P(r)) {
 	rb_cmperr(num, zero);
     }
     return r;
@@ -499,7 +499,7 @@ do_coerce(VALUE *x, VALUE *y, int err)
     }
 
     ary = rb_rescue(coerce_body, (VALUE)a, err ? coerce_rescue : coerce_rescue_quiet, (VALUE)a);
-    if (ary == Qundef) {
+    if (UNDEF_P(ary)) {
 	rb_warn("Numerical comparison operators will no more rescue exceptions of #coerce");
 	rb_warn("in the next release. Return nil in #coerce if the coercion is impossible.");
 	return FALSE;
@@ -1500,7 +1500,7 @@ flo_cmp(VALUE x, VALUE y)
 	b = RFLOAT_VALUE(y);
     }
     else {
-	if (isinf(a) && (i = rb_check_funcall(y, rb_intern("infinite?"), 0, 0)) != Qundef) {
+	if (isinf(a) && !UNDEF_P(i = rb_check_funcall(y, rb_intern("infinite?"), 0, 0))) {
 	    if (RTEST(i)) {
 		int j = rb_cmpint(i, x, y);
 		j = (a > 0.0) ? (j > 0 ? 0 : +1) : (j < 0 ? 0 : -1);
@@ -2576,7 +2576,7 @@ num_step_negative_p(VALUE num)
 	    return BIGNUM_NEGATIVE_P(num);
     }
     r = rb_rescue(num_step_compare_with_zero, num, coerce_rescue_quiet, Qnil);
-    if (r == Qundef) {
+    if (UNDEF_P(r)) {
 	coerce_failed(num, INT2FIX(0));
     }
     return !RTEST(r);
@@ -2595,11 +2595,11 @@ num_step_scan_args(int argc, const VALUE *argv, VALUE *to, VALUE *step)
 	keys[0] = id_to;
 	keys[1] = id_by;
 	rb_get_kwargs(hash, keys, 0, 2, values);
-	if (values[0] != Qundef) {
+	if (!UNDEF_P(values[0])) {
 	    if (argc > 0) rb_raise(rb_eArgError, "to is given twice");
 	    *to = values[0];
 	}
-	if (values[1] != Qundef) {
+	if (!UNDEF_P(values[1])) {
 	    if (argc > 1) rb_raise(rb_eArgError, "step is given twice");
 	    *step = values[1];
 	}
@@ -4302,7 +4302,7 @@ rb_num_coerce_bit(VALUE x, VALUE y, ID func)
     do_coerce(&args[1], &args[2], TRUE);
     ret = rb_exec_recursive_paired(num_funcall_bit_1,
 				   args[2], args[1], (VALUE)args);
-    if (ret == Qundef) {
+    if (UNDEF_P(ret)) {
 	/* show the original object, not coerced object */
 	coerce_failed(x, y);
     }

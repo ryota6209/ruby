@@ -1032,7 +1032,7 @@ prepare_getline_args(struct getline_arg *arg, int argc, VALUE *argv)
 	    keywords[0] = rb_intern_const("chomp");
 	}
 	rb_get_kwargs(opts, keywords, 0, 1, &vchomp);
-	arg->chomp = (vchomp != Qundef) && RTEST(vchomp);
+	arg->chomp = (!UNDEF_P(vchomp)) && RTEST(vchomp);
     }
     return arg;
 }

@@ -411,7 +411,7 @@ check_funcall_missing(rb_thread_t *th, VALUE klass, VALUE recv, ID mid, int argc
 				       ID2SYM(mid), PRIV);
     if (!RTEST(ret)) return def;
     args.respond = respond > 0;
-    args.respond_to_missing = (ret != Qundef);
+    args.respond_to_missing = (!UNDEF_P(ret));
     ret = def;
     me = method_entry_get(klass, idMethodMissing, &args.defined_class);
     if (me && !METHOD_ENTRY_BASIC(me)) {
@@ -478,7 +478,7 @@ rb_check_funcall_with_hook(VALUE recv, ID mid, int argc, const VALUE *argv,
     if (!check_funcall_callable(th, me)) {
 	VALUE ret = check_funcall_missing(th, klass, recv, mid, argc, argv,
 					  respond, Qundef);
-	(*hook)(ret != Qundef, recv, mid, argc, argv, arg);
+	(*hook)(!UNDEF_P(ret), recv, mid, argc, argv, arg);
 	return ret;
     }
     stack_check(th);
@@ -599,7 +599,7 @@ rb_method_call_status(rb_thread_t *th, const rb_callable_method_entry_t *me, cal
 		    defined_class = RBASIC(defined_class)->klass;
 		}
 
-		if (self == Qundef || !rb_obj_is_kind_of(self, defined_class)) {
+		if (UNDEF_P(self) || !rb_obj_is_kind_of(self, defined_class)) {
 		    return MISSING_PROTECTED;
 		}
 	    }
@@ -1018,7 +1018,7 @@ rb_yield_1(VALUE val)
 VALUE
 rb_yield(VALUE val)
 {
-    if (val == Qundef) {
+    if (UNDEF_P(val)) {
 	return rb_yield_0(0, 0);
     }
     else {
@@ -1296,7 +1296,7 @@ eval_string_with_cref(VALUE self, VALUE src, VALUE scope, rb_cref_t *const cref_
 	VALUE absolute_path = Qnil;
 	VALUE fname;
 
-	if (file != Qundef) {
+	if (!UNDEF_P(file)) {
 	    absolute_path = file;
 	}
 
@@ -1325,7 +1325,7 @@ eval_string_with_cref(VALUE self, VALUE src, VALUE scope, rb_cref_t *const cref_
 	    }
 	}
 
-	if ((fname = file) == Qundef) {
+	if (UNDEF_P(fname = file)) {
 	    fname = rb_usascii_str_new_cstr("(eval)");
 	}
 
@@ -1364,7 +1364,7 @@ eval_string_with_cref(VALUE self, VALUE src, VALUE scope, rb_cref_t *const cref_
 	}
     }
 
-    if (file != Qundef) {
+    if (!UNDEF_P(file)) {
 	/* kick */
 	return vm_exec(th);
     }

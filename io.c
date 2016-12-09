@@ -3044,7 +3044,7 @@ extract_getline_opts(VALUE opts, struct getline_arg *args)
 	    kwds[0] = rb_intern_const("chomp");
 	}
 	rb_get_kwargs(opts, kwds, 0, -2, &vchomp);
-	chomp = (vchomp != Qundef) && RTEST(vchomp);
+	chomp = (!UNDEF_P(vchomp)) && RTEST(vchomp);
     }
     args->chomp = chomp;
 }
@@ -4505,7 +4505,7 @@ static VALUE
 io_close(VALUE io)
 {
     VALUE closed = rb_check_funcall(io, rb_intern("closed?"), 0, 0);
-    if (closed != Qundef && RTEST(closed)) return io;
+    if (!UNDEF_P(closed) && RTEST(closed)) return io;
     rb_rescue2(io_call_close, io, ignore_closed_stream, io,
 	       rb_eIOError, (VALUE)0);
     return io;
@@ -5221,21 +5221,21 @@ rb_io_extract_encoding_option(VALUE opt, rb_encoding **enc_p, rb_encoding **enc2
 	v = rb_hash_lookup2(opt, sym_extenc, Qundef);
 	if (v != Qnil) extenc = v;
 	v = rb_hash_lookup2(opt, sym_intenc, Qundef);
-	if (v != Qundef) intenc = v;
+	if (!UNDEF_P(v)) intenc = v;
     }
-    if ((extenc != Qundef || intenc != Qundef) && !NIL_P(encoding)) {
+    if ((!UNDEF_P(extenc) || !UNDEF_P(intenc)) && !NIL_P(encoding)) {
 	if (!NIL_P(ruby_verbose)) {
 	    int idx = rb_to_encoding_index(encoding);
 	    if (idx >= 0) encoding = rb_enc_from_encoding(rb_enc_from_index(idx));
 	    rb_warn("Ignoring encoding parameter '%"PRIsVALUE"': %s_encoding is used",
-		    encoding, extenc == Qundef ? "internal" : "external");
+		    encoding, UNDEF_P(extenc) ? "internal" : "external");
 	}
 	encoding = Qnil;
     }
-    if (extenc != Qundef && !NIL_P(extenc)) {
+    if (!UNDEF_P(extenc) && !NIL_P(extenc)) {
 	extencoding = rb_to_encoding(extenc);
     }
-    if (intenc != Qundef) {
+    if (!UNDEF_P(intenc)) {
 	if (NIL_P(intenc)) {
 	    /* internal_encoding: nil => no transcoding */
 	    intencoding = (rb_encoding *)Qnil;
@@ -5268,7 +5268,7 @@ rb_io_extract_encoding_option(VALUE opt, rb_encoding **enc_p, rb_encoding **enc2
 	    rb_io_ext_int_to_encs(rb_to_encoding(encoding), NULL, enc_p, enc2_p, 0);
 	}
     }
-    else if (extenc != Qundef || intenc != Qundef) {
+    else if (!UNDEF_P(extenc) || !UNDEF_P(intenc)) {
         extracted = 1;
 	rb_io_ext_int_to_encs(extencoding, intencoding, enc_p, enc2_p, 0);
     }
@@ -11538,7 +11538,7 @@ static void
 argf_block_call(ID mid, int argc, VALUE *argv, VALUE argf)
 {
     VALUE ret = rb_block_call(ARGF.current_file, mid, argc, argv, argf_block_call_i, argf);
-    if (ret != Qundef) ARGF.next_p = 1;
+    if (!UNDEF_P(ret)) ARGF.next_p = 1;
 }
 
 /*

@@ -3287,7 +3287,7 @@ take_items(VALUE obj, long n)
     if (!NIL_P(result)) return rb_ary_subseq(result, 0, n);
     result = rb_ary_new2(n);
     args[0] = result; args[1] = (VALUE)n;
-    if (rb_check_block_call(obj, idEach, 0, 0, take_i, (VALUE)args) == Qundef)
+    if (UNDEF_P(rb_check_block_call(obj, idEach, 0, 0, take_i, (VALUE)args)))
 	rb_raise(rb_eTypeError, "wrong argument type %"PRIsVALUE" (must respond to :each)",
 		 rb_obj_class(obj));
     return result;
@@ -3575,7 +3575,7 @@ rb_ary_fill(int argc, VALUE *argv, VALUE ary)
 	ARY_SET_LEN(ary, end);
     }
 
-    if (item == Qundef) {
+    if (UNDEF_P(item)) {
 	VALUE v;
 	long i;
 
@@ -4031,7 +4031,7 @@ rb_ary_cmp(VALUE ary1, VALUE ary2)
     if (NIL_P(ary2)) return Qnil;
     if (ary1 == ary2) return INT2FIX(0);
     v = rb_exec_recursive_paired(recursive_cmp, ary1, ary2, ary2);
-    if (v != Qundef) return v;
+    if (!UNDEF_P(v)) return v;
     len = RARRAY_LEN(ary1) - RARRAY_LEN(ary2);
     if (len == 0) return INT2FIX(0);
     if (len > 0) return INT2FIX(1);
@@ -4254,7 +4254,7 @@ rb_ary_max(int argc, VALUE *argv, VALUE ary)
     if (rb_block_given_p()) {
 	for (i = 0; i < RARRAY_LEN(ary); i++) {
 	   v = RARRAY_AREF(ary, i);
-	   if (result == Qundef || rb_cmpint(rb_yield_values(2, v, result), v, result) > 0) {
+	   if (UNDEF_P(result) || rb_cmpint(rb_yield_values(2, v, result), v, result) > 0) {
 	       result = v;
 	   }
 	}
@@ -4262,12 +4262,12 @@ rb_ary_max(int argc, VALUE *argv, VALUE ary)
     else {
 	for (i = 0; i < RARRAY_LEN(ary); i++) {
 	   v = RARRAY_AREF(ary, i);
-	   if (result == Qundef || OPTIMIZED_CMP(v, result, cmp_opt) > 0) {
+	   if (UNDEF_P(result) || OPTIMIZED_CMP(v, result, cmp_opt) > 0) {
 	       result = v;
 	   }
 	}
     }
-    if (result == Qundef) return Qnil;
+    if (UNDEF_P(result)) return Qnil;
     return result;
 }
 
@@ -4309,7 +4309,7 @@ rb_ary_min(int argc, VALUE *argv, VALUE ary)
     if (rb_block_given_p()) {
 	for (i = 0; i < RARRAY_LEN(ary); i++) {
 	   v = RARRAY_AREF(ary, i);
-	   if (result == Qundef || rb_cmpint(rb_yield_values(2, v, result), v, result) < 0) {
+	   if (UNDEF_P(result) || rb_cmpint(rb_yield_values(2, v, result), v, result) < 0) {
 	       result = v;
 	   }
 	}
@@ -4317,12 +4317,12 @@ rb_ary_min(int argc, VALUE *argv, VALUE ary)
     else {
 	for (i = 0; i < RARRAY_LEN(ary); i++) {
 	   v = RARRAY_AREF(ary, i);
-	   if (result == Qundef || OPTIMIZED_CMP(v, result, cmp_opt) < 0) {
+	   if (UNDEF_P(result) || OPTIMIZED_CMP(v, result, cmp_opt) < 0) {
 	       result = v;
 	   }
 	}
     }
-    if (result == Qundef) return Qnil;
+    if (UNDEF_P(result)) return Qnil;
     return result;
 }
 
@@ -4711,7 +4711,7 @@ rb_ary_shuffle_bang(int argc, VALUE *argv, VALUE ary)
 
 	keyword_ids[0] = id_random;
 	rb_get_kwargs(opts, keyword_ids, 0, 1, &rnd);
-	if (rnd != Qundef) {
+	if (!UNDEF_P(rnd)) {
 	    randgen = rnd;
 	}
     }
@@ -4797,7 +4797,7 @@ rb_ary_sample(int argc, VALUE *argv, VALUE ary)
 
 	keyword_ids[0] = id_random;
 	rb_get_kwargs(opts, keyword_ids, 0, 1, &rnd);
-	if (rnd != Qundef) {
+	if (!UNDEF_P(rnd)) {
 	    randgen = rnd;
 	}
     }
@@ -5761,7 +5761,7 @@ rb_ary_sum(int argc, VALUE *argv, VALUE ary)
         else if (RB_TYPE_P(e, T_BIGNUM))
             v = rb_big_plus(e, v);
         else if (RB_TYPE_P(e, T_RATIONAL)) {
-            if (r == Qundef)
+            if (UNDEF_P(r))
                 r = e;
             else
                 r = rb_rational_plus(r, e);
@@ -5771,7 +5771,7 @@ rb_ary_sum(int argc, VALUE *argv, VALUE ary)
     }
     if (n != 0)
         v = rb_fix_plus(LONG2FIX(n), v);
-    if (r != Qundef) {
+    if (!UNDEF_P(r)) {
         /* r can be an Integer when mathn is loaded */
         if (FIXNUM_P(r))
             v = rb_fix_plus(r, v);
@@ -5785,7 +5785,7 @@ rb_ary_sum(int argc, VALUE *argv, VALUE ary)
   not_exact:
     if (n != 0)
         v = rb_fix_plus(LONG2FIX(n), v);
-    if (r != Qundef) {
+    if (!UNDEF_P(r)) {
         /* r can be an Integer when mathn is loaded */
         if (FIXNUM_P(r))
             v = rb_fix_plus(r, v);

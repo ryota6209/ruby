@@ -605,7 +605,7 @@ rb_check_type(VALUE x, int t)
 {
     int xt;
 
-    if (x == Qundef) {
+    if (UNDEF_P(x)) {
 	rb_bug(UNDEF_LEAKED);
     }
 
@@ -618,7 +618,7 @@ rb_check_type(VALUE x, int t)
 void
 rb_unexpected_type(VALUE x, int t)
 {
-    if (x == Qundef) {
+    if (UNDEF_P(x)) {
 	rb_bug(UNDEF_LEAKED);
     }
 
@@ -1008,15 +1008,15 @@ exc_equal(VALUE exc, VALUE obj)
 	int status = 0;
 
 	obj = rb_protect(try_convert_to_exception, obj, &status);
-	if (status || obj == Qundef) {
+	if (status || UNDEF_P(obj)) {
 	    rb_set_errinfo(Qnil);
 	    return Qfalse;
 	}
 	if (rb_obj_class(exc) != rb_obj_class(obj)) return Qfalse;
 	mesg = rb_check_funcall(obj, id_message, 0, 0);
-	if (mesg == Qundef) return Qfalse;
+	if (UNDEF_P(mesg)) return Qfalse;
 	backtrace = rb_check_funcall(obj, id_backtrace, 0, 0);
-	if (backtrace == Qundef) return Qfalse;
+	if (UNDEF_P(backtrace)) return Qfalse;
     }
     else {
 	mesg = rb_attr_get(obj, id_mesg);
@@ -1396,7 +1396,7 @@ name_err_receiver(VALUE self)
     VALUE *ptr, recv, mesg;
 
     recv = rb_ivar_lookup(self, id_receiver, Qundef);
-    if (recv != Qundef) return recv;
+    if (!UNDEF_P(recv)) return recv;
 
     mesg = rb_attr_get(self, id_mesg);
     if (!rb_typeddata_is_kind_of(mesg, &name_err_mesg_data_type)) {

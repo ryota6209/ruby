@@ -295,7 +295,7 @@ pack_pack(int argc, VALUE *argv, VALUE ary)
 
 	rb_get_kwargs(opt, keyword_ids, 0, 1, &buffer);
 
-	if (buffer != Qundef && !RB_TYPE_P(buffer, T_STRING))
+	if (!UNDEF_P(buffer) && !RB_TYPE_P(buffer, T_STRING))
 	    rb_raise(rb_eTypeError, "buffer must be String, not %s", rb_obj_classname(buffer));
     }
     if (buffer)

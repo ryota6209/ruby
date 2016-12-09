@@ -156,7 +156,7 @@ vm_exec_core(rb_thread_t *th, VALUE initial)
 	}
     }
 
-    if (th->retval != Qundef) {
+    if (!UNDEF_P(th->retval)) {
 	VALUE ret = th->retval;
 	th->retval = Qundef;
 	return ret;

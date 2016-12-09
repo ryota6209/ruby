@@ -443,8 +443,10 @@ enum ruby_special_consts {
 
 #define RB_TEST(v) !(((VALUE)(v) & ~RUBY_Qnil) == 0)
 #define RB_NIL_P(v) !((VALUE)(v) != RUBY_Qnil)
+#define RB_UNDEF_P(v) !((VALUE)(v) != RUBY_Qundef)
 #define RTEST(v) RB_TEST(v)
 #define NIL_P(v) RB_NIL_P(v)
+#define UNDEF_P(v) RB_UNDEF_P(v)
 
 #define CLASS_OF(v) rb_class_of((VALUE)(v))
 

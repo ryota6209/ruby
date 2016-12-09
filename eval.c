@@ -484,7 +484,7 @@ setup_exception(rb_thread_t *th, int tag, volatile VALUE mesg, VALUE cause)
 	mesg = rb_exc_new(rb_eRuntimeError, 0, 0);
 	nocause = 0;
     }
-    if (cause != Qundef) {
+    if (!UNDEF_P(cause)) {
 	exc_setup_cause(mesg, cause);
     }
     else if (nocause) {
@@ -583,7 +583,7 @@ setup_exception(rb_thread_t *th, int tag, volatile VALUE mesg, VALUE cause)
 void
 rb_threadptr_setup_exception(rb_thread_t *th, VALUE mesg, VALUE cause)
 {
-    if (cause == Qundef) {
+    if (UNDEF_P(cause)) {
 	cause = get_thread_errinfo(th);
     }
     if (cause != mesg) {
@@ -682,7 +682,7 @@ rb_f_raise(int argc, VALUE *argv)
 
     argc = extract_raise_opts(argc, argv, opts);
     if (argc == 0) {
-	if (*cause != Qundef) {
+	if (!UNDEF_P(*cause)) {
 	    rb_raise(rb_eArgError, "only cause is given with no arguments");
 	}
 	err = get_errinfo();
@@ -727,7 +727,7 @@ make_exception(int argc, const VALUE *argv, int isstr)
       exception_call:
 	if (sysstack_error_p(exc)) return exc;
 	mesg = rb_check_funcall(exc, idException, n, argv+1);
-	if (mesg == Qundef) {
+	if (UNDEF_P(mesg)) {
 	    rb_raise(rb_eTypeError, "exception class/object expected");
 	}
 	break;

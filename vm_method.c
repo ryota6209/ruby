@@ -95,7 +95,7 @@ rb_clear_constant_cache(void)
 void
 rb_clear_method_cache_by_class(VALUE klass)
 {
-    if (klass && klass != Qundef) {
+    if (klass && !UNDEF_P(klass)) {
 	int global = klass == rb_cBasicObject || klass == rb_cObject || klass == rb_mKernel;
 
 	RUBY_DTRACE_HOOK(METHOD_CACHE_CLEAR, (global ? "global" : rb_class2name(klass)));
@@ -1909,7 +1909,7 @@ basic_obj_respond_to(rb_thread_t *th, VALUE obj, ID id, int pub)
       case 0:
 	ret = basic_obj_respond_to_missing(th, klass, obj, ID2SYM(id),
 					   pub ? Qfalse : Qtrue);
-	return RTEST(ret) && ret != Qundef;
+	return RTEST(ret) && !UNDEF_P(ret);
       default:
 	return TRUE;
     }
@@ -2014,7 +2014,7 @@ obj_respond_to(int argc, VALUE *argv, VALUE obj)
     if (!(id = rb_check_id(&mid))) {
 	VALUE ret = basic_obj_respond_to_missing(th, CLASS_OF(obj), obj,
 						 rb_to_symbol(mid), priv);
-	if (ret == Qundef) ret = Qfalse;
+	if (UNDEF_P(ret)) ret = Qfalse;
 	return ret;
     }
     if (basic_obj_respond_to(th, obj, id, !RTEST(priv)))

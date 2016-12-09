@@ -60,7 +60,7 @@ block_mark(const struct rb_block *block)
 	    const struct rb_captured_block *captured = &block->as.captured;
 	    RUBY_MARK_UNLESS_NULL(captured->self);
 	    RUBY_MARK_UNLESS_NULL((VALUE)captured->code.val);
-	    if (captured->ep && captured->ep[VM_ENV_DATA_INDEX_ENV] != Qundef /* cfunc_proc_t */) {
+	    if (captured->ep && !UNDEF_P(captured->ep[VM_ENV_DATA_INDEX_ENV]) /* cfunc_proc_t */) {
 		RUBY_MARK_UNLESS_NULL(VM_ENV_ENVVAL(captured->ep));
 	    }
 	}
@@ -1315,7 +1315,7 @@ respond_to_missing_p(VALUE klass, VALUE obj, VALUE sym, int scope)
     /* TODO: merge with obj_respond_to() */
     ID rmiss = idRespond_to_missing;
 
-    if (obj == Qundef) return 0;
+    if (UNDEF_P(obj)) return 0;
     if (rb_method_basic_definition_p(klass, rmiss)) return 0;
     return RTEST(rb_funcall(obj, rmiss, 2, sym, scope ? Qfalse : Qtrue));
 }
@@ -1408,7 +1408,7 @@ mnew(VALUE klass, VALUE obj, ID id, VALUE mclass, int scope)
 {
     const rb_method_entry_t *me;
 
-    if (obj == Qundef) { /* UnboundMethod */
+    if (UNDEF_P(obj)) { /* UnboundMethod */
 	me = rb_method_entry_without_refinements(klass, id);
     }
     else {
@@ -2082,7 +2082,7 @@ rb_method_call_with_block(int argc, const VALUE *argv, VALUE method, VALUE passe
     rb_thread_t *const th = GET_THREAD();
 
     TypedData_Get_Struct(method, struct METHOD, &method_data_type, data);
-    if (data->recv == Qundef) {
+    if (UNDEF_P(data->recv)) {
 	rb_raise(rb_eTypeError, "can't call unbound method; bind first");
     }
     if (OBJ_TAINTED(method)) {
@@ -2555,7 +2555,7 @@ method_inspect(VALUE method)
     if (FL_TEST(mklass, FL_SINGLETON)) {
 	VALUE v = rb_ivar_get(mklass, attached);
 
-	if (data->recv == Qundef) {
+	if (UNDEF_P(data->recv)) {
 	    rb_str_buf_append(str, rb_inspect(mklass));
 	}
 	else if (data->recv == v) {

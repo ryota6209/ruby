@@ -518,7 +518,7 @@ static int
 is_integer_p(VALUE v)
 {
     VALUE is_int = rb_check_funcall(v, id_integer_p, 0, 0);
-    return RTEST(is_int) && is_int != Qundef;
+    return RTEST(is_int) && !UNDEF_P(is_int);
 }
 
 /*

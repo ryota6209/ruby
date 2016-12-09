@@ -117,7 +117,7 @@ vm_ep_in_heap_p_(const rb_thread_t *th, const VALUE *ep)
     if (VM_EP_IN_HEAP_P(th, ep)) {
 	VALUE envval = ep[VM_ENV_DATA_INDEX_ENV]; /* VM_ENV_ENVVAL(ep); */
 
-	if (envval != Qundef) {
+	if (!UNDEF_P(envval)) {
 	    const rb_env_t *env = (const rb_env_t *)envval;
 
 	    VM_ASSERT(vm_assert_env(envval));
@@ -1381,7 +1381,7 @@ rb_vm_make_jump_tag_but_local_jump(int state, VALUE val)
 {
     VALUE result = Qnil;
 
-    if (val == Qundef) {
+    if (UNDEF_P(val)) {
 	val = GET_THREAD()->tag->retval;
     }
     switch (state) {

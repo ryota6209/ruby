@@ -999,11 +999,11 @@ opt_newarray_max
 	    result = TOPN(i);
 	    while (i-- > 0) {
 		const VALUE v = TOPN(i);
-		if (result == Qundef || OPTIMIZED_CMP(v, result, cmp_opt) > 0) {
+		if (UNDEF_P(result) || OPTIMIZED_CMP(v, result, cmp_opt) > 0) {
 		    result = v;
 		}
 	    }
-	    val = result == Qundef ? Qnil : result;
+	    val = UNDEF_P(result) ? Qnil : result;
 	}
 	POPN(num);
     }
@@ -1033,11 +1033,11 @@ opt_newarray_min
 	    result = TOPN(i);
 	    while (i-- > 0) {
 		const VALUE v = TOPN(i);
-		if (result == Qundef || OPTIMIZED_CMP(v, result, cmp_opt) < 0) {
+		if (UNDEF_P(result) || OPTIMIZED_CMP(v, result, cmp_opt) < 0) {
 		    result = v;
 		}
 	    }
-	    val = result == Qundef ? Qnil : result;
+	    val = UNDEF_P(result) ? Qnil : result;
 	}
 	POPN(num);
     }
@@ -1103,7 +1103,7 @@ invokeblock
     calling.recv = GET_SELF();
 
     val = vm_invoke_block(th, GET_CFP(), &calling, ci);
-    if (val == Qundef) {
+    if (UNDEF_P(val)) {
 	RESTORE_REGS();
 	NEXT_INSN();
     }
@@ -1272,7 +1272,7 @@ setinlinecache
 (VALUE val)
 (VALUE val)
 {
-    VM_ASSERT(ic->ic_value.value != Qundef);
+    VM_ASSERT(!UNDEF_P(ic->ic_value.value));
     ic->ic_value.value = val;
     ic->ic_serial = GET_GLOBAL_CONSTANT_STATE() - ruby_vm_const_missing_count;
     ic->ic_cref = vm_get_const_key_cref(GET_EP());
@@ -1578,7 +1578,7 @@ opt_eq
 {
     val = opt_eq_func(recv, obj, ci, cc);
 
-    if (val == Qundef) {
+    if (UNDEF_P(val)) {
 	/* other */
 	PUSH(recv);
 	PUSH(obj);
@@ -1605,12 +1605,12 @@ opt_neq
     if (check_cfunc(cc->me, rb_obj_not_equal)) {
 	val = opt_eq_func(recv, obj, ci_eq, cc_eq);
 
-	if (val != Qundef) {
+	if (!UNDEF_P(val)) {
 	    val = RTEST(val) ? Qfalse : Qtrue;
 	}
     }
 
-    if (val == Qundef) {
+    if (UNDEF_P(val)) {
 	/* other */
 	PUSH(recv);
 	PUSH(obj);

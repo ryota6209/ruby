@@ -786,7 +786,7 @@ vm_get_ev_const(rb_thread_t *th, VALUE orig_klass, ID id, int is_defined)
 		if ((ce = rb_const_lookup(klass, id))) {
 		    rb_const_warn_if_deprecated(ce, klass, id);
 		    val = ce->value;
-		    if (val == Qundef) {
+		    if (UNDEF_P(val)) {
 			if (am == klass) break;
 			am = klass;
 			if (is_defined) return 1;
@@ -889,7 +889,7 @@ vm_getivar(VALUE obj, ID id, IC ic, struct rb_call_cache *cc, int is_attr)
 		val = ROBJECT_IVPTR(obj)[index];
 	    }
 	  undef_check:
-	    if (UNLIKELY(val == Qundef)) {
+	    if (UNLIKELY(UNDEF_P(val))) {
 		if (!is_attr && RTEST(ruby_verbose))
 		    rb_warning("instance variable %"PRIsVALUE" not initialized", QUOTE_ID(id));
 		val = Qnil;
@@ -2718,7 +2718,7 @@ check_respond_to_missing(VALUE obj, VALUE v)
 
     args[0] = obj; args[1] = Qfalse;
     r = rb_check_funcall(v, idRespond_to_missing, 2, args);
-    if (r != Qundef && RTEST(r)) {
+    if (!UNDEF_P(r) && RTEST(r)) {
 	return DEFINED_METHOD;
     }
     else {

@@ -107,7 +107,7 @@ rb_any_cmp(VALUE a, VALUE b)
 	RB_TYPE_P(b, T_STRING) && RBASIC(b)->klass == rb_cString) {
 	return rb_str_hash_cmp(a, b);
     }
-    if (a == Qundef || b == Qundef) return -1;
+    if (UNDEF_P(a) || UNDEF_P(b)) return -1;
     if (SYMBOL_P(a) && SYMBOL_P(b)) {
 	return a != b;
     }
@@ -819,7 +819,7 @@ rb_hash_default_value(VALUE hash, VALUE key)
     if (rb_method_basic_definition_p(CLASS_OF(hash), id_default)) {
 	VALUE ifnone = RHASH_IFNONE(hash);
 	if (!FL_TEST(hash, HASH_PROC_DEFAULT)) return ifnone;
-	if (key == Qundef) return Qnil;
+	if (UNDEF_P(key)) return Qnil;
 	return rb_funcall(ifnone, id_yield, 2, hash, key);
     }
     else {
@@ -1139,7 +1139,7 @@ rb_hash_delete(VALUE hash, VALUE key)
 {
     VALUE deleted_value = rb_hash_delete_entry(hash, key);
 
-    if (deleted_value != Qundef) { /* likely pass */
+    if (!UNDEF_P(deleted_value)) { /* likely pass */
 	return deleted_value;
     }
     else {
@@ -1173,7 +1173,7 @@ rb_hash_delete_m(VALUE hash, VALUE key)
     rb_hash_modify_check(hash);
     val = rb_hash_delete_entry(hash, key);
 
-    if (val != Qundef) {
+    if (!UNDEF_P(val)) {
 	return val;
     }
     else {
@@ -1229,7 +1229,7 @@ rb_hash_shift(VALUE hash)
 	}
 	else {
 	    rb_hash_foreach(hash, shift_i_safe, (VALUE)&var);
-	    if (var.key != Qundef) {
+	    if (!UNDEF_P(var.key)) {
 		rb_hash_delete_entry(hash, var.key);
 		return rb_assoc_new(var.key, var.val);
 	    }
@@ -2593,7 +2593,7 @@ rb_hash_assoc(VALUE hash, VALUE key)
 	ensure_arg.hash = hash;
 	ensure_arg.orighash = orighash;
 	value = rb_ensure(lookup2_call, (VALUE)&args, reset_hash_type, (VALUE)&ensure_arg);
-	if (value != Qundef) return rb_assoc_new(key, value);
+	if (!UNDEF_P(value)) return rb_assoc_new(key, value);
     }
 
     args[0] = key;
@@ -2906,7 +2906,7 @@ hash_le_i(VALUE key, VALUE value, VALUE arg)
 {
     VALUE *args = (VALUE *)arg;
     VALUE v = rb_hash_lookup2(args[0], key, Qundef);
-    if (v != Qundef && rb_equal(value, v)) return ST_CONTINUE;
+    if (!UNDEF_P(v) && rb_equal(value, v)) return ST_CONTINUE;
     args[1] = Qfalse;
     return ST_STOP;
 }

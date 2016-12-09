@@ -33,7 +33,7 @@ path_initialize(VALUE self, VALUE arg)
     }
     else {
         str = rb_check_funcall(arg, id_to_path, 0, NULL);
-        if (str == Qundef)
+        if (UNDEF_P(str))
             str = arg;
         StringValue(str);
     }

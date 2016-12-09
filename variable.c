@@ -416,7 +416,7 @@ rb_path_to_class(VALUE pathname)
 		     rb_str_subseq(pathname, 0, p-path));
 	}
 	c = rb_const_search(c, id, TRUE, FALSE, FALSE);
-	if (c == Qundef) goto undefined_class;
+	if (UNDEF_P(c)) goto undefined_class;
 	if (!RB_TYPE_P(c, T_MODULE) && !RB_TYPE_P(c, T_CLASS)) {
 	    rb_raise(rb_eTypeError, "%"PRIsVALUE" does not refer to class/module",
 		     pathname);
@@ -954,7 +954,7 @@ gen_ivar_compat_tbl_i(st_data_t id, st_data_t index, st_data_t arg)
 
     if (index < a->ivtbl->numiv) {
 	VALUE val = a->ivtbl->ivptr[index];
-	if (val != Qundef) {
+	if (!UNDEF_P(val)) {
 	    st_add_direct(a->tbl, id, (st_data_t)val);
 	}
     }
@@ -1019,7 +1019,7 @@ generic_ivar_delete(VALUE obj, ID id, VALUE undef)
 		VALUE ret = ivtbl->ivptr[index];
 
 		ivtbl->ivptr[index] = Qundef;
-		return ret == Qundef ? undef : ret;
+		return UNDEF_P(ret) ? undef : ret;
 	    }
 	}
     }
@@ -1039,7 +1039,7 @@ generic_ivar_get(VALUE obj, ID id, VALUE undef)
 	    if (index < ivtbl->numiv) {
 		VALUE ret = ivtbl->ivptr[index];
 
-		return ret == Qundef ? undef : ret;
+		return UNDEF_P(ret) ? undef : ret;
 	    }
 	}
     }
@@ -1131,7 +1131,7 @@ generic_ivar_defined(VALUE obj, ID id)
     if (!st_lookup(iv_index_tbl, (st_data_t)id, &index)) return Qfalse;
     if (!gen_ivtbl_get(obj, &ivtbl)) return Qfalse;
 
-    if ((index < ivtbl->numiv) && (ivtbl->ivptr[index] != Qundef))
+    if ((index < ivtbl->numiv) && !UNDEF_P(ivtbl->ivptr[index]))
 	return Qtrue;
 
     return Qfalse;
@@ -1150,7 +1150,7 @@ generic_ivar_remove(VALUE obj, ID id, VALUE *valp)
     if (!gen_ivtbl_get(obj, &ivtbl)) return 0;
 
     if (index < ivtbl->numiv) {
-	if (ivtbl->ivptr[index] != Qundef) {
+	if (!UNDEF_P(ivtbl->ivptr[index])) {
 	    *valp = ivtbl->ivptr[index];
 	    ivtbl->ivptr[index] = Qundef;
 	    return 1;
@@ -1213,7 +1213,7 @@ gen_ivtbl_count(const struct gen_ivtbl *ivtbl)
     size_t n = 0;
 
     for (i = 0; i < ivtbl->numiv; i++) {
-	if (ivtbl->ivptr[i] != Qundef) {
+	if (!UNDEF_P(ivtbl->ivptr[i])) {
 	    n++;
 	}
     }
@@ -1239,7 +1239,7 @@ rb_ivar_lookup(VALUE obj, ID id, VALUE undef)
         if (!st_lookup(iv_index_tbl, (st_data_t)id, &index)) break;
         if (len <= index) break;
         val = ptr[index];
-        if (val != Qundef)
+        if (!UNDEF_P(val))
             return val;
 	break;
       case T_CLASS:
@@ -1261,7 +1261,7 @@ rb_ivar_get(VALUE obj, ID id)
 {
     VALUE iv = rb_ivar_lookup(obj, id, Qundef);
 
-    if (iv == Qundef) {
+    if (UNDEF_P(iv)) {
 	if (RTEST(ruby_verbose))
 	    rb_warning("instance variable %"PRIsVALUE" not initialized", QUOTE_ID(id));
 	iv = Qnil;
@@ -1294,7 +1294,7 @@ rb_ivar_delete(VALUE obj, ID id, VALUE undef)
         if (len <= index) break;
         val = ptr[index];
         ptr[index] = Qundef;
-        if (val != Qundef)
+        if (!UNDEF_P(val))
             return val;
 	break;
       case T_CLASS:
@@ -1432,7 +1432,7 @@ rb_ivar_defined(VALUE obj, ID id)
         if (!st_lookup(iv_index_tbl, (st_data_t)id, &index)) break;
         if (ROBJECT_NUMIV(obj) <= index) break;
         val = ROBJECT_IVPTR(obj)[index];
-        if (val != Qundef)
+        if (!UNDEF_P(val))
             return Qtrue;
 	break;
       case T_CLASS:
@@ -1460,7 +1460,7 @@ obj_ivar_i(st_data_t key, st_data_t index, st_data_t arg)
     struct obj_ivar_tag *data = (struct obj_ivar_tag *)arg;
     if (index < ROBJECT_NUMIV(data->obj)) {
         VALUE val = ROBJECT_IVPTR(data->obj)[index];
-        if (val != Qundef) {
+        if (!UNDEF_P(val)) {
             return (data->func)((ID)key, val, data->arg);
         }
     }
@@ -1497,7 +1497,7 @@ gen_ivar_each_i(st_data_t key, st_data_t index, st_data_t data)
 
     if (index < arg->ivtbl->numiv) {
         VALUE val = arg->ivtbl->ivptr[index];
-        if (val != Qundef) {
+        if (!UNDEF_P(val)) {
             return (arg->func)((ID)key, val, arg->arg);
         }
     }
@@ -1622,7 +1622,7 @@ rb_ivar_count(VALUE obj)
 	    st_index_t i, count, num = ROBJECT_NUMIV(obj);
 	    const VALUE *const ivptr = ROBJECT_IVPTR(obj);
 	    for (i = count = 0; i < num; ++i) {
-		if (ivptr[i] != Qundef) {
+		if (!UNDEF_P(ivptr[i])) {
 		    count++;
 		}
 	    }
@@ -1751,7 +1751,7 @@ rb_obj_remove_instance_variable(VALUE obj, VALUE name)
         if (!st_lookup(iv_index_tbl, (st_data_t)id, &index)) break;
         if (ROBJECT_NUMIV(obj) <= index) break;
         val = ROBJECT_IVPTR(obj)[index];
-        if (val != Qundef) {
+        if (!UNDEF_P(val)) {
             ROBJECT_IVPTR(obj)[index] = Qundef;
             return val;
         }
@@ -1958,7 +1958,7 @@ rb_autoload_str(VALUE mod, ID id, VALUE file)
     }
 
     ce = rb_const_lookup(mod, id);
-    if (ce && ce->value != Qundef) {
+    if (ce && !UNDEF_P(ce->value)) {
 	return;
     }
 
@@ -2057,7 +2057,7 @@ rb_autoloading_value(VALUE mod, ID id, VALUE* value)
 	return 0;
     }
     if (ele->state && ele->state->thread == rb_thread_current()) {
-	if (ele->value != Qundef) {
+	if (!UNDEF_P(ele->value)) {
 	    if (value) {
 		*value = ele->value;
 	    }
@@ -2072,7 +2072,7 @@ autoload_defined_p(VALUE mod, ID id)
 {
     rb_const_entry_t *ce = rb_const_lookup(mod, id);
 
-    if (!ce || ce->value != Qundef) {
+    if (!ce || !UNDEF_P(ce->value)) {
 	return 0;
     }
     return !rb_autoloading_value(mod, id, NULL);
@@ -2121,7 +2121,7 @@ autoload_reset(VALUE arg)
     }
 
     /* At the last, move a value defined in autoload to constant table */
-    if (RTEST(state->result) && state->ele->value != Qundef) {
+    if (RTEST(state->result) && !UNDEF_P(state->ele->value)) {
 	int safe_backup;
 	struct autoload_const_set_args args;
 
@@ -2242,7 +2242,7 @@ static VALUE
 rb_const_get_0(VALUE klass, ID id, int exclude, int recurse, int visibility)
 {
     VALUE c = rb_const_search(klass, id, exclude, recurse, visibility);
-    if (c != Qundef) return c;
+    if (!UNDEF_P(c)) return c;
     return rb_const_missing(klass, ID2SYM(id));
 }
 
@@ -2265,7 +2265,7 @@ rb_const_search(VALUE klass, ID id, int exclude, int recurse, int visibility)
 	    }
 	    rb_const_warn_if_deprecated(ce, tmp, id);
 	    value = ce->value;
-	    if (value == Qundef) {
+	    if (UNDEF_P(value)) {
 		if (am == tmp) break;
 		am = tmp;
 		if (rb_autoloading_value(tmp, id, &av)) return av;
@@ -2368,7 +2368,7 @@ rb_const_remove(VALUE mod, ID id)
     rb_clear_constant_cache();
 
     val = ce->value;
-    if (val == Qundef) {
+    if (UNDEF_P(val)) {
 	autoload_delete(mod, id);
 	val = Qnil;
     }
@@ -2519,7 +2519,7 @@ rb_const_defined_0(VALUE klass, ID id, int exclude, int recurse, int visibility)
 	    if (visibility && RB_CONST_PRIVATE_P(ce)) {
 		return (int)Qfalse;
 	    }
-	    if (ce->value == Qundef && !check_autoload_required(tmp, id, 0) &&
+	    if (UNDEF_P(ce->value) && !check_autoload_required(tmp, id, 0) &&
 		    !rb_autoloading_value(tmp, id, 0))
 		return (int)Qfalse;
 	    return (int)Qtrue;
@@ -2625,7 +2625,7 @@ const_tbl_update(struct autoload_const_set_args *args)
 
     if (rb_id_table_lookup(tbl, id, &value)) {
 	ce = (rb_const_entry_t *)value;
-	if (ce->value == Qundef) {
+	if (UNDEF_P(ce->value)) {
 	    VALUE load;
 	    struct autoload_data_i *ele;
 

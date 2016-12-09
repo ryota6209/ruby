@@ -2035,7 +2035,7 @@ rb_threadptr_execute_interrupts(rb_thread_t *th, int blocking_timing)
 	    VALUE err = rb_threadptr_pending_interrupt_deque(th, blocking_timing ? INTERRUPT_ON_BLOCKING : INTERRUPT_NONE);
 	    thread_debug("rb_thread_execute_interrupts: %"PRIdVALUE"\n", err);
 
-	    if (err == Qundef) {
+	    if (UNDEF_P(err)) {
 		/* no error */
 	    }
 	    else if (err == eKillSignal        /* Thread#kill received */   ||
@@ -4481,7 +4481,7 @@ recursive_check(VALUE list, VALUE obj_id, VALUE paired_obj_id)
 #endif
 
     VALUE pair_list = rb_hash_lookup2(list, obj_id, Qundef);
-    if (pair_list == Qundef)
+    if (UNDEF_P(pair_list))
 	return Qfalse;
     if (paired_obj_id) {
 	if (!RB_TYPE_P(pair_list, T_HASH)) {
@@ -4513,7 +4513,7 @@ recursive_push(VALUE list, VALUE obj, VALUE paired_obj)
     if (!paired_obj) {
 	rb_hash_aset(list, obj, Qtrue);
     }
-    else if ((pair_list = rb_hash_lookup2(list, obj, Qundef)) == Qundef) {
+    else if (UNDEF_P(pair_list = rb_hash_lookup2(list, obj, Qundef))) {
 	rb_hash_aset(list, obj, paired_obj);
     }
     else {
@@ -4540,7 +4540,7 @@ recursive_pop(VALUE list, VALUE obj, VALUE paired_obj)
 {
     if (paired_obj) {
 	VALUE pair_list = rb_hash_lookup2(list, obj, Qundef);
-	if (pair_list == Qundef) {
+	if (UNDEF_P(pair_list)) {
 	    return 0;
 	}
 	if (RB_TYPE_P(pair_list, T_HASH)) {

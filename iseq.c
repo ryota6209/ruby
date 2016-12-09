@@ -1892,7 +1892,7 @@ iseq_data_to_ary(const rb_iseq_t *iseq)
 	    }
 	    for (j=0; i<iseq->body->param.keyword->num; i++, j++) {
 		VALUE key = rb_ary_new_from_args(1, ID2SYM(iseq->body->param.keyword->table[i]));
-		if (iseq->body->param.keyword->default_values[j] != Qundef) {
+		if (!UNDEF_P(iseq->body->param.keyword->default_values[j])) {
 		    rb_ary_push(key, iseq->body->param.keyword->default_values[j]);
 		}
 		rb_ary_push(keywords, key);

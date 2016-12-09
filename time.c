@@ -498,7 +498,7 @@ num_exact(VALUE v)
         goto typeerror;
 
       default:
-        if ((tmp = rb_check_funcall(v, rb_intern("to_r"), 0, NULL)) != Qundef) {
+        if (!UNDEF_P(tmp = rb_check_funcall(v, rb_intern("to_r"), 0, NULL))) {
             /* test to_int method availability to reject non-Numeric
              * objects such as String, Time, etc which have to_r method. */
             if (!rb_respond_to(v, rb_intern("to_int"))) goto typeerror;
@@ -2263,7 +2263,7 @@ time_timespec(VALUE num, int interval)
       default:
 	i = INT2FIX(1);
 	ary = rb_check_funcall(num, id_divmod, 1, &i);
-	if (ary != Qundef && !NIL_P(ary = rb_check_array_type(ary))) {
+	if (!UNDEF_P(ary) && !NIL_P(ary = rb_check_array_type(ary))) {
             i = rb_ary_entry(ary, 0);
             f = rb_ary_entry(ary, 1);
             t.tv_sec = NUM2TIMET(i);

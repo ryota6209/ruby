@@ -353,7 +353,7 @@ make_unknown_kw_hash(const VALUE *passed_keywords, int passed_keyword_len, const
     VALUE obj = rb_ary_tmp_new(1);
 
     for (i=0; i<passed_keyword_len; i++) {
-	if (kw_argv[i] != Qundef) {
+	if (!UNDEF_P(kw_argv[i])) {
 	    rb_ary_push(obj, passed_keywords[i]);
 	}
     }
@@ -367,7 +367,7 @@ make_rest_kw_hash(const VALUE *passed_keywords, int passed_keyword_len, const VA
     VALUE obj = rb_hash_new();
 
     for (i=0; i<passed_keyword_len; i++) {
-	if (kw_argv[i] != Qundef) {
+	if (!UNDEF_P(kw_argv[i])) {
 	    rb_hash_aset(obj, passed_keywords[i], kw_argv[i]);
 	}
     }
@@ -422,7 +422,7 @@ args_setup_kw_parameters(VALUE* const passed_values, const int passed_keyword_le
 	    found++;
 	}
 	else {
-	    if (default_values[di] == Qundef) {
+	    if (UNDEF_P(default_values[di])) {
 		locals[i] = Qnil;
 
 		if (LIKELY(i < 32)) { /* TODO: 32 -> Fixnum's max bits */

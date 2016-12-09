@@ -168,7 +168,7 @@ remove_event_hook(rb_hook_list_t *list, rb_event_hook_func_t func, VALUE data)
 
     while (hook) {
 	if (func == 0 || hook->func == func) {
-	    if (data == Qundef || hook->data == data) {
+	    if (UNDEF_P(data) || hook->data == data) {
 		hook->hook_flags |= RUBY_EVENT_HOOK_FLAG_DELETED;
 		ret+=1;
 		list->need_clean = TRUE;
@@ -749,7 +749,7 @@ rb_tracearg_event(rb_trace_arg_t *trace_arg)
 static void
 fill_path_and_lineno(rb_trace_arg_t *trace_arg)
 {
-    if (trace_arg->path == Qundef) {
+    if (UNDEF_P(trace_arg->path)) {
 	rb_control_frame_t *cfp = rb_vm_get_ruby_level_next_cfp(trace_arg->th, trace_arg->cfp);
 
 	if (cfp) {
@@ -847,7 +847,7 @@ rb_tracearg_return_value(rb_trace_arg_t *trace_arg)
     else {
 	rb_raise(rb_eRuntimeError, "not supported by this event");
     }
-    if (trace_arg->data == Qundef) {
+    if (UNDEF_P(trace_arg->data)) {
 	rb_bug("tp_attr_return_value_m: unreachable");
     }
     return trace_arg->data;
@@ -862,7 +862,7 @@ rb_tracearg_raised_exception(rb_trace_arg_t *trace_arg)
     else {
 	rb_raise(rb_eRuntimeError, "not supported by this event");
     }
-    if (trace_arg->data == Qundef) {
+    if (UNDEF_P(trace_arg->data)) {
 	rb_bug("tp_attr_raised_exception_m: unreachable");
     }
     return trace_arg->data;
@@ -877,7 +877,7 @@ rb_tracearg_object(rb_trace_arg_t *trace_arg)
     else {
 	rb_raise(rb_eRuntimeError, "not supported by this event");
     }
-    if (trace_arg->data == Qundef) {
+    if (UNDEF_P(trace_arg->data)) {
 	rb_bug("tp_attr_raised_exception_m: unreachable");
     }
     return trace_arg->data;

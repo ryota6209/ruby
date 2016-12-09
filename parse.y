@@ -694,7 +694,7 @@ static VALUE ripper_id2sym(ID);
 #define arg_add(l,a) dispatch2(args_add, (l), (a))
 #define arg_add_star(l,a) dispatch2(args_add_star, (l), (a))
 #define arg_add_block(l,b) dispatch2(args_add_block, (l), (b))
-#define arg_add_optblock(l,b) ((b)==Qundef? (l) : dispatch2(args_add_block, (l), (b)))
+#define arg_add_optblock(l,b) (UNDEF_P(b) ? (l) : dispatch2(args_add_block, (l), (b)))
 #define bare_assoc(v) dispatch1(bare_assoc_hash, (v))
 #define arg_add_assocs(l,b) arg_add((l), bare_assoc(b))
 
@@ -714,11 +714,11 @@ static VALUE ripper_id2sym(ID);
 #define blockvar_add_star(l,a) dispatch2(block_var_add_star, (l), (a))
 #define blockvar_add_block(l,a) dispatch2(block_var_add_block, (l), (a))
 
-#define method_optarg(m,a) ((a)==Qundef ? (m) : dispatch2(method_add_arg,(m),(a)))
+#define method_optarg(m,a) (UNDEF_P(a) ? (m) : dispatch2(method_add_arg,(m),(a)))
 #define method_arg(m,a) dispatch2(method_add_arg,(m),(a))
 #define method_add_block(m,b) dispatch2(method_add_block, (m), (b))
 
-#define escape_Qundef(x) ((x)==Qundef ? Qnil : (x))
+#define escape_Qundef(x) (UNDEF_P(x) ? Qnil : (x))
 
 static inline VALUE
 new_args_gen(struct parser_params *parser, VALUE f, VALUE o, VALUE r, VALUE p, VALUE tail)
@@ -11289,7 +11289,7 @@ static VALUE
 ripper_get_value(VALUE v)
 {
     NODE *nd;
-    if (v == Qundef) return Qnil;
+    if (UNDEF_P(v)) return Qnil;
     if (!RB_TYPE_P(v, T_NODE)) return v;
     nd = (NODE *)v;
     if (nd_type(nd) != NODE_RIPPER) return Qnil;
@@ -11512,7 +11512,7 @@ static VALUE
 ripper_assert_Qundef(VALUE self, VALUE obj, VALUE msg)
 {
     StringValue(msg);
-    if (obj == Qundef) {
+    if (UNDEF_P(obj)) {
         rb_raise(rb_eArgError, "%"PRIsVALUE, msg);
     }
     return Qnil;
