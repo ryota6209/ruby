@@ -7926,6 +7926,19 @@ parse_ident(struct parser_params *parser, int c, int cmd_state)
 	if (kw) {
 	    enum lex_state_e state = lex_state;
 	    SET_LEX_STATE(kw->state);
+#ifdef RIPPER
+	    switch (kw->id[0]) {
+	      case keyword_begin: case keyword_if: case keyword_unless:
+	      case keyword_while: case keyword_until: case keyword_case:
+	      case keyword_for: case keyword_class: case keyword_module:
+	      case keyword_def:
+		++paren_nest;
+		break;
+	      case keyword_end:
+		--paren_nest;
+		break;
+	    }
+#endif
 	    if (IS_lex_state_for(state, EXPR_FNAME)) {
 		set_yylval_name(rb_intern2(tok(), toklen()));
 		return kw->id[0];
@@ -10983,6 +10996,21 @@ ripper_immediate_toplevel_statement_set(VALUE vparser, VALUE flag)
     parser->immediate_toplevel_statement = RTEST(flag);
     return flag;
 }
+
+/*
+ *  call-seq:
+ *    ripper#nesting_level   -> integer
+ *
+ *  Return nesting level.
+ */
+static VALUE
+ripper_nesting_level(VALUE vparser)
+{
+    struct parser_params *parser;
+
+    TypedData_Get_Struct(vparser, struct parser_params, &parser_data_type, parser);
+    return INT2NUM(paren_nest);
+}
 #endif
 
 /*
@@ -11621,6 +11649,7 @@ InitVM_ripper(void)
     rb_define_method(Ripper, "error?", ripper_error_p, 0);
     rb_define_method(Ripper, "immediate_toplevel_statement?", ripper_immediate_toplevel_statement_p, 0);
     rb_define_method(Ripper, "immediate_toplevel_statement=", ripper_immediate_toplevel_statement_set, 1);
+    rb_define_method(Ripper, "nesting_level", ripper_nesting_level, 0);
 #ifdef RIPPER_DEBUG
     rb_define_method(rb_mKernel, "assert_Qundef", ripper_assert_Qundef, 2);
     rb_define_method(rb_mKernel, "rawVALUE", ripper_value, 1);
