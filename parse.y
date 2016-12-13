@@ -318,6 +318,7 @@ struct parser_params {
     /* Ripper only */
 
     unsigned int immediate_toplevel_statement: 1;
+    unsigned int continued_statement: 1;
 
     const char *tokp;
     VALUE delayed;
@@ -693,6 +694,8 @@ static VALUE ripper_id2sym(ID);
 #endif
 
 #define top_stmt(n) (parser->immediate_toplevel_statement ? dispatch1(top_stmt, (n)) : (n))
+#define SET_CONTINUED(ls) (parser->continued_statement = IS_lex_state_for(ls, EXPR_BEG|EXPR_FNAME|EXPR_DOT))
+#define CLEAR_CONTINUED() (parser->continued_statement = 0)
 
 #define arg_new() dispatch0(args_new)
 #define arg_add(l,a) dispatch2(args_add, (l), (a))
@@ -4383,6 +4386,7 @@ superclass	: '<'
 
 f_arglist	: '(' f_args rparen
 		    {
+			CLEAR_CONTINUED();
 		    /*%%%*/
 			$$ = $2;
 		    /*%
@@ -7933,9 +7937,11 @@ parse_ident(struct parser_params *parser, int c, int cmd_state)
 	      case keyword_for: case keyword_class: case keyword_module:
 	      case keyword_def:
 		++paren_nest;
+		SET_CONTINUED(lex_state);
 		break;
 	      case keyword_end:
 		--paren_nest;
+		CLEAR_CONTINUED();
 		break;
 	    }
 #endif
@@ -8090,6 +8096,7 @@ parser_yylex(struct parser_params *parser)
 	}
 #ifdef RIPPER
 	if (parser->immediate_toplevel_statement) {
+	    SET_CONTINUED(last_state);
 	    dispatch_scan_event('\n');
 	    goto normal_newline;
 	}
@@ -11050,6 +11057,21 @@ ripper_string_p(VALUE vparser)
     if (func & STR_FUNC_EXPAND) return rb_str_new_cstr("\"");
     return rb_str_new_cstr("'");
 }
+
+/*
+ *  call-seq:
+ *    ripper#continue?   -> boolean
+ *
+ *  Return true if in a continued statement.
+ */
+static VALUE
+ripper_continue_p(VALUE vparser)
+{
+    struct parser_params *parser;
+
+    TypedData_Get_Struct(vparser, struct parser_params, &parser_data_type, parser);
+    return parser->continued_statement ? Qtrue : Qfalse;
+}
 #endif
 
 /*
@@ -11691,6 +11713,7 @@ InitVM_ripper(void)
     rb_define_method(Ripper, "nesting_level", ripper_nesting_level, 0);
     rb_define_method(Ripper, "eol?", ripper_eol_p, 0);
     rb_define_method(Ripper, "string?", ripper_string_p, 0);
+    rb_define_method(Ripper, "continue?", ripper_continue_p, 0);
 #ifdef RIPPER_DEBUG
     rb_define_method(rb_mKernel, "assert_Qundef", ripper_assert_Qundef, 2);
     rb_define_method(rb_mKernel, "rawVALUE", ripper_value, 1);
