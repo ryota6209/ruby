@@ -943,7 +943,7 @@ typedef rb_control_frame_t *
   (FUNC_FASTCALL(*rb_insn_func_t))(rb_thread_t *, rb_control_frame_t *);
 
 #define VM_TAGGED_PTR_SET(p, tag)  ((VALUE)(p) | (tag))
-#define VM_TAGGED_PTR_REF(v, mask) ((void *)((v) & ~mask))
+#define VM_TAGGED_PTR_REF(v, mask) ((void *)((v) & ~(VALUE)(mask)))
 
 #define GC_GUARDED_PTR(p)     VM_TAGGED_PTR_SET((p), 0x01)
 #define GC_GUARDED_PTR_REF(p) VM_TAGGED_PTR_REF((p), 0x03)
@@ -1015,7 +1015,7 @@ VM_ENV_FLAGS_UNSET(const VALUE *ep, VALUE flag)
 }
 
 static inline unsigned long
-VM_ENV_FLAGS(const VALUE *ep, long flag)
+VM_ENV_FLAGS(const VALUE *ep, unsigned long flag)
 {
     VALUE flags = ep[VM_ENV_DATA_INDEX_FLAGS];
     VM_ASSERT(FIXNUM_P(flags));

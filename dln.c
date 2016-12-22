@@ -127,7 +127,7 @@ init_funcname_len(const char **file)
     }
     *file = base;
     /* Delete suffix if it exists */
-    return (dot ? dot : p) - base;
+    return (size_t)((dot ? dot : p) - base);
 }
 
 static const char funcname_prefix[sizeof(FUNCNAME_PREFIX) - 1] = FUNCNAME_PREFIX;

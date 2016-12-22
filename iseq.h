@@ -23,7 +23,7 @@ typedef struct rb_iseq_struct rb_iseq_t;
 static inline size_t
 rb_call_info_kw_arg_bytes(int keyword_len)
 {
-    return sizeof(struct rb_call_info_kw_arg) + sizeof(VALUE) * (keyword_len - 1);
+    return sizeof(struct rb_call_info_kw_arg) + sizeof(VALUE) * (size_t)(keyword_len - 1);
 }
 
 enum iseq_mark_ary_index {
@@ -69,7 +69,7 @@ ISEQ_ORIGINAL_ISEQ(const rb_iseq_t *iseq)
 static inline VALUE *
 ISEQ_ORIGINAL_ISEQ_ALLOC(const rb_iseq_t *iseq, long size)
 {
-    VALUE str = rb_str_tmp_new(size * sizeof(VALUE));
+    VALUE str = rb_str_tmp_new(size * (long)sizeof(VALUE));
     RARRAY_ASET(ISEQ_MARK_ARY(iseq), ISEQ_MARK_ARY_ORIGINAL_ISEQ, str);
     return (VALUE *)RSTRING_PTR(str);
 }
@@ -171,8 +171,8 @@ iseq_catch_table_bytes(int n)
 	catch_table_entries_max = (INT_MAX - sizeof(struct iseq_catch_table)) / sizeof(struct iseq_catch_table_entry)
     };
     if (n > catch_table_entries_max) rb_fatal("too large iseq_catch_table - %d", n);
-    return (int)(sizeof(struct iseq_catch_table) +
-		 (n - 1) * sizeof(struct iseq_catch_table_entry));
+    return (int)sizeof(struct iseq_catch_table) +
+	(n - 1) * (int)sizeof(struct iseq_catch_table_entry);
 }
 
 #define INITIAL_ISEQ_COMPILE_DATA_STORAGE_BUFF_SIZE (512)

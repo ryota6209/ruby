@@ -671,7 +671,7 @@ rb_iseq_compile_node(rb_iseq_t *iseq, NODE *node)
 	validate_labels(iseq, labels_table);
     }
 #endif
-    return iseq_setup(iseq, ret);
+    return iseq_setup(iseq, ret) ? Qtrue : Qfalse;
 }
 
 int
@@ -684,7 +684,7 @@ rb_iseq_translate_threaded_code(rb_iseq_t *iseq)
 
     for (i = 0; i < iseq->body->iseq_size; /* */ ) {
 	int insn = (int)iseq->body->iseq_encoded[i];
-	int len = insn_len(insn);
+	unsigned int len = insn_len((VALUE)insn);
 	encoded[i] = (VALUE)table[insn];
 	i += len;
     }
@@ -725,8 +725,8 @@ rb_iseq_original_iseq(const rb_iseq_t *iseq) /* cold path */
 	    const void *addr = (const void *)original_code[i];
 	    const int insn = rb_vm_insn_addr2insn(addr);
 
-	    original_code[i] = insn;
-	    i += insn_len(insn);
+	    original_code[i] = (VALUE)insn;
+	    i += insn_len((VALUE)insn);
 	}
     }
 #endif
@@ -822,7 +822,7 @@ compile_data_alloc(rb_iseq_t *iseq, size_t size)
 #endif /* STRICT_ALIGNMENT */
 
     ptr = (void *)&storage->buff[storage->pos];
-    storage->pos += (int)size;
+    storage->pos += size;
     return ptr;
 }
 
@@ -1046,7 +1046,7 @@ new_insn_core(rb_iseq_t *iseq, int line_no,
 
     iobj->link.type = ISEQ_ELEMENT_INSN;
     iobj->link.next = 0;
-    iobj->insn_id = insn_id;
+    iobj->insn_id = (enum ruby_vminsn_type)insn_id;
     iobj->line_no = line_no;
     iobj->operands = argv;
     iobj->operand_size = argc;

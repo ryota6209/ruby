@@ -277,7 +277,7 @@ struct clone_const_arg {
     struct rb_id_table *tbl;
 };
 
-static int
+static enum rb_id_table_iterator_result
 clone_const(ID key, const rb_const_entry_t *ce, struct clone_const_arg *arg)
 {
     rb_const_entry_t *nce = ALLOC(rb_const_entry_t);

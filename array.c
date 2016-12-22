@@ -66,8 +66,8 @@ static ID id_cmp, id_div, id_power;
     long tmp_n = (n); \
     assert(ARY_EMBED_P(ary)); \
     assert(!OBJ_FROZEN(ary)); \
-    RBASIC(ary)->flags &= ~RARRAY_EMBED_LEN_MASK; \
-    RBASIC(ary)->flags |= (tmp_n) << RARRAY_EMBED_LEN_SHIFT; \
+    RBASIC(ary)->flags &= ~(VALUE)RARRAY_EMBED_LEN_MASK; \
+    RBASIC(ary)->flags |= (VALUE)(tmp_n) << RARRAY_EMBED_LEN_SHIFT; \
 } while (0)
 #define ARY_SET_HEAP_LEN(ary, n) do { \
     assert(!ARY_EMBED_P(ary)); \
@@ -555,7 +555,7 @@ RUBY_FUNC_EXPORTED size_t
 rb_ary_memsize(VALUE ary)
 {
     if (ARY_OWNS_HEAP_P(ary)) {
-	return RARRAY(ary)->as.heap.aux.capa * sizeof(VALUE);
+	return (size_t)RARRAY(ary)->as.heap.aux.capa * sizeof(VALUE);
     }
     else {
 	return 0;
@@ -567,7 +567,7 @@ ary_discard(VALUE ary)
 {
     rb_ary_free(ary);
     RBASIC(ary)->flags |= RARRAY_EMBED_FLAG;
-    RBASIC(ary)->flags &= ~RARRAY_EMBED_LEN_MASK;
+    RBASIC(ary)->flags &= ~(VALUE)RARRAY_EMBED_LEN_MASK;
 }
 
 static VALUE
@@ -2462,7 +2462,7 @@ rb_ary_sort_bang(VALUE ary)
 	data.cmp_opt.opt_methods = 0;
 	data.cmp_opt.opt_inited = 0;
 	RARRAY_PTR_USE(tmp, ptr, {
-	    ruby_qsort(ptr, len, sizeof(VALUE),
+	    ruby_qsort(ptr, (size_t)len, sizeof(VALUE),
 		       rb_block_given_p()?sort_1:sort_2, &data);
 	}); /* WB: no new reference */
 	rb_ary_modify(ary);
@@ -3931,11 +3931,11 @@ rb_ary_hash(VALUE ary)
     st_index_t h;
     VALUE n;
 
-    h = rb_hash_start(RARRAY_LEN(ary));
+    h = rb_hash_start((st_index_t)RARRAY_LEN(ary));
     h = rb_hash_uint(h, (st_index_t)rb_ary_hash);
     for (i=0; i<RARRAY_LEN(ary); i++) {
 	n = rb_hash(RARRAY_AREF(ary, i));
-	h = rb_hash_uint(h, NUM2LONG(n));
+	h = rb_hash_uint(h, (st_index_t)NUM2LONG(n));
     }
     h = rb_hash_end(h);
     return ST2FIX(h);
@@ -4376,7 +4376,7 @@ rb_ary_uniq_bang(VALUE ary)
     else
 	hash = ary_make_hash(ary);
 
-    hash_size = RHASH_SIZE(hash);
+    hash_size = (long)RHASH_SIZE(hash);
     if (RARRAY_LEN(ary) == hash_size) {
 	return Qnil;
     }
@@ -4683,7 +4683,7 @@ rb_ary_flatten(int argc, VALUE *argv, VALUE ary)
     (argc > 0 && !NIL_P((opts) = rb_check_hash_type(argv[argc-1])) && (--argc, 1))
 static ID id_random;
 
-#define RAND_UPTO(max) (long)rb_random_ulong_limited((randgen), (max)-1)
+#define RAND_UPTO(max) (long)rb_random_ulong_limited((randgen), (unsigned long)(max)-1)
 
 /*
  *  call-seq:
@@ -4860,7 +4860,7 @@ rb_ary_sample(int argc, VALUE *argv, VALUE ary)
 		if (k < sorted[j]) break;
 		++k;
 	    }
-	    memmove(&sorted[j+1], &sorted[j], sizeof(sorted[0])*(i-j));
+	    memmove(&sorted[j+1], &sorted[j], sizeof(sorted[0])*(size_t)(i-j));
 	    sorted[j] = idx[i] = k;
 	}
 	result = rb_ary_new_capa(n);
@@ -4950,7 +4950,7 @@ rb_ary_cycle(int argc, VALUE *argv, VALUE ary)
     return Qnil;
 }
 
-#define tmpbuf(n, size) rb_str_tmp_new((n)*(size))
+#define tmpbuf(n, size) rb_str_tmp_new((long)((n)*(size)))
 #define tmpbuf_discard(s) (rb_str_resize((s), 0L), RBASIC_SET_CLASS_RAW(s, rb_cString))
 #define tmpary(n) rb_ary_tmp_new(n)
 #define tmpary_discard(a) (ary_discard(a), RBASIC_SET_CLASS_RAW(a, rb_cArray))
@@ -4992,7 +4992,7 @@ permute0(const long n, const long r, long *const p, char *const used, const VALU
     long i = 0, index = 0;
 
     for (;;) {
-	const char *const unused = memchr(&used[i], 0, n-i);
+	const char *const unused = memchr(&used[i], 0, (size_t)(n-i));
 	if (!unused) {
 	    if (!index) break;
 	    i = p[--index];                /* pop index */
@@ -5112,7 +5112,7 @@ rb_ary_permutation(int argc, VALUE *argv, VALUE ary)
     }
     else {             /* this is the general case */
 	volatile VALUE t0;
-	long *p = ALLOCV_N(long, t0, r+roomof(n, sizeof(long)));
+	long *p = ALLOCV_N(long, t0, r+roomof(n, (int)sizeof(long)));
 	char *used = (char*)(p + r);
 	VALUE ary0 = ary_make_shared_copy(ary); /* private defensive copy of ary */
 	RBASIC_CLEAR_CLASS(ary0);
@@ -5441,7 +5441,7 @@ rb_ary_product(int argc, VALUE *argv, VALUE ary)
 {
     int n = argc+1;    /* How many arrays we're operating on */
     volatile VALUE t0 = tmpary(n);
-    volatile VALUE t1 = tmpbuf(n, sizeof(int));
+    volatile VALUE t1 = tmpbuf((size_t)n, sizeof(int));
     VALUE *arrays = RARRAY_PTR(t0); /* The arrays we're computing the product of */
     int *counters = (int*)RSTRING_PTR(t1); /* The current position in each one */
     VALUE result = Qnil;      /* The array we'll be returning, when no block given */
