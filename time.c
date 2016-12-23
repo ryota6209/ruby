@@ -2994,16 +2994,23 @@ tmcmp(struct tm *a, struct tm *b)
 static VALUE
 time_utc_or_local(int argc, VALUE *argv, int utc_p, VALUE klass)
 {
-    struct vtm vtm;
-    VALUE time;
+    VALUE time = time_s_alloc(klass);
+    struct time_object *tobj = DATA_PTR(time);
 
-    time_arg(argc, argv, &vtm);
-    if (utc_p)
-        time = time_new_timew(klass, timegmw(&vtm));
-    else
-        time = time_new_timew(klass, timelocalw(&vtm));
-    if (utc_p) return time_gmtime(time);
-    return time_localtime(time);
+    time_arg(argc, argv, &tobj->vtm);
+# define TIME_SET_VALUE(tobj, tmz) \
+    (tmz##timew(tobj->timew = time##tmz##w(&tobj->vtm), &tobj->vtm) ? \
+     (void)0 : rb_raise(rb_eArgError, #tmz"time error"))
+    if (utc_p) {
+	TIME_SET_VALUE(tobj, gm);
+	TIME_SET_UTC(tobj);
+    }
+    else {
+	TIME_SET_VALUE(tobj, local);
+	TIME_SET_LOCALTIME(tobj);
+    }
+    tobj->tm_got = 1;
+    return time;
 }
 
 /*
