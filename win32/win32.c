@@ -7783,6 +7783,25 @@ rb_w32_pow(double x, double y)
 }
 #endif
 
+int
+rb_w32_valid_address_p(void *x)
+{
+    MEMORY_BASIC_INFORMATION m;
+    memset(&m, 0, sizeof(m));
+    return !VirtualQuery(x, &m, sizeof(m));
+}
+
+void
+rb_w32_inquire_value(VALUE x, const char *mesg)
+{
+    if (!SPECIAL_CONST_P(x)) {
+	void *p = (void *)x;
+	if (!rb_w32_valid_address_p(p)) {
+	    rb_fatal("Insane value %p: %s", p, mesg);
+	}
+    }
+}
+
 VALUE (*const rb_f_notimplement_)(int, const VALUE *, VALUE) = rb_f_notimplement;
 
 #if RUBY_MSVCRT_VERSION < 120
