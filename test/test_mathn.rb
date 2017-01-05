@@ -187,6 +187,7 @@ class TestMathn < Test::Unit::TestCase
       assert_equal(-5, "-5".to_r)
       assert_equal(1, "5/5".to_r)
       assert_equal(5, "5e0".to_r)
+      assert_instance_of(Rational, 1.0r)
     end;
   end
 end

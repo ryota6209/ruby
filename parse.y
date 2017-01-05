@@ -7253,7 +7253,9 @@ parse_rational(struct parser_params *parser, char *str, int len, int seen_point)
     size_t fraclen = len-seen_point-1;
     memmove(point, point+1, fraclen+1);
     v = rb_cstr_to_inum(str, 10, FALSE);
-    return rb_rational_new(v, rb_int_positive_pow(10, fraclen));
+    v = rb_rational_new(v, rb_int_positive_pow(10, fraclen));
+    if (!RB_TYPE_P(v, T_RATIONAL)) v = rb_rational_raw(v, INT2FIX(1));
+    return v;
 }
 
 static int
