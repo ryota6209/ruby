@@ -7797,6 +7797,56 @@ parse_ident(struct parser_params *parser, int c, int cmd_state)
     return result;
 }
 
+static const char*
+vt100_attribute_p(const char *p, const char *e, unsigned a)
+{
+    if (p < e && *p == '[') {
+	int found = 0;
+	++p;
+	while (p < e) {
+	    size_t w;
+	    int ov;
+	    if (ruby_scan_digits(p, e - p, 10, &w, &ov) == a)
+		found = 1;
+	    p += w;
+	    switch (*p) {
+	      case 'm':
+		return found ? ++p : 0;
+	      case ';':
+		++p;
+		continue;
+	    }
+	}
+    }
+    return 0;
+}
+
+static int
+skip_highlight_comment(struct parser_params *parser)
+{
+    const char *nextp = vt100_attribute_p(lex_p, lex_pend, 1);
+    if (!nextp) return 0;
+    while (1) {
+	while (lex_p < lex_pend) {
+	    nextp = memchr(lex_p, '\033', lex_pend - lex_p);
+	    if (!nextp) {
+		lex_p = lex_pend;
+		break;
+	    }
+	    nextp = vt100_attribute_p(lex_p = ++nextp, lex_pend, 0);
+	    if (nextp) {
+		lex_p = nextp;
+		break;
+	    }
+	}
+	dispatch_scan_event(tCOMMENT);
+	if (nextp) break;
+	if (parser_nextline(parser)) return -1;
+	nextp = lex_p;
+    }
+    return 1;
+}
+
 static int
 parser_yylex(struct parser_params *parser)
 {
@@ -8453,6 +8503,18 @@ parser_yylex(struct parser_params *parser)
 	newtok();
 	break;
 
+
+      case '\033':		/* ESC */
+	switch (skip_highlight_comment(parser)) {
+	  case -1:
+	    compile_error(PARSER_ARG "comment meets end of file");
+	    return 0;
+	  case 1:
+	    space_seen = 1;
+	    parser->token_seen = token_seen;
+	    goto retry;
+	}
+	/* fall through */
       default:
 	if (!parser_is_identchar()) {
 	    compile_error(PARSER_ARG  "Invalid char `\\x%02X' in expression", c);

@@ -958,6 +958,15 @@ x = __ENCODING__
     assert_syntax_error("    0b\n", /\^/)
   end
 
+  def test_inline_comment
+    assert_valid_syntax("\e[1m -. \e[m")
+    assert_valid_syntax("\e[1m -. \e[0m")
+    assert_valid_syntax("\e[41;1m -. \e[0m")
+    assert_valid_syntax("\e[1;37m -. \e[0m")
+    assert_syntax_error("\e[1m -. \e[", /comment meets end of file/)
+    assert_syntax_error("\e[1m -. \e[4m", /comment meets end of file/)
+  end
+
 =begin
   def test_past_scope_variable
     assert_warning(/past scope/) {catch {|tag| eval("BEGIN{throw tag}; tap {a = 1}; a")}}
