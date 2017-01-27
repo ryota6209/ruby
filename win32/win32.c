@@ -41,6 +41,7 @@
 #include <shlobj.h>
 #include <mbstring.h>
 #include <shlwapi.h>
+#include <sddl.h>
 #if _MSC_VER >= 1400
 #include <crtdbg.h>
 #include <rtcapi.h>
@@ -2705,32 +2706,134 @@ rb_w32_strerror(int e)
 #define ROOT_UID	0
 #define ROOT_GID	0
 
-/* License: Artistic or GPL */
+/* License: Ruby's */
+static DWORD
+sid_to_id(PSID sid)
+{
+    const char *last;
+    LPTSTR str;
+    unsigned long id = 0;
+
+    if (!ConvertSidToStringSid(sid, &str)) {
+	rb_syserr_fail(map_errno(GetLastError()), "ConvertSidToStringSid");
+    }
+    last = strrchr(str, '-');
+    if (last) id = strtoul(last + 1, NULL, 10);
+    LocalFree(str);
+    return id;
+}
+
+static struct {
+    rb_uid_t id;
+    TOKEN_USER *info;
+    LPTSTR sid_string;
+} user = {-1, NULL};
+
+/* License: Ruby's */
 rb_uid_t
 getuid(void)
 {
-	return ROOT_UID;
+    if (user.id < 0) {
+	TOKEN_USER *info = user.info;
+
+	if (!info) {
+	    HANDLE token;
+	    DWORD rlength = 0;
+	    BOOL ret;
+	    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) {
+		return -1;
+	    }
+
+	    GetTokenInformation(token, TokenUser, NULL, 0, &rlength);
+	    info = malloc(rlength);
+	    if (info && !GetTokenInformation(token, TokenUser, info, rlength, &rlength)) {
+		free(info);
+		info = NULL;
+	    }
+	    CloseHandle(token);
+	}
+	if (info) {
+	    PSID sid = info->User.Sid;
+	    LPTSTR str;
+	    if (ConvertSidToStringSid(sid, &str)) {
+		const char *last = strrchr(str, '-');
+		if (last) {
+		    user.id = strtoul(last + 1, NULL, 10);
+		    user.sid_string = str;
+		}
+		else {
+		    LocalFree(str);
+		}
+	    }
+	}
+    }
+    return user.id;
 }
 
-/* License: Artistic or GPL */
+/* License: Ruby's */
 rb_uid_t
 geteuid(void)
 {
-	return ROOT_UID;
+    return getuid();
 }
 
-/* License: Artistic or GPL */
+static struct {
+    rb_gid_t id;
+    TOKEN_GROUPS *info;
+} group = {-1, NULL};
+
+/* License: Ruby's */
 rb_gid_t
 getgid(void)
 {
-	return ROOT_GID;
+    if (group.id < 0) {
+	TOKEN_GROUPS *info = group.info;
+	const char *last;
+
+	if (getuid() < 0 || !user.sid_string) return -1;
+	last = strrchr(user.sid_string, '-');
+	if (!last) return -1;
+	++last;
+
+	if (!info) {
+	    HANDLE token;
+	    DWORD rlength = 0;
+	    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
+		return -1;
+
+	    GetTokenInformation(token, TokenGroups, NULL, 0, &rlength);
+	    info = malloc(rlength);
+	    if (info && !GetTokenInformation(token, TokenGroups, info, rlength, &rlength)) {
+		free(info);
+		info = NULL;
+	    }
+	    CloseHandle(token);
+	}
+	if (info) {
+	    DWORD i;
+	    for (i = 0; i < info->GroupCount; ++i) {
+		LPTSTR str;
+		PSID sid = info->Groups[i].Sid;
+		if (ConvertSidToStringSid(sid, &str)) {
+		    if (strncmp(user.sid_string, str, last - user.sid_string) == 0) {
+			group.id = strtoul(str + (last - user.sid_string), NULL, 10);
+			LocalFree(str);
+			break;
+		    }
+		    LocalFree(str);
+		}
+	    }
+	}
+    }
+
+    return group.id;
 }
 
-/* License: Artistic or GPL */
+/* License: Ruby's */
 rb_gid_t
 getegid(void)
 {
-    return ROOT_GID;
+    return getgid();
 }
 
 /* License: Artistic or GPL */
