@@ -5408,6 +5408,38 @@ static WCHAR *name_for_stat(WCHAR *buf, const WCHAR *path);
 static DWORD stati64_handle(HANDLE h, struct stati64 *st);
 
 /* License: Ruby's */
+static unsigned long
+get_file_sid_last(const WCHAR *wfile, SECURITY_INFORMATION info)
+{
+    DWORD size_needed = 0, size;
+    PSECURITY_DESCRIPTOR security_ptr;
+    PSID sid;
+    BOOL defaulted;
+    const char *meth;
+
+    GetFileSecurityW(wfile, info, NULL, 0, &size_needed);
+    security_ptr = alloca(size = size_needed);
+    if (!GetFileSecurityW(wfile, info, security_ptr, size, &size_needed)) {
+	int e = GetLastError();
+	switch (e) {
+	  case ERROR_SHARING_VIOLATION: /* Locked files, etc. */
+	  case ERROR_INVALID_FUNCTION:	/* Network drive, etc. */
+	    return 0;
+	}
+	fprintf(stderr, "wfile=%ls, e=%d, size=%u,%u\n", wfile, e, size, size_needed);
+	rb_syserr_fail(map_errno(e), "GetFileSecurity");
+    }
+    if (!(info == OWNER_SECURITY_INFORMATION ?
+	  (meth = "GetSecurityDescriptorOwner",
+	   GetSecurityDescriptorOwner(security_ptr, &sid, &defaulted)) :
+	  (meth = "GetSecurityDescriptorGroup",
+	   GetSecurityDescriptorGroup(security_ptr, &sid, &defaulted)))) {
+	rb_syserr_fail(map_errno(GetLastError()), meth);
+    }
+    return sid_to_id(sid);
+}
+
+/* License: Ruby's */
 static void
 stati64_set_inode(BY_HANDLE_FILE_INFORMATION *pinfo, struct stati64 *st)
 {
@@ -5661,6 +5693,8 @@ winnt_stat(const WCHAR *path, struct stati64 *st)
 	if (attr & FILE_ATTRIBUTE_DIRECTORY) {
 	    if (check_valid_dir(path)) return -1;
 	}
+	st->st_uid = get_file_sid_last(finalname, OWNER_SECURITY_INFORMATION);
+	st->st_gid = get_file_sid_last(finalname, GROUP_SECURITY_INFORMATION);
 	st->st_mode = fileattr_to_unixmode(attr, path);
 	if (len) {
 	    finalname[min(len, numberof(finalname)-1)] = L'\0';
