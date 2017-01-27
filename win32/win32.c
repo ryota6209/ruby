@@ -5407,6 +5407,13 @@ static time_t filetime_to_unixtime(const FILETIME *ft);
 static WCHAR *name_for_stat(WCHAR *buf, const WCHAR *path);
 static DWORD stati64_handle(HANDLE h, struct stati64 *st);
 
+static const GENERIC_MAPPING generic_mapping = {
+    FILE_GENERIC_READ,
+    FILE_GENERIC_WRITE,
+    FILE_GENERIC_EXECUTE,
+    FILE_ALL_ACCESS,
+};
+
 /* License: Ruby's */
 static unsigned long
 get_file_sid_last(const WCHAR *wfile, SECURITY_INFORMATION info)
