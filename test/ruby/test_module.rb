@@ -1429,6 +1429,18 @@ class TestModule < Test::Unit::TestCase
     assert_warn(/deprecated/, bug12382) {c.class_eval "FOO"}
   end
 
+  def test_deprecate_constant
+    c = Class.new {
+      deprecate_method def foo
+      end
+    }
+    o = c.new
+    assert_warn(/#{c}#foo is deprecated/) {o.foo}
+    assert_warn(/#{c}#foo is deprecated/) {o.method(:foo)}
+    assert_warn(/#{c}#foo is deprecated/) {c.instance_method(:foo)}
+    assert_warn(/#{c}#foo is deprecated/) {Class.new(c).new.foo}
+  end
+
   def test_constants_with_private_constant
     assert_not_include(::TestModule.constants, :PrivateClass)
     assert_not_include(::TestModule.constants(true), :PrivateClass)

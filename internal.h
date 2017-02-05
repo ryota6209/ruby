@@ -1787,6 +1787,10 @@ VALUE rb_const_missing(VALUE klass, VALUE name);
 int rb_class_ivar_set(VALUE klass, ID vid, VALUE value);
 st_table *rb_st_copy(VALUE obj, struct st_table *orig_tbl);
 
+/* vm_method.c (export) */
+void rb_deprecate_method(VALUE klass, const char *name);
+void rb_deprecate_method_id(VALUE klass, ID id);
+
 /* gc.c (export) */
 VALUE rb_wb_protected_newobj_of(VALUE, VALUE);
 VALUE rb_wb_unprotected_newobj_of(VALUE, VALUE);

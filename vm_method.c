@@ -715,6 +715,51 @@ rb_method_entry_at(VALUE klass, ID id)
     return lookup_method_table(klass, id);
 }
 
+void
+rb_deprecate_method_id(VALUE klass, ID id)
+{
+    rb_method_entry_t *me;
+    rb_frozen_class_p(klass);
+    me = lookup_method_table(klass, id);
+    if (UNDEFINED_METHOD_ENTRY_P(me)) {
+	rb_print_undef_str(klass, rb_id2str(id));
+    }
+    me->def->deprecated = 1;
+    rb_clear_method_cache_by_class(klass);
+}
+
+void
+rb_deprecate_method(VALUE klass, const char *name)
+{
+    long len = strlen(name);
+    ID id = rb_check_id_cstr(name, len, rb_usascii_encoding());
+    if (!id) {
+	rb_print_undef_str(klass, rb_usascii_str_new(name, len));
+    }
+    rb_deprecate_method_id(klass, id);
+}
+
+static void
+warn_deprecated_method(const rb_method_entry_t *me, ID id)
+{
+    if (me->def->deprecated) {
+	VALUE klass = me->defined_class;
+	VALUE name = QUOTE_ID(id);
+	if (klass == rb_mKernel) {
+	    rb_warn("method %"PRIsVALUE" is deprecated", name);
+	}
+	else if (FL_TEST_RAW(klass, FL_SINGLETON)) {
+	    VALUE obj = rb_ivar_get(klass, id__attached__);
+	    rb_warn("method %"PRIsVALUE".%"PRIsVALUE" is deprecated",
+		    rb_inspect(obj), name);
+	}
+	else {
+	    rb_warn("method %"PRIsVALUE"#%"PRIsVALUE" is deprecated",
+		    rb_class_name(klass), name);
+	}
+    }
+}
+
 /*
  * search method entry without the method cache.
  *
@@ -774,6 +819,7 @@ verify_method_cache(VALUE klass, ID id, VALUE defined_class, rb_method_entry_t *
 static rb_method_entry_t *
 method_entry_get(VALUE klass, ID id, VALUE *defined_class_ptr)
 {
+    rb_method_entry_t *me;
 #if OPT_GLOBAL_METHOD_CACHE
     struct cache_entry *ent;
     ent = GLOBAL_METHOD_CACHE(klass, id);
@@ -784,11 +830,15 @@ method_entry_get(VALUE klass, ID id, VALUE *defined_class_ptr)
 	verify_method_cache(klass, id, ent->defined_class, ent->me);
 #endif
 	if (defined_class_ptr) *defined_class_ptr = ent->defined_class;
-	return ent->me;
+	me = ent->me;
     }
+    else
 #endif
-
-    return method_entry_get_without_cache(klass, id, defined_class_ptr);
+    {
+	me = method_entry_get_without_cache(klass, id, defined_class_ptr);
+    }
+    if (me) warn_deprecated_method(me, id);
+    return me;
 }
 
 const rb_method_entry_t *
@@ -1717,6 +1767,42 @@ rb_mod_private(int argc, VALUE *argv, VALUE module)
 
 /*
  *  call-seq:
+ *     deprecated(name)        -> name
+ *
+ *  Makes an existing method deprecated.
+ *
+ */
+
+static VALUE
+rb_mod_deprecated(VALUE mod, VALUE name)
+{
+    ID id = rb_check_id(&name);
+    if (!id) {
+	rb_print_undef_str(mod, name);
+    }
+    rb_deprecate_method_id(mod, id);
+    return name;
+}
+
+/*
+ *  call-seq:
+ *     mod.deprecate_method(symbol, ...)    => mod
+ *
+ *  Makes a list of existing methods deprecated.
+ */
+
+static VALUE
+rb_mod_deprecate_method(int argc, const VALUE *argv, VALUE mod)
+{
+    int i;
+    for (i = 0; i < argc; ++i) {
+	rb_mod_deprecated(mod, argv[i]);
+    }
+    return mod;
+}
+
+/*
+ *  call-seq:
  *     mod.public_class_method(symbol, ...)    -> mod
  *     mod.public_class_method(string, ...)    -> mod
  *
@@ -1793,6 +1879,18 @@ static VALUE
 top_private(int argc, VALUE *argv)
 {
     return rb_mod_private(argc, argv, rb_cObject);
+}
+
+/*
+ *  call-seq:
+ *     deprecated name
+ *
+ *  Make the named method deprecated.
+ */
+static VALUE
+top_deprecated(VALUE name)
+{
+    return rb_mod_deprecated(rb_cObject, name);
 }
 
 /*
@@ -2098,6 +2196,7 @@ Init_eval_method(void)
     rb_define_private_method(rb_cModule, "protected", rb_mod_protected, -1);
     rb_define_private_method(rb_cModule, "private", rb_mod_private, -1);
     rb_define_private_method(rb_cModule, "module_function", rb_mod_modfunc, -1);
+    rb_define_private_method(rb_cModule, "deprecated", rb_mod_deprecated, 1);
 
     rb_define_method(rb_cModule, "method_defined?", rb_mod_method_defined, 1);
     rb_define_method(rb_cModule, "public_method_defined?", rb_mod_public_method_defined, 1);
@@ -2105,11 +2204,14 @@ Init_eval_method(void)
     rb_define_method(rb_cModule, "protected_method_defined?", rb_mod_protected_method_defined, 1);
     rb_define_method(rb_cModule, "public_class_method", rb_mod_public_method, -1);
     rb_define_method(rb_cModule, "private_class_method", rb_mod_private_method, -1);
+    rb_define_method(rb_cModule, "deprecate_method", rb_mod_deprecate_method, -1);
 
     rb_define_private_method(rb_singleton_class(rb_vm_top_self()),
 			     "public", top_public, -1);
     rb_define_private_method(rb_singleton_class(rb_vm_top_self()),
 			     "private", top_private, -1);
+    rb_define_private_method(rb_singleton_class(rb_vm_top_self()),
+			     "deprecated", top_deprecated, 1);
 
     {
 #define REPLICATE_METHOD(klass, id) do { \

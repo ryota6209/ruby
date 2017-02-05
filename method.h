@@ -145,7 +145,8 @@ typedef struct rb_method_refined_struct {
 } rb_method_refined_t;
 
 typedef struct rb_method_definition_struct {
-    rb_method_type_t type :  8; /* method type */
+    rb_method_type_t type :  7; /* method type */
+    unsigned int deprecated: 1;
     int alias_count       : 28;
     int complemented_count: 28;
 
