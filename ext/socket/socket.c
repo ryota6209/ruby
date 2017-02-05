@@ -2068,6 +2068,12 @@ Init_socket(void)
 
     rb_define_singleton_method(rb_cSocket, "ip_address_list", socket_s_ip_address_list, 0);
 
+    {
+	VALUE k = rb_singleton_class(rb_cSocket);
+	rb_deprecate_method(k, "gethostbyname");
+	rb_deprecate_method(k, "gethostbyaddr");
+    }
+
 #undef rb_intern
     sym_wait_writable = ID2SYM(rb_intern("wait_writable"));
 }
