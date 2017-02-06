@@ -1680,22 +1680,31 @@ set_method_visibility(VALUE self, int argc, const VALUE *argv, rb_method_visibil
 }
 
 static VALUE
+symbol_list(int argc, const VALUE *argv)
+{
+    if (argc > 1) return rb_ary_new_from_values(argc, argv);
+    if (argc > 0) return argv[0];
+    return Qnil;
+}
+
+static VALUE
 set_visibility(int argc, const VALUE *argv, VALUE module, rb_method_visibility_t visi)
 {
     if (argc == 0) {
 	rb_scope_visibility_set(visi);
+	return module;
     }
     else {
 	set_method_visibility(module, argc, argv, visi);
+	return symbol_list(argc, argv);
     }
-    return module;
 }
 
 /*
  *  call-seq:
  *     public                 -> self
- *     public(symbol, ...)    -> self
- *     public(string, ...)    -> self
+ *     public(name)           -> name
+ *     public(name, ...)      -> [name, ...]
  *
  *  With no arguments, sets the default visibility for subsequently
  *  defined methods to public. With arguments, sets the named methods to
@@ -1712,8 +1721,8 @@ rb_mod_public(int argc, VALUE *argv, VALUE module)
 /*
  *  call-seq:
  *     protected                -> self
- *     protected(symbol, ...)   -> self
- *     protected(string, ...)   -> self
+ *     protected(name)          -> name
+ *     protected(name, ...)     -> [name, ...]
  *
  *  With no arguments, sets the default visibility for subsequently
  *  defined methods to protected. With arguments, sets the named methods
@@ -1739,8 +1748,8 @@ rb_mod_protected(int argc, VALUE *argv, VALUE module)
 /*
  *  call-seq:
  *     private                 -> self
- *     private(symbol, ...)    -> self
- *     private(string, ...)    -> self
+ *     private(name)           -> name
+ *     private(name, ...)      -> [name, ...]
  *
  *  With no arguments, sets the default visibility for subsequently
  *  defined methods to private. With arguments, sets the named methods
@@ -1970,7 +1979,7 @@ rb_mod_modfunc(int argc, VALUE *argv, VALUE module)
 	}
 	rb_method_entry_set(rb_singleton_class(module), id, me, METHOD_VISI_PUBLIC);
     }
-    return module;
+    return symbol_list(argc, argv);
 }
 
 int
