@@ -1196,6 +1196,17 @@ eom
     assert_valid_syntax('obj::foo (1) {}')
   end
 
+  def test_comparison_sequence
+    x = 2
+    assert_equal(true, 1 < x <= 2)
+    assert_equal(false, 1 > x <= 2)
+    val = nil
+    if 1 < x <= 2 then val = :ok end
+    assert_equal(:ok, val)
+    if 1 > x <= 2 then val = :ng end
+    assert_equal(:ok, val)
+  end
+
   private
 
   def not_label(x) @result = x; @not_label ||= nil end
