@@ -9799,8 +9799,6 @@ ret_args_gen(struct parser_params *parser, NODE *node)
 static NODE *
 new_yield_gen(struct parser_params *parser, NODE *node)
 {
-    if (node) no_blockarg(parser, node);
-
     return NEW_YIELD(node);
 }
 

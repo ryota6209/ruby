@@ -829,12 +829,8 @@ x = __ENCODING__
     end
   end
 
-  def test_no_blockarg
-    assert_raise(SyntaxError) do
-      eval <<-END, nil, __FILE__, __LINE__+1
-        yield(&:+)
-      END
-    end
+  def test_yield_blockarg
+    assert_valid_syntax 'def o.f;yield(&:+);end'
   end
 
   def test_method_block_location
