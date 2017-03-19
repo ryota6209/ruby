@@ -1050,6 +1050,15 @@ eom
     assert_equal(:begin, result)
   end
 
+  def test_yield_blockarg
+    o = Object.new
+    o.instance_eval("def t; yield(&:succ); end")
+    o.t do |&b|
+      assert_equal("b", b.call("a"))
+      assert_equal(42, b.call(41))
+    end
+  end
+
   private
 
   def not_label(x) @result = x; @not_label ||= nil end

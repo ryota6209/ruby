@@ -1097,11 +1097,13 @@ invokeblock
 (...)
 (VALUE val)  // inc += 1 - ci->orig_argc;
 {
+    ISEQ blockiseq = NULL;
     struct rb_calling_info calling;
     calling.argc = ci->orig_argc;
     calling.block_handler = VM_BLOCK_HANDLER_NONE;
     calling.recv = GET_SELF();
 
+    vm_caller_setup_arg_block(th, reg_cfp, &calling, ci, blockiseq, FALSE);
     val = vm_invoke_block(th, GET_CFP(), &calling, ci);
     if (val == Qundef) {
 	RESTORE_REGS();
