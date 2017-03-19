@@ -2610,30 +2610,6 @@ primary		: literal
 			$$ = dispatch0(return0);
 		    %*/
 		    }
-		| keyword_yield '(' call_args rparen
-		    {
-		    /*%%%*/
-			$$ = new_yield($3);
-		    /*%
-			$$ = dispatch1(yield, dispatch1(paren, $3));
-		    %*/
-		    }
-		| keyword_yield '(' rparen
-		    {
-		    /*%%%*/
-			$$ = NEW_YIELD(0);
-		    /*%
-			$$ = dispatch1(yield, dispatch1(paren, arg_new()));
-		    %*/
-		    }
-		| keyword_yield
-		    {
-		    /*%%%*/
-			$$ = NEW_YIELD(0);
-		    /*%
-			$$ = dispatch0(yield0);
-		    %*/
-		    }
 		| keyword_defined opt_nl '(' {in_defined = 1;} expr rparen
 		    {
 			in_defined = 0;
@@ -3550,6 +3526,22 @@ method_call	: fcall paren_args
 			$$ = NEW_ZSUPER();
 		    /*%
 			$$ = dispatch0(zsuper);
+		    %*/
+		    }
+		| keyword_yield paren_args
+		    {
+		    /*%%%*/
+			$$ = new_yield($2);
+		    /*%
+			$$ = dispatch1(yield, $2);
+		    %*/
+		    }
+		| keyword_yield
+		    {
+		    /*%%%*/
+			$$ = NEW_YIELD(0);
+		    /*%
+			$$ = dispatch0(yield0);
 		    %*/
 		    }
 		| primary_value '[' opt_call_args rbracket

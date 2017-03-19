@@ -829,6 +829,10 @@ x = __ENCODING__
     end
   end
 
+  def test_yield_block
+    assert_valid_syntax 'def o.f;yield {|x|};end'
+  end
+
   def test_yield_blockarg
     assert_valid_syntax 'def o.f;yield(&:+);end'
   end
