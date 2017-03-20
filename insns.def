@@ -1093,11 +1093,10 @@ invokesuper
  */
 DEFINE_INSN
 invokeblock
-(CALL_INFO ci)
+(CALL_INFO ci, ISEQ blockiseq)
 (...)
 (VALUE val)  // inc += 1 - ci->orig_argc;
 {
-    ISEQ blockiseq = NULL;
     struct rb_calling_info calling;
     calling.argc = ci->orig_argc;
     calling.block_handler = VM_BLOCK_HANDLER_NONE;

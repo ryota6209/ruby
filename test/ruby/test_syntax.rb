@@ -1050,6 +1050,15 @@ eom
     assert_equal(:begin, result)
   end
 
+  def test_yield_block
+    o = Object.new
+    o.instance_eval("def t; yield {|x| x.succ}; end")
+    o.t do |&b|
+      assert_equal("b", b.call("a"))
+      assert_equal(42, b.call(41))
+    end
+  end
+
   def test_yield_blockarg
     o = Object.new
     o.instance_eval("def t; yield(&:succ); end")

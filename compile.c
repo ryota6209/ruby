@@ -5586,8 +5586,10 @@ iseq_compile_each0(rb_iseq_t *iseq, LINK_ANCHOR *const ret, NODE *node, int popp
 	VALUE argc;
 	unsigned int flag = 0;
 	struct rb_call_info_kw_arg *keywords = NULL;
+	const rb_iseq_t *parent_block = ISEQ_COMPILE_DATA(iseq)->current_block;
 
 	INIT_ANCHOR(args);
+	ISEQ_COMPILE_DATA(iseq)->current_block = NULL;
 	if (iseq->body->type == ISEQ_TYPE_TOP ||
 	    iseq->body->type == ISEQ_TYPE_MAIN) {
 	    COMPILE_ERROR(ERROR_ARGS "Invalid yield");
@@ -5602,7 +5604,8 @@ iseq_compile_each0(rb_iseq_t *iseq, LINK_ANCHOR *const ret, NODE *node, int popp
 	}
 
 	ADD_SEQ(ret, args);
-	ADD_INSN1(ret, line, invokeblock, new_callinfo(iseq, 0, FIX2INT(argc), flag, keywords, FALSE));
+	ADD_INSN2(ret, line, invokeblock, new_callinfo(iseq, 0, FIX2INT(argc), flag, keywords, parent_block != NULL),
+		  parent_block);
 
 	if (popped) {
 	    ADD_INSN(ret, line, pop);
