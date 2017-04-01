@@ -967,6 +967,12 @@ x = __ENCODING__
     assert_syntax_error("\e[1m -. \e[4m", /comment meets end of file/)
   end
 
+  def test_literal_blue
+    str = eval("\e[34mBlue\e[m")
+    assert_equal("Blue", str)
+    assert_predicate(str, :frozen?)
+  end
+
 =begin
   def test_past_scope_variable
     assert_warning(/past scope/) {catch {|tag| eval("BEGIN{throw tag}; tap {a = 1}; a")}}

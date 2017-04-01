@@ -41,6 +41,11 @@
 #define TAB_WIDTH 8
 
 #define ESC '\033'
+#define TERM_ESC(n) ((n) | (ESC << CHAR_BIT))
+#define TERM_ESC_P(c) (((c) >> CHAR_BIT) == ESC)
+#define TERM_ESC_MODE(c) (unsigned char)(c)
+#define BLUE 34
+
 #define YYMALLOC(size)		rb_parser_malloc(parser, (size))
 #define YYREALLOC(ptr, size)	rb_parser_realloc(parser, (ptr), (size))
 #define YYCALLOC(nelem, size)	rb_parser_calloc(parser, (nelem), (size))
@@ -396,6 +401,7 @@ static int parser_yyerror(struct parser_params*, const char*);
 #define lambda_beginning_p() (lpar_beg && lpar_beg == paren_nest)
 
 static int yylex(YYSTYPE*, struct parser_params*);
+static const char* vt100_attribute_p(const char *p, const char *e, unsigned a);
 
 static inline void
 parser_set_line(NODE *n, int l)
@@ -937,7 +943,7 @@ static void token_info_pop_gen(struct parser_params*, const char *token, size_t 
 %token <id>   tIDENTIFIER tFID tGVAR tIVAR tCONSTANT tCVAR tLABEL
 %token <node> tINTEGER tFLOAT tRATIONAL tIMAGINARY tSTRING_CONTENT tCHAR
 %token <node> tNTH_REF tBACK_REF
-%token <num>  tREGEXP_END
+%token <num>  tREGEXP_END tSTRING_END
 
 %type <node> singleton strings string string1 xstring regexp
 %type <node> string_contents xstring_contents regexp_contents string_content
@@ -1004,7 +1010,7 @@ static void token_info_pop_gen(struct parser_params*, const char *token, size_t 
 %token tAMPER		"&"
 %token tLAMBDA		"->"
 %token tSYMBEG tSTRING_BEG tXSTRING_BEG tREGEXP_BEG tWORDS_BEG tQWORDS_BEG tSYMBOLS_BEG tQSYMBOLS_BEG
-%token tSTRING_DBEG tSTRING_DEND tSTRING_DVAR tSTRING_END tLAMBEG tLABEL_END
+%token tSTRING_DBEG tSTRING_DEND tSTRING_DVAR tLAMBEG tLABEL_END
 
 /*
  *	precedence table
@@ -3734,6 +3740,10 @@ string		: tCHAR
 string1		: tSTRING_BEG string_contents tSTRING_END
 		    {
 			$$ = new_string1(heredoc_dedent($2));
+		    /*%%%*/
+			if ($3 == BLUE) $$ = call_uni_op($$, idUMinus);
+		    /*%
+		    %*/
 		    }
 		;
 
@@ -6186,6 +6196,20 @@ parser_parse_string(struct parser_params *parser, NODE *quote)
 	}
 	return parser_string_term(parser, func);
     }
+    if (TERM_ESC_P(term)) {
+	if (c == ESC) {
+	    const char *nextp = vt100_attribute_p(lex_p, lex_pend,
+						  TERM_ESC_MODE(term));
+	    if (nextp) {
+		lex_p = nextp;
+#ifndef RIPPER
+		yylval.num = TERM_ESC_MODE(paren);
+#endif
+		return tSTRING_END;
+	    }
+	}
+	term = ESC;
+    }
     if (space) {
 	pushback(c);
 	return ' ';
@@ -8506,6 +8530,16 @@ parser_yylex(struct parser_params *parser)
 
 
       case ESC:
+	{
+	    const char *nextp = vt100_attribute_p(lex_p, lex_pend, BLUE);
+	    if (nextp) {
+		label = (IS_LABEL_POSSIBLE() ? str_label : 0);
+		lex_strterm = NEW_STRTERM(str_squote | label,
+					  TERM_ESC(0), TERM_ESC(BLUE));
+		lex_p = nextp;
+		return tSTRING_BEG;
+	    }
+	}
 	switch (skip_highlight_comment(parser)) {
 	  case -1:
 	    compile_error(PARSER_ARG "comment meets end of file");
