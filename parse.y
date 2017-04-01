@@ -40,6 +40,7 @@
 
 #define TAB_WIDTH 8
 
+#define ESC '\033'
 #define YYMALLOC(size)		rb_parser_malloc(parser, (size))
 #define YYREALLOC(ptr, size)	rb_parser_realloc(parser, (ptr), (size))
 #define YYCALLOC(nelem, size)	rb_parser_calloc(parser, (nelem), (size))
@@ -7828,7 +7829,7 @@ skip_highlight_comment(struct parser_params *parser)
     if (!nextp) return 0;
     while (1) {
 	while (lex_p < lex_pend) {
-	    nextp = memchr(lex_p, '\033', lex_pend - lex_p);
+	    nextp = memchr(lex_p, ESC, lex_pend - lex_p);
 	    if (!nextp) {
 		lex_p = lex_pend;
 		break;
@@ -8504,7 +8505,7 @@ parser_yylex(struct parser_params *parser)
 	break;
 
 
-      case '\033':		/* ESC */
+      case ESC:
 	switch (skip_highlight_comment(parser)) {
 	  case -1:
 	    compile_error(PARSER_ARG "comment meets end of file");
