@@ -29,6 +29,7 @@ os:
 before_install:
   - "CONFIG_FLAG="
   - "JOBS='-j 4'"
+  - "RUBYSPEC_PULL_REQUEST=421"
 
 before_script:
   - "uname -a"
