@@ -513,4 +513,9 @@ class TestSprintf < Test::Unit::TestCase
     assert_equal before + 1, after, 'only new string is the created one'
     assert_equal '1970-01-01', val
   end
+
+  def test_object_id
+    x = Object.new
+    assert_equal(x.to_s, sprintf("#<%s:%I>", x.class, x))
+  end
 end

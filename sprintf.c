@@ -25,6 +25,7 @@
 
 static char *fmt_setup(char*,size_t,int,int,int,int);
 static char *ruby_ultoa(unsigned long val, char *endp, int base, int octzero);
+static char *ruby_ptoa(VALUE val, char *endp, int base, int octzero);
 
 static char
 sign_bits(int base, const char *p)
@@ -781,6 +782,18 @@ rb_str_format(int argc, const VALUE *argv, VALUE fmt)
 	    }
 	    break;
 
+	  case 'I':
+	    {
+		VALUE arg = GETARG();
+		prec = (SIZEOF_VOIDP * CHAR_BIT + 3) / 4;
+		CHECK(prec + 2);
+		PUSH_("0x", 2);
+		t = ruby_ptoa(arg, &buf[blen + prec], 16, 0);
+		if (t > &buf[blen]) memset(&buf[blen], '0', t - &buf[blen]);
+		blen += prec;
+	    }
+	    break;
+
 	  case 'd':
 	  case 'i':
 	  case 'o':
@@ -1253,6 +1266,18 @@ ruby_ultoa(unsigned long val, char *endp, int base, int flags)
     const char *xdigs = lower_hexdigits;
     int octzero = flags & FSHARP;
     return BSD__ultoa(val, endp, base, octzero, xdigs);
+}
+
+static char *
+ruby_ptoa(VALUE val, char *endp, int base, int flags)
+{
+    const char *xdigs = lower_hexdigits;
+    int octzero = flags & FSHARP;
+#ifdef _HAVE_SANE_QUAD_
+    return BSD__uqtoa(val, endp, base, octzero, xdigs);
+#else
+    return BSD__ultoa(val, endp, base, octzero, xdigs);
+#endif
 }
 
 int
