@@ -7851,6 +7851,18 @@ parse_ident(struct parser_params *parser, int c, int cmd_state)
 }
 
 static int
+parser_indented_bol_p(struct parser_params *parser)
+{
+    const char *p = lex_pbeg;
+    const char *e = lex_p - 1;
+    while (p < e) {
+	if (!ISSPACE(*p)) return FALSE;
+	p++;
+    }
+    return TRUE;
+}
+
+static int
 parser_yylex(struct parser_params *parser)
 {
     register int c;
@@ -8039,7 +8051,7 @@ parser_yylex(struct parser_params *parser)
 	return '!';
 
       case '=':
-	if (was_bol()) {
+	if (was_bol() || parser_indented_bol_p(parser)) {
 	    /* skip embedded rd document */
 	    if (strncmp(lex_p, "begin", 5) == 0 && ISSPACE(lex_p[5])) {
 		int first_p = TRUE;
@@ -8057,6 +8069,7 @@ parser_yylex(struct parser_params *parser)
 			compile_error(PARSER_ARG "embedded document meets end of file");
 			return 0;
 		    }
+		    while (ISSPACE(c)) c = nextc();
 		    if (c != '=') continue;
 		    if (c == '=' && strncmp(lex_p, "end", 3) == 0 &&
 			(lex_p + 3 == lex_pend || ISSPACE(lex_p[3]))) {

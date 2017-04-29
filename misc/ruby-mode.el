@@ -135,7 +135,7 @@
   (concat "[?$/%(){}#\"'`.:]\\|<<\\|\\[\\|\\]\\|\\_<\\("
           ruby-block-beg-re
           "\\)\\_>\\|" ruby-block-end-re
-          "\\|^=begin\\|" ruby-here-doc-beg-re)
+          "\\|^[ \t]*=begin\\|" ruby-here-doc-beg-re)
   )
 
 (defconst ruby-negative
@@ -671,8 +671,8 @@ Emacs to Ruby."
             (looking-at "\\.[a-zA-Z_0-9]+")
             (looking-at "\\."))
         (goto-char (match-end 0)))
-       ((looking-at "^=begin")
-        (if (re-search-forward "^=end" end t)
+       ((looking-at "^[ \t]*=begin")
+        (if (re-search-forward "^[ \t]*=end" end t)
             (forward-line 1)
           (setq in-string (match-end 0))
           (goto-char end)))
@@ -954,10 +954,10 @@ An end of a defun is found by moving forward from the beginning of one."
       (cond
        ((looking-at "^\\s *$"))
        ((looking-at "^\\s *#"))
-       ((and (> n 0) (looking-at "^=begin\\>"))
-        (re-search-forward "^=end\\>"))
-       ((and (< n 0) (looking-at "^=end\\>"))
-        (re-search-backward "^=begin\\>"))
+       ((and (> n 0) (looking-at "^[ \t]*=begin\\>"))
+        (re-search-forward "^[ \t]*=end\\>"))
+       ((and (< n 0) (looking-at "^[ \t]*=end\\>"))
+        (re-search-backward "^[ \t]*=begin\\>"))
        (t
         (setq pos (current-indentation))
         (cond
@@ -1410,12 +1410,12 @@ buffer position `limit' or the end of the buffer."
               . ruby-font-lock-syntactic-keywords))))
 
   (defun ruby-font-lock-docs (limit)
-    (if (re-search-forward "^=begin\\(\\s \\|$\\)" limit t)
+    (if (re-search-forward "^[ \t]*=begin\\(\\s \\|$\\)" limit t)
         (let (beg)
           (beginning-of-line)
           (setq beg (point))
           (forward-line 1)
-          (if (re-search-forward "^=end\\(\\s \\|$\\)" limit t)
+          (if (re-search-forward "^[ \t]*=end\\(\\s \\|$\\)" limit t)
               (progn
                 (set-match-data (list beg (point)))
                 t)))))
@@ -1423,12 +1423,12 @@ buffer position `limit' or the end of the buffer."
   (defun ruby-font-lock-maybe-docs (limit)
     (let (beg)
       (save-excursion
-        (if (and (re-search-backward "^=\\(begin\\|end\\)\\(\\s \\|$\\)" nil t)
+        (if (and (re-search-backward "^[ \t]*=\\(begin\\|end\\)\\(\\s \\|$\\)" nil t)
                  (string= (match-string 1) "begin"))
             (progn
               (beginning-of-line)
               (setq beg (point)))))
-      (if (and beg (and (re-search-forward "^=\\(begin\\|end\\)\\(\\s \\|$\\)" nil t)
+      (if (and beg (and (re-search-forward "^[ \t]*=\\(begin\\|end\\)\\(\\s \\|$\\)" nil t)
                         (string= (match-string 1) "end")))
           (progn
             (set-match-data (list beg (point)))

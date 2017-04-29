@@ -988,6 +988,15 @@ x = __ENCODING__
     assert_equal(-100, e.backtrace_locations.first.lineno, bug)
   end
 
+  def test_indented_multiline_comment
+    assert_valid_syntax("#{<<-"begin;"}\n#{<<-"end;"}")
+    begin;
+      =begin
+         <.><^>
+      =end
+    end;
+  end
+
 =begin
   def test_past_scope_variable
     assert_warning(/past scope/) {catch {|tag| eval("BEGIN{throw tag}; tap {a = 1}; a")}}
