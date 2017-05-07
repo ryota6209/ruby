@@ -74,21 +74,6 @@ branches:
     - /^feature\//
     - /^bug\//
 
-# We want to be notified when something happens.
-notifications:
-  irc:
-    channels:
-      - "chat.freenode.net#ruby-core"
-      - "chat.freenode.net#ruby-ja"
-    on_success: change # [always|never|change] # default: always
-    on_failure: always # [always|never|change] # default: always
-    template:
-      - "%{message} by @%{author}: See %{build_url}"
-
-  email:
-    - ko1c-failure@atdot.net
-    - shibata.hiroshi@gmail.com
-
 # Local Variables:
 # mode: YAML
 # coding: utf-8-unix
