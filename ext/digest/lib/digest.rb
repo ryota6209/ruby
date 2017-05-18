@@ -35,6 +35,16 @@ module Digest
       new(*args).file(name)
     end
 
+    # Creates a digest object and reads a given _stream_.
+    # Optional arguments are passed to the constructor of the digest
+    # class.
+    #
+    #   p open("X11R6.8.2-src.tar.bz2") {|f| Digest::SHA256.stream(f).hexdigest}
+    #   # => "f02e3c85572dc9ad7cb77c2a638e3be24cc1b5bea9fdbb0b0299c9668475c534"
+    def self.stream(io, *args)
+      new(*args).file(io)
+    end
+
     # Returns the base64 encoded hash value of a given _string_.  The
     # return value is properly padded with '=' and contains no line
     # feeds.
@@ -47,12 +57,22 @@ module Digest
     # Updates the digest with the contents of a given file _name_ and
     # returns self.
     def file(name)
+      if name.respond_to?(:read) and name.respond_to?(:eof?)
+        return stream(name)
+      end
       File.open(name, "rb") {|f|
-        buf = ""
-        while f.read(16384, buf)
-          update buf
-        end
+        stream(f)
       }
+    end
+
+    # Updates the digest with the contents of a given _stream_ and
+    # returns self.  _stream_ will be read from the current position
+    # to the end.
+    def stream(f)
+      buf = ""
+      while !f.eof? and f.read(16384, buf)
+        update buf
+      end
       self
     end
 

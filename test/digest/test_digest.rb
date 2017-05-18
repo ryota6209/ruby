@@ -4,6 +4,7 @@
 
 require 'test/unit'
 require 'tempfile'
+require 'stringio'
 
 require 'digest'
 %w[digest/md5 digest/rmd160 digest/sha1 digest/sha2 digest/bubblebabble].each do |lib|
@@ -89,6 +90,12 @@ module TestDigest
 
       assert_equal self.class::ALGO.new.update(str), self.class::ALGO.file(tmpfile.path)
     }
+  end
+
+  def test_s_stream
+    str = "hello, world.\r\n"
+    io = StringIO.new(str)
+    assert_equal self.class::ALGO.new.update(str), self.class::ALGO.stream(io)
   end
 
   def test_instance_eval
