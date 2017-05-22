@@ -367,7 +367,6 @@ apply2files(void (*func)(const char *, VALUE, void *), int argc, VALUE *argv, vo
 /*
  *  call-seq:
  *     file.path  ->  filename
- *     file.to_path  ->  filename
  *
  *  Returns the pathname used to create <i>file</i> as a string. Does
  *  not normalize the name.
@@ -390,6 +389,38 @@ rb_file_path(VALUE obj)
     if (NIL_P(fptr->pathv)) return Qnil;
     return rb_obj_taint(rb_str_dup(fptr->pathv));
 }
+
+#ifdef O_TMPFILE
+/*
+ *  call-seq:
+ *     file.to_path  ->  filename
+ *
+ *  Returns the pathname to open the <i>file</i> as a string.
+ *
+ *  The pathname may not point the file corresponding to <i>file</i>.
+ *  e.g. file has been moved, deleted, or created with <code>File::TMPFILE</code> option.
+ */
+
+static VALUE
+rb_file_to_path(VALUE obj)
+{
+    rb_io_t *fptr;
+    int flags;
+
+    fptr = RFILE(rb_io_taint_check(obj))->fptr;
+    rb_io_check_initialized(fptr);
+    flags = fcntl(fptr->fd, F_GETFL);
+    if (flags == -1) rb_sys_fail_path(fptr->pathv);
+    if ((flags & O_TMPFILE) == O_TMPFILE) {
+	rb_raise(rb_eIOError, "unnamed temporary file at %"PRIsVALUE,
+		 fptr->pathv);
+    }
+    if (NIL_P(fptr->pathv)) return Qnil;
+    return rb_obj_taint(rb_str_dup(fptr->pathv));
+}
+#else
+# define rb_file_to_path rb_file_path
+#endif
 
 static size_t
 stat_memsize(const void *p)
@@ -6140,7 +6171,7 @@ Init_File(void)
     rb_define_const(rb_mFConst, "NULL", rb_fstring_cstr(null_device));
 
     rb_define_method(rb_cFile, "path",  rb_file_path, 0);
-    rb_define_method(rb_cFile, "to_path",  rb_file_path, 0);
+    rb_define_method(rb_cFile, "to_path",  rb_file_to_path, 0);
     rb_define_global_function("test", rb_f_test, -1);
 
     rb_cStat = rb_define_class_under(rb_cFile, "Stat", rb_cObject);

@@ -1652,4 +1652,14 @@ class TestFileExhaustive < Test::Unit::TestCase
     dir = File.expand_path("/bar")
     assert_equal(File.join(dir, "~foo"), File.absolute_path("~foo", dir))
   end
+
+  if File.const_defined?(:TMPFILE)
+    def test_tmpfile_to_path
+      f = open(Dir.tmpdir, File::RDWR|File::TMPFILE)
+      assert_instance_of(File, f)
+      assert_raise_with_message(IOError, /unnamed temporary file/) {
+        open(f) {}
+      }
+    end
+  end
 end
