@@ -67,7 +67,7 @@ grep_i(RB_BLOCK_CALL_FUNC_ARGLIST(i, args))
     struct MEMO *memo = MEMO_CAST(args);
     ENUM_WANT_SVALUE();
 
-    if (RTEST(rb_funcall(memo->v1, id_eqq, 1, i)) == RTEST(memo->u3.value)) {
+    if (RTEST(rb_funcallv(memo->v1, id_eqq, 1, &i)) == RTEST(memo->u3.value)) {
 	rb_ary_push(memo->v2, i);
     }
     return Qnil;
@@ -79,7 +79,7 @@ grep_iter_i(RB_BLOCK_CALL_FUNC_ARGLIST(i, args))
     struct MEMO *memo = MEMO_CAST(args);
     ENUM_WANT_SVALUE();
 
-    if (RTEST(rb_funcall(memo->v1, id_eqq, 1, i)) == RTEST(memo->u3.value)) {
+    if (RTEST(rb_funcallv(memo->v1, id_eqq, 1, &i)) == RTEST(memo->u3.value)) {
 	rb_ary_push(memo->v2, enum_yield(argc, i));
     }
     return Qnil;
@@ -642,7 +642,7 @@ inject_op_i(RB_BLOCK_CALL_FUNC_ARGLIST(i, p))
     }
     else if (SYMBOL_P(name = memo->u3.value)) {
 	const ID mid = SYM2ID(name);
-	MEMO_V1_SET(memo, rb_funcall(memo->v1, mid, 1, i));
+	MEMO_V1_SET(memo, rb_funcallv(memo->v1, mid, 1, &i));
     }
     else {
 	VALUE args[2];
