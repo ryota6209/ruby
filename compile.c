@@ -404,6 +404,27 @@ compile_bug(rb_iseq_t *iseq, int line, const char *fmt, ...)
 
 #define COMPILE_ERROR append_compile_error
 
+NOINLINE(static struct rb_printf_output *prepare_badinsn_error(rb_iseq_t *iseq, struct rb_printf_output *to));
+static struct rb_printf_output *
+prepare_badinsn_error(rb_iseq_t *iseq, struct rb_printf_output *to)
+{
+    VALUE str = Qnil, err = ISEQ_COMPILE_DATA(iseq)->err_info;
+    if (err == Qtrue || err == Qfalse || compile_debug) {
+	if (!err) RB_OBJ_WRITE(iseq, &ISEQ_COMPILE_DATA(iseq)->err_info, Qtrue);
+	rb_printf_output_init_stdio(to, stderr);
+    }
+    else if (!NIL_P(err)) {
+	str = rb_attr_get(err, idMesg);
+    }
+    if (NIL_P(str)) {
+	str = rb_str_new_cstr("Bad instruction\n");
+	err = rb_exc_new_str(rb_eSyntaxError, str);
+	RB_OBJ_WRITE(iseq, &ISEQ_COMPILE_DATA(iseq)->err_info, err);
+	rb_set_errinfo(err);
+    }
+    return rb_printf_output_init_string(to, str);
+}
+
 #define ERROR_ARGS_AT(n) iseq, nd_line(n),
 #define ERROR_ARGS ERROR_ARGS_AT(node)
 
@@ -473,7 +494,7 @@ freeze_hide_obj(VALUE obj)
 #define gl_node_level ISEQ_COMPILE_DATA(iseq)->node_level
 #endif
 
-static void dump_disasm_list_with_cursor(const LINK_ELEMENT *link, const LINK_ELEMENT *curr, const LABEL *dest);
+static void dump_disasm_list_to(struct rb_printf_output *to, const LINK_ELEMENT *link, const LINK_ELEMENT *curr, const LABEL *dest);
 static void dump_disasm_list(const LINK_ELEMENT *elem);
 
 static int insn_data_length(INSN *iobj);
@@ -1610,7 +1631,8 @@ get_ivar_ic_value(rb_iseq_t *iseq,ID id)
 }
 
 #define BADINSN_DUMP(anchor, list, dest) \
-    dump_disasm_list_with_cursor(&anchor->anchor, list, dest)
+    dump_disasm_list_to(prepare_badinsn_error(iseq, RB_PRINTF_ALLOC()), \
+			&anchor->anchor, list, dest)
 
 #define BADINSN_ERROR \
     (xfree(generated_iseq), \
@@ -6854,45 +6876,45 @@ insn_data_to_s_detail(INSN *iobj)
 static void
 dump_disasm_list(const LINK_ELEMENT *link)
 {
-    dump_disasm_list_with_cursor(link, NULL, NULL);
+    dump_disasm_list_to(RB_PRINTF_INIT_STDIO(stdout), link, NULL, NULL);
 }
 
 static void
-dump_disasm_list_with_cursor(const LINK_ELEMENT *link, const LINK_ELEMENT *curr, const LABEL *dest)
+dump_disasm_list_to(struct rb_printf_output *to, const LINK_ELEMENT *link, const LINK_ELEMENT *curr, const LABEL *dest)
 {
     int pos = 0;
     INSN *iobj;
     LABEL *lobj;
     VALUE str;
 
-    printf("-- raw disasm--------\n");
+    rb_gen_printf(to, "-- raw disasm--------\n");
 
     while (link) {
-	if (curr) printf(curr == link ? "*" : " ");
+	if (curr) rb_gen_printf(to, curr == link ? "*" : " ");
 	switch (link->type) {
 	  case ISEQ_ELEMENT_INSN:
 	    {
 		iobj = (INSN *)link;
 		str = insn_data_to_s_detail(iobj);
-		printf("%04d %-65s(%4u)\n", pos, StringValueCStr(str), iobj->line_no);
+		rb_gen_printf(to, "%04d %-65s(%4u)\n", pos, StringValueCStr(str), iobj->line_no);
 		pos += insn_data_length(iobj);
 		break;
 	    }
 	  case ISEQ_ELEMENT_LABEL:
 	    {
 		lobj = (LABEL *)link;
-		printf(LABEL_FORMAT"%s\n", lobj->label_no, dest == lobj ? " <---" : "");
+		rb_gen_printf(to, LABEL_FORMAT"%s\n", lobj->label_no, dest == lobj ? " <---" : "");
 		break;
 	    }
 	  case ISEQ_ELEMENT_NONE:
 	    {
-		printf("[none]\n");
+		rb_gen_printf(to, "[none]\n");
 		break;
 	    }
 	  case ISEQ_ELEMENT_ADJUST:
 	    {
 		ADJUST *adjust = (ADJUST *)link;
-		printf("adjust: [label: %d]\n", adjust->label ? adjust->label->label_no : -1);
+		rb_gen_printf(to, "adjust: [label: %d]\n", adjust->label ? adjust->label->label_no : -1);
 		break;
 	    }
 	  default:
@@ -6901,8 +6923,8 @@ dump_disasm_list_with_cursor(const LINK_ELEMENT *link, const LINK_ELEMENT *curr,
 	}
 	link = link->next;
     }
-    printf("---------------------\n");
-    fflush(stdout);
+    rb_gen_printf(to, "---------------------\n");
+    rb_printf_output_finish(to);
 }
 
 const char *
