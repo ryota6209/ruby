@@ -1082,7 +1082,7 @@ new_callinfo(rb_iseq_t *iseq, ID mid, int argc, unsigned int flag, struct rb_cal
 	iseq->body->ci_size++;
     }
 
-    if (!(ci->flag & (VM_CALL_ARGS_SPLAT | VM_CALL_ARGS_BLOCKARG)) &&
+    if (!(ci->flag & (VM_CALL_ARGS_SPLAT | VM_CALL_ARGS_BLOCKARG | VM_CALL_KW_SPLAT)) &&
 	kw_arg == NULL && !has_blockiseq) {
 	ci->flag |= VM_CALL_ARGS_SIMPLE;
     }
@@ -3026,7 +3026,8 @@ compile_branch_condition(rb_iseq_t *iseq, LINK_ANCHOR *const ret, NODE *cond,
 static int
 compile_array_keyword_arg(rb_iseq_t *iseq, LINK_ANCHOR *const ret,
 			  const NODE *const root_node,
-			  struct rb_call_info_kw_arg **const kw_arg_ptr)
+			  struct rb_call_info_kw_arg **const kw_arg_ptr,
+			  unsigned int *flag)
 {
     if (kw_arg_ptr == NULL) return FALSE;
 
@@ -3041,6 +3042,7 @@ compile_array_keyword_arg(rb_iseq_t *iseq, LINK_ANCHOR *const ret,
 		/* can be keywords */
 	    }
 	    else {
+		if (flag) *flag |= VM_CALL_KW_SPLAT;
 		return FALSE;
 	    }
 	    node = node->nd_next; /* skip value node */
@@ -3110,7 +3112,8 @@ static_literal_value(NODE *node)
 
 static int
 compile_array_(rb_iseq_t *iseq, LINK_ANCHOR *const ret, NODE* node_root,
-	       enum compile_array_type_t type, struct rb_call_info_kw_arg **keywords_ptr, int popped)
+	       enum compile_array_type_t type, struct rb_call_info_kw_arg **keywords_ptr,
+	       unsigned int *flag, int popped)
 {
     NODE *node = node_root;
     int line = (int)nd_line(node);
@@ -3155,7 +3158,9 @@ compile_array_(rb_iseq_t *iseq, LINK_ANCHOR *const ret, NODE* node_root,
 		    opt_p = 0;
 		}
 
-		if (type == COMPILE_ARRAY_TYPE_ARGS && node->nd_next == NULL /* last node */ && compile_array_keyword_arg(iseq, anchor, node->nd_head, keywords_ptr)) {
+		if (type == COMPILE_ARRAY_TYPE_ARGS &&
+		    node->nd_next == NULL /* last node */ &&
+		    compile_array_keyword_arg(iseq, anchor, node->nd_head, keywords_ptr, flag)) {
 		    len--;
 		}
 		else {
@@ -3274,7 +3279,7 @@ compile_array_(rb_iseq_t *iseq, LINK_ANCHOR *const ret, NODE* node_root,
 static VALUE
 compile_array(rb_iseq_t *iseq, LINK_ANCHOR *const ret, NODE* node_root, enum compile_array_type_t type)
 {
-    return compile_array_(iseq, ret, node_root, type, NULL, 0);
+    return compile_array_(iseq, ret, node_root, type, NULL, NULL, 0);
 }
 
 static VALUE
@@ -3981,10 +3986,8 @@ setup_args(rb_iseq_t *iseq, LINK_ANCHOR *const args, NODE *argn,
 	    break;
 	  }
 	  case NODE_ARRAY:
-	    {
-		argc = INT2FIX(compile_array_(iseq, args, argn, COMPILE_ARRAY_TYPE_ARGS, keywords, FALSE));
-		break;
-	    }
+	    argc = INT2FIX(compile_array_(iseq, args, argn, COMPILE_ARRAY_TYPE_ARGS, keywords, flag, FALSE));
+	    break;
 	  default: {
 	    UNKNOWN_NODE("setup_arg", argn);
 	  }
@@ -5601,7 +5604,7 @@ iseq_compile_each0(rb_iseq_t *iseq, LINK_ANCHOR *const ret, NODE *node, int popp
 	break;
       }
       case NODE_ARRAY:{
-	compile_array_(iseq, ret, node, COMPILE_ARRAY_TYPE_ARRAY, NULL, popped);
+	compile_array_(iseq, ret, node, COMPILE_ARRAY_TYPE_ARRAY, NULL, NULL, popped);
 	break;
       }
       case NODE_ZARRAY:{
@@ -5629,7 +5632,7 @@ iseq_compile_each0(rb_iseq_t *iseq, LINK_ANCHOR *const ret, NODE *node, int popp
 	INIT_ANCHOR(list);
 	switch (type) {
 	  case NODE_ARRAY:
-	    compile_array_(iseq, list, node->nd_head, COMPILE_ARRAY_TYPE_HASH, NULL, popped);
+	    compile_array_(iseq, list, node->nd_head, COMPILE_ARRAY_TYPE_HASH, NULL, NULL, popped);
 	    ADD_SEQ(ret, list);
 	    break;
 
