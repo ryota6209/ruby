@@ -189,7 +189,8 @@ keyword_hash_p(VALUE *kw_hash_ptr, VALUE *rest_hash_ptr, rb_thread_t *th)
 }
 
 static VALUE
-args_pop_keyword_hash(struct args_info *args, VALUE *kw_hash_ptr, rb_thread_t *th)
+args_pop_keyword_hash(struct args_info *args, VALUE *kw_hash_ptr,
+		      int splat_kw, rb_thread_t *th)
 {
     VALUE rest_hash;
 
@@ -202,7 +203,7 @@ args_pop_keyword_hash(struct args_info *args, VALUE *kw_hash_ptr, rb_thread_t *t
 	    if (rest_hash) {
 		args->argv[args->argc-1] = rest_hash;
 	    }
-	    else {
+	    else if (!splat_kw || RHASH_EMPTY_P(*kw_hash_ptr)) {
 		args->argc--;
 		return TRUE;
 	    }
@@ -218,7 +219,7 @@ args_pop_keyword_hash(struct args_info *args, VALUE *kw_hash_ptr, rb_thread_t *t
 		if (rest_hash) {
 		    RARRAY_ASET(args->rest, len - 1, rest_hash);
 		}
-		else {
+		else if (!splat_kw || RHASH_EMPTY_P(*kw_hash_ptr)) {
 		    args->rest = rb_ary_dup(args->rest);
 		    rb_ary_pop(args->rest);
 		    return TRUE;
@@ -523,6 +524,7 @@ setup_parameters_complex(rb_thread_t * const th, const rb_iseq_t * const iseq,
     const int max_argc = (iseq->body->param.flags.has_rest == FALSE) ? min_argc + iseq->body->param.opt_num : UNLIMITED_ARGUMENTS;
     int opt_pc = 0;
     int given_argc;
+    int splat_kw = (ci->flag & VM_CALL_KW_SPLAT);
     struct args_info args_body, *args;
     VALUE keyword_hash = Qnil;
     VALUE * const orig_sp = th->ec.cfp->sp;
@@ -614,11 +616,11 @@ setup_parameters_complex(rb_thread_t * const th, const rb_iseq_t * const iseq,
 	}
     }
 
-    if (given_argc > min_argc &&
-	(iseq->body->param.flags.has_kw || iseq->body->param.flags.has_kwrest ||
-	 (!iseq->body->param.flags.has_rest && (ci->flag & VM_CALL_KW_SPLAT))) &&
-	args->kw_argv == NULL) {
-	if (args_pop_keyword_hash(args, &keyword_hash, th)) {
+    if (given_argc > min_argc && !args->kw_argv) {
+	if ((iseq->body->param.flags.has_kw ||
+	     iseq->body->param.flags.has_kwrest ||
+	     splat_kw) &&
+	    args_pop_keyword_hash(args, &keyword_hash, splat_kw, th)) {
 	    given_argc--;
 	}
     }
@@ -677,8 +679,9 @@ setup_parameters_complex(rb_thread_t * const th, const rb_iseq_t * const iseq,
     else if (iseq->body->param.flags.has_kwrest) {
 	args_setup_kw_rest_parameter(keyword_hash, locals + iseq->body->param.keyword->rest_start);
     }
-    else if (!NIL_P(keyword_hash) && RHASH_SIZE(keyword_hash) > 0) {
-	argument_kw_error(th, iseq, "unknown", rb_hash_keys(keyword_hash));
+    else if (arg_setup_type == arg_setup_method &&
+	     splat_kw && !NIL_P(keyword_hash) && !RHASH_EMPTY_P(keyword_hash)) {
+	argument_kw_error(th, iseq, "ignored", rb_hash_keys(keyword_hash));
     }
 
     if (iseq->body->param.flags.has_block) {
