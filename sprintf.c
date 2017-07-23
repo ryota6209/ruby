@@ -1506,6 +1506,58 @@ rb_printf_output_size(void)
     return sizeof(struct rb_printf_output);
 }
 
+static int
+ruby_iovwrite(register rb_printf_buffer *fp, register struct __suio *uio)
+{
+    struct __siov *iov;
+    VALUE io = (VALUE)fp->_bf._base;
+    int cnt = uio->uio_iovcnt;
+    for (iov = uio->uio_iov; cnt-- > 0; ++iov) {
+	if (rb_io_bufwrite(io, iov->iov_base, iov->iov_len) < 0)
+	    return -1;
+    }
+    return 0;
+}
+
+ssize_t
+rb_vioprintf(VALUE io, const char *fmt, va_list ap)
+{
+    rb_printf_buffer f;
+
+    f._flags = __SWR|__SLBF;
+    f._bf._base = (unsigned char *)io;
+    f.vwrite = ruby_iovwrite;
+    f.vextra = ruby__sfvextra;
+    return BSD_vfprintf(&f, fmt, ap);
+}
+
+ssize_t
+rb_ioprintf(VALUE io, const char *format, ...)
+{
+    ssize_t result;
+    va_list ap;
+
+    va_start(ap, format);
+    result = rb_vioprintf(io, format, ap);
+    va_end(ap);
+
+    return result;
+}
+
+struct rb_printf_output *
+rb_printf_output_init_io(void *ptr, VALUE io)
+{
+    struct rb_printf_output *buf = ptr;
+#define f buf->base
+
+    f._bf._base = (unsigned char *)io;
+    f._flags = __SWR;
+    f.vwrite = ruby_iovwrite;
+    f.vextra = ruby__sfvextra;
+#undef f
+    return buf;
+}
+
 struct rb_printf_output *
 rb_printf_output_init_string(void *ptr, VALUE str)
 {
@@ -1535,6 +1587,9 @@ rb_printf_output_finish(struct rb_printf_output *to)
 	VALUE str = (VALUE)to->base._bf._base;
 	RBASIC_SET_CLASS_RAW(str, to->klass);
 	rb_str_resize(str, (char *)to->base._p - RSTRING_PTR(str));
+    }
+    else if (to->base.vwrite == ruby_iovwrite) {
+	rb_io_flush((VALUE)to->base._bf._base);
     }
     return 0;
 }
