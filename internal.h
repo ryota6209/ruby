@@ -1584,16 +1584,21 @@ struct rb_printf_output;
 size_t rb_printf_output_size(void);
 struct rb_printf_output *rb_printf_output_init_string(void *ptr, VALUE str);
 struct rb_printf_output *rb_printf_output_init_io(void *ptr, VALUE io);
+struct rb_printf_output *rb_printf_output_init_stdio(void *ptr, FILE *out);
 int rb_printf_output_finish(struct rb_printf_output *to);
 ssize_t rb_gen_vprintf(struct rb_printf_output *to, const char *format, va_list ap);
 ssize_t rb_gen_printf(struct rb_printf_output *to, const char *format, ...);
 ssize_t rb_vioprintf(VALUE io, const char *format, va_list ap);
 ssize_t rb_ioprintf(VALUE io, const char *format, ...);
+ssize_t rb_vfprintf(FILE *out, const char *format, va_list ap);
+ssize_t rb_fprintf(FILE *out, const char *format, ...);
 #define RB_PRINTF_ALLOC() alloca(rb_printf_output_size())
 #define RB_PRINTF_INIT_STRING(str) \
     rb_printf_output_init_string(RB_PRINTF_ALLOC(), str)
 #define RB_PRINTF_INIT_IO(out) \
     rb_printf_output_init_io(RB_PRINTF_ALLOCA(), out)
+#define RB_PRINTF_INIT_STDIO(out) \
+    rb_printf_output_init_stdio(RB_PRINTF_ALLOC(), out)
 
 /* st.c */
 extern void rb_hash_bulk_insert(long, const VALUE *, VALUE);
