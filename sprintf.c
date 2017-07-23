@@ -1302,9 +1302,10 @@ ruby_snprintf(char *str, size_t n, char const *fmt, ...)
     return ret;
 }
 
-typedef struct {
+typedef struct rb_printf_output {
     rb_printf_buffer base;
     volatile VALUE value;
+    VALUE klass;
 } rb_printf_buffer_extra;
 
 static int
@@ -1466,7 +1467,6 @@ rb_str_vcatf(VALUE str, const char *fmt, va_list ap)
 {
     rb_printf_buffer_extra buffer;
 #define f buffer.base
-    VALUE klass;
 
     StringValue(str);
     rb_str_modify(str);
@@ -1475,13 +1475,13 @@ rb_str_vcatf(VALUE str, const char *fmt, va_list ap)
     f._w = rb_str_capacity(str);
     f._bf._base = (unsigned char *)str;
     f._p = (unsigned char *)RSTRING_END(str);
-    klass = RBASIC(str)->klass;
+    buffer.klass = RBASIC(str)->klass;
     RBASIC_CLEAR_CLASS(str);
     f.vwrite = ruby__sfvwrite;
     f.vextra = ruby__sfvextra;
     buffer.value = 0;
     BSD_vfprintf(&f, fmt, ap);
-    RBASIC_SET_CLASS_RAW(str, klass);
+    RBASIC_SET_CLASS_RAW(str, buffer.klass);
     rb_str_resize(str, (char *)f._p - RSTRING_PTR(str));
 #undef f
 
@@ -1498,4 +1498,62 @@ rb_str_catf(VALUE str, const char *format, ...)
     va_end(ap);
 
     return str;
+}
+
+size_t
+rb_printf_output_size(void)
+{
+    return sizeof(struct rb_printf_output);
+}
+
+struct rb_printf_output *
+rb_printf_output_init_string(void *ptr, VALUE str)
+{
+    struct rb_printf_output *buf = ptr;
+#define f buf->base
+
+    StringValue(str);
+    rb_str_modify(str);
+    f._flags = __SWR | __SSTR;
+    f._bf._size = 0;
+    f._w = rb_str_capacity(str);
+    f._bf._base = (unsigned char *)str;
+    f._p = (unsigned char *)RSTRING_END(str);
+    buf->klass = RBASIC(str)->klass;
+    RBASIC_CLEAR_CLASS(str);
+    f.vwrite = ruby__sfvwrite;
+    f.vextra = ruby__sfvextra;
+    buf->value = 0;
+#undef f
+    return buf;
+}
+
+int
+rb_printf_output_finish(struct rb_printf_output *to)
+{
+    if (to->base.vwrite == ruby__sfvwrite) {
+	VALUE str = (VALUE)to->base._bf._base;
+	RBASIC_SET_CLASS_RAW(str, to->klass);
+	rb_str_resize(str, (char *)to->base._p - RSTRING_PTR(str));
+    }
+    return 0;
+}
+
+ssize_t
+rb_gen_vprintf(struct rb_printf_output *to, const char *fmt, va_list ap)
+{
+    return BSD_vfprintf(&to->base, fmt, ap);
+}
+
+ssize_t
+rb_gen_printf(struct rb_printf_output *to, const char *format, ...)
+{
+    va_list ap;
+    ssize_t result;
+
+    va_start(ap, format);
+    result = rb_gen_vprintf(to, format, ap);
+    va_end(ap);
+
+    return result;
 }
