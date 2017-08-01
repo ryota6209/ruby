@@ -1074,6 +1074,10 @@ x = __ENCODING__
   def assert_nonascii_const
     NONASCII_CONSTANTS.each do |n|
       m = Module.new
+      assert_not_operator(m, :const_defined?, n)
+      assert_raise_with_message(NameError, /uninitialized/) do
+        m.const_get(n)
+      end
       assert_nil(eval("defined?(m::#{n})"))
 
       v = yield m, n
