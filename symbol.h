@@ -103,6 +103,7 @@ ID rb_intern_cstr_without_pindown(const char *, long, rb_encoding *);
 RUBY_SYMBOL_EXPORT_BEGIN
 
 size_t rb_sym_immortal_count(void);
+int rb_sym_constant_char_p(const char *name, long nlen, rb_encoding *enc);
 
 RUBY_SYMBOL_EXPORT_END
 #endif
