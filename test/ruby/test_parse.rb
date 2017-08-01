@@ -1069,6 +1069,37 @@ x = __ENCODING__
     assert_equal(1.3, o.x)
   end
 
+  NONASCII_CONSTANTS = %W"\u{00de} \u{1f2}"
+
+  def assert_nonascii_const
+    NONASCII_CONSTANTS.each do |n|
+      m = Module.new
+      assert_nil(eval("defined?(m::#{n})"))
+
+      v = yield m, n
+
+      assert_operator(m, :const_defined?, n)
+      assert_equal("constant", eval("defined?(m::#{n})"))
+      assert_same(v, m.const_get(n))
+
+      m.__send__(:remove_const, n)
+      assert_not_operator(m, :const_defined?, n)
+      assert_nil(eval("defined?(m::#{n})"))
+    end
+  end
+
+  def test_nonascii_const_set
+    assert_nonascii_const do |m, n|
+      m.const_set(n, 42)
+    end
+  end
+
+  def test_nonascii_constant
+    assert_nonascii_const do |m, n|
+      m.module_eval("class #{n}; self; end")
+    end
+  end
+
 =begin
   def test_past_scope_variable
     assert_warning(/past scope/) {catch {|tag| eval("BEGIN{throw tag}; tap {a = 1}; a")}}
