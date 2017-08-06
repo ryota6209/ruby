@@ -1014,7 +1014,12 @@ describe "A method" do
 
       h = mock("keyword splat")
       h.should_receive(:to_hash).and_return({"a" => 1, a: 2})
-      m(h).should == [{"a" => 1}, {a: 2}]
+      ruby_version_is ""..."2.5" do
+        m(h).should == [{"a" => 1}, {a: 2}]
+      end
+      ruby_version_is "2.5" do
+        m(h).should == [h, {a: 2}]
+      end
     end
 
     evaluate <<-ruby do

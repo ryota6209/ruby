@@ -178,6 +178,9 @@ keyword_hash_p(VALUE *kw_hash_ptr, VALUE *rest_hash_ptr, rb_thread_t *th)
 
     if (!NIL_P(*rest_hash_ptr)) {
 	VALUE hash = rb_extract_keywords(rest_hash_ptr);
+	if (*rest_hash_ptr && !RB_TYPE_P(*kw_hash_ptr, T_HASH)) {
+	    *rest_hash_ptr = *kw_hash_ptr;
+	}
 	if (!hash) hash = Qnil;
 	*kw_hash_ptr = hash;
 	return TRUE;

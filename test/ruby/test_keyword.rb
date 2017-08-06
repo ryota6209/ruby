@@ -501,6 +501,11 @@ class TestKeywordArguments < Test::Unit::TestCase
     assert_equal([1, 42, [], o, :key, {}, nil], f9(1, o))
     assert_equal([1, 9], m1(1, o) {|a, k: 0| break [a, k]}, bug10016)
     assert_equal([1, 9], m1(1, o, &->(a, k: 0) {break [a, k]}), bug10016)
+
+    o = Object.new
+    def o.to_hash() { "k" => 9 } end
+    def o.m(a = nil, k: 42) [a, k] end
+    assert_equal([o, 42], o.m(o))
   end
 
   def test_splat_hash

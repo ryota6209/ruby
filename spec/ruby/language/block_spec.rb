@@ -59,7 +59,12 @@ describe "A block yielded a single" do
       obj.should_receive(:to_hash).and_return({"a" => 1, b: 2})
 
       result = m([obj]) { |a=nil, **b| [a, b] }
-      result.should == [{"a" => 1}, b: 2]
+      ruby_version_is ""..."2.5" do
+        result.should == [{"a" => 1}, b: 2]
+      end
+      ruby_version_is "2.5" do
+        result.should == [obj, b: 2]
+      end
     end
 
     ruby_version_is "2.2.1" do # SEGV on MRI 2.2.0
@@ -68,7 +73,12 @@ describe "A block yielded a single" do
         obj.should_receive(:to_hash).and_return({"a" => 1, "b" => 2})
 
         result = m([obj]) { |a=nil, **b| [a, b] }
-        result.should == [{"a" => 1, "b" => 2}, {}]
+        ruby_version_is ""..."2.5" do
+          result.should == [{"a" => 1, "b" => 2}, {}]
+        end
+        ruby_version_is "2.5" do
+          result.should == [obj, {}]
+        end
       end
     end
 
