@@ -895,7 +895,7 @@ static void token_info_pop_gen(struct parser_params*, const char *token, size_t 
 %type <node> string_contents xstring_contents regexp_contents string_content
 %type <node> words symbols symbol_list qwords qsymbols word_list qword_list qsym_list word
 %type <node> literal numeric simple_numeric dsym cpath
-%type <node> top_compstmt top_stmts top_stmt
+%type <node> top_compstmt top_stmts top_stmt opt_inits inits init_asgn cleanup
 %type <node> bodystmt compstmt stmts stmt_or_begin stmt expr arg primary command command_call method_call
 %type <node> expr_value arg_value primary_value fcall
 %type <node> if_tail opt_else case_body cases opt_rescue exc_list exc_var opt_ensure
@@ -2470,21 +2470,22 @@ primary		: literal
 		    /*%
 		    %*/
 		    }
+		  opt_inits
 		  bodystmt
 		  k_end
 		    {
 			CMDARG_SET($<val>1);
 		    /*%%%*/
-			if ($3 == NULL) {
+			if ($4 == NULL) {
 			    $$ = NEW_NIL();
 			}
 			else {
-			    set_line_body($3, $<num>2);
-			    $$ = NEW_BEGIN($3);
+			    set_line_body($4, $<num>2);
+			    $$ = NEW_BEGIN($4);
 			}
 			nd_set_line($$, $<num>2);
 		    /*%
-			$$ = dispatch1(begin, $3);
+			$$ = dispatch1(begin, $4);
 		    %*/
 		    }
 		| tLPAREN_ARG {SET_LEX_STATE(EXPR_ENDARG);} rparen
@@ -2894,6 +2895,51 @@ primary		: literal
 			$$ = dispatch0(retry);
 		    %*/
 		    }
+		;
+
+opt_inits	: none
+		| '|' inits '|' {$$ = $2;}
+		| '|' '|' {$$ = 0;}
+		| tOROP {$$ = 0;}
+		;
+
+inits		: init_asgn
+		    {
+		    /*%%%*/
+			$$ = $1;
+		    /*%
+			$$ = rb_ary_new3(1, $1);
+		    %*/
+		    }
+		| inits term init_asgn
+		    {
+		    /*%%%*/
+			NODE *opts = $1;
+
+			while (opts->nd_next) {
+			    opts = opts->nd_next;
+			}
+			opts->nd_next = $3;
+			$$ = $1;
+		    /*%
+			$$ = rb_ary_push($1, $3);
+		    %*/
+		    }
+		;
+
+init_asgn	: primary_value tASSOC f_norm_arg cleanup
+		    {
+			$$ = assignable($3, $1);
+		    /*%%%*/
+			$$ = NEW_OPT_ARG(0, $$);
+		    /*%
+			$$ = rb_assoc_new($$, $1);
+		    %*/
+		    }
+		;
+
+cleanup 	: none
+		| '=' primary {$$ = $2;}
 		;
 
 primary_value	: primary
