@@ -2927,7 +2927,7 @@ inits		: init_asgn
 		    }
 		;
 
-init_asgn	: primary_value tASSOC f_norm_arg cleanup
+init_asgn	: primary_value tASSOC f_arg_asgn cleanup
 		    {
 			$$ = assignable($3, $1);
 		    /*%%%*/
@@ -2940,6 +2940,19 @@ init_asgn	: primary_value tASSOC f_norm_arg cleanup
 
 cleanup 	: none
 		| '=' primary {$$ = $2;}
+		| '=' call_op operation2
+		    {
+			$<id>1 = current_arg;
+			current_arg = 0;
+		    /*%%%*/
+			$<num>$ = ruby_sourceline;
+		    /*% %*/
+		    }
+		  opt_paren_args
+		    {
+			$$ = new_qcall($2, gettable($<id>1), $3, $5);
+			nd_set_line($$, $<num>4);
+		    }
 		;
 
 primary_value	: primary
