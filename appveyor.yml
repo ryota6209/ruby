@@ -16,7 +16,7 @@ install:
   - SET vcvars
   - '"%vcvars%" %Platform:x64=amd64%'
   - SET ruby_path=C:\Ruby%ruby_version:-x86=%
-  - SET PATH=\usr\local\bin;%ruby_path%\bin;%PATH%;C:\msys64\mingw64\bin;C:\msys64\usr\bin
+  - SET PATH=\usr\local\bin;%ruby_path%\bin;%PATH%
   - ruby --version
   - 'cl'
   - SET
