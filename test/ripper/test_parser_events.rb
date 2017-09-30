@@ -86,6 +86,10 @@ class TestRipper::ParserEvents < Test::Unit::TestCase
     assert_equal '[aliaserr(valias($a,$1))]', parse('alias $a $1')
   end
 
+  def test_anonymous_block_arg
+    assert_include parse('def f;m(&);end'), '&anonymous_block_arg'
+  end
+
   def test_arglist
     assert_equal '[fcall(m,[])]', parse('m()')
     assert_equal '[fcall(m,[1])]', parse('m(1)')

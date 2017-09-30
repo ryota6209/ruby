@@ -2335,6 +2335,14 @@ block_arg	: tAMPER arg_value
 			$$ = $2;
 		    %*/
 		    }
+		| tAMPER
+		    {
+		    /*%%%*/
+			$$ = NEW_BLOCK_PASS((NODE*)-1);
+		    /*%
+			$$ = dispatch0(anonymous_block_arg);
+		    %*/
+		    }
 		;
 
 opt_block_arg	: ',' block_arg

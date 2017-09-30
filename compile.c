@@ -1133,7 +1133,7 @@ new_callinfo(rb_iseq_t *iseq, ID mid, int argc, unsigned int flag, struct rb_cal
 	iseq->body->ci_size++;
     }
 
-    if (!(ci->flag & (VM_CALL_ARGS_SPLAT | VM_CALL_ARGS_BLOCKARG | VM_CALL_KW_SPLAT)) &&
+    if (!(ci->flag & (VM_CALL_ARGS_ANY_SPLAT | VM_CALL_ARGS_ANY_BLOCK)) &&
 	kw_arg == NULL && !has_blockiseq) {
 	ci->flag |= VM_CALL_ARGS_SIMPLE;
     }
@@ -2670,7 +2670,7 @@ iseq_specialized_instruction(rb_iseq_t *iseq, INSN *iobj)
 	    }
 	}
 
-	if ((ci->flag & VM_CALL_ARGS_BLOCKARG) == 0 && blockiseq == NULL) {
+	if ((ci->flag & VM_CALL_ARGS_ANY_BLOCK) == 0 && blockiseq == NULL) {
 	    iobj->insn_id = BIN(opt_send_without_block);
 	    iobj->operand_size = insn_len(iobj->insn_id) - 1;
 	}
@@ -4061,8 +4061,13 @@ setup_args(rb_iseq_t *iseq, LINK_ANCHOR *const args, NODE *argn,
     INIT_ANCHOR(arg_block);
     INIT_ANCHOR(args_splat);
     if (argn && nd_type(argn) == NODE_BLOCK_PASS) {
-	COMPILE(arg_block, "block", argn->nd_body);
-	*flag |= VM_CALL_ARGS_BLOCKARG;
+	if (argn->nd_body != (NODE *)-1) {
+	    COMPILE(arg_block, "block", argn->nd_body);
+	    *flag |= VM_CALL_ARGS_BLOCKARG;
+	}
+	else {
+	    *flag |= VM_CALL_ARGS_BLOCKPASS;
+	}
 	argn = argn->nd_head;
     }
 

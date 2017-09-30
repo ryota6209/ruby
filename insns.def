@@ -816,7 +816,8 @@ send
 {
     struct rb_calling_info calling;
 
-    vm_caller_setup_arg_block(th, reg_cfp, &calling, ci, blockiseq, FALSE);
+    vm_caller_setup_arg_block(th, reg_cfp, &calling, ci, blockiseq,
+			      (ci->flag & VM_CALL_ARGS_BLOCKPASS));
     vm_search_method(ci, cc, calling.recv = TOPN(calling.argc = ci->orig_argc));
     CALL_METHOD(&calling, ci, cc);
 }

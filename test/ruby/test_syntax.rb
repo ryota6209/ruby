@@ -237,6 +237,23 @@ class TestSyntax < Test::Unit::TestCase
     assert_syntax_error('def o.foo(@@foo: a) end', /class variable/)
   end
 
+  def test_block_passing
+    o = Object.new
+    def o.bar(*)
+      yield :ok
+    end
+    def o.foo
+    end
+    o.instance_eval('undef foo; def foo; bar(&); end')
+    assert_equal(:ok, o.foo {|x| break x})
+    o.instance_eval('undef foo; def foo; bar &; end')
+    assert_equal(:ok, o.foo {|x| break x})
+    o.instance_eval('undef foo; def foo; bar(1, &); end')
+    assert_equal(:ok, o.foo {|x| break x})
+    o.instance_eval('undef foo; def foo; bar 1, &; end')
+    assert_equal(:ok, o.foo {|x| break x})
+  end
+
   def test_optional_self_reference
     bug9593 = '[ruby-core:61299] [Bug #9593]'
     o = Object.new
