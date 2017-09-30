@@ -446,22 +446,24 @@ fgdbm_fetch_m(int argc, VALUE *argv, VALUE obj)
 static VALUE
 fgdbm_key(VALUE obj, VALUE valstr)
 {
+    datum key, val;
     struct dbmdata *dbmp;
     GDBM_FILE dbm;
-    VALUE keystr, valstr2;
+    long len;
 
     ExportStringValue(valstr);
+    len = RSTRING_LEN(valstr);
+    if (TOO_LONG(len)) return Qnil;
     GetDBM2(obj, dbmp, dbm);
-    for (keystr = rb_gdbm_firstkey(dbm); RTEST(keystr);
-         keystr = rb_gdbm_nextkey(dbm, keystr)) {
-
-        valstr2 = rb_gdbm_fetch2(dbm, keystr);
-        if (!NIL_P(valstr2) &&
-            (int)RSTRING_LEN(valstr) == (int)RSTRING_LEN(valstr2) &&
-            memcmp(RSTRING_PTR(valstr), RSTRING_PTR(valstr2),
-                   (int)RSTRING_LEN(valstr)) == 0) {
-            return keystr;
+    for (key = gdbm_firstkey(dbm); key.dptr; key = gdbm_nextkey(dbm, key)) {
+        val = gdbm_fetch(dbm, key);
+        if (!val.dptr) continue;
+        if ((long)val.dsize == RSTRING_LEN(valstr) &&
+            memcmp(RSTRING_PTR(valstr), val.dptr, val.dsize) == 0) {
+            free(val.dptr);
+            return rb_str_new(key.dptr, key.dsize);
         }
+        free(val.dptr);
     }
     return Qnil;
 }
@@ -854,17 +856,21 @@ fgdbm_empty_p(VALUE obj)
 static VALUE
 fgdbm_each_value(VALUE obj)
 {
+    datum key, val;
     struct dbmdata *dbmp;
     GDBM_FILE dbm;
-    VALUE keystr;
 
     RETURN_ENUMERATOR(obj, 0, 0);
 
     GetDBM2(obj, dbmp, dbm);
-    for (keystr = rb_gdbm_firstkey(dbm); RTEST(keystr);
-         keystr = rb_gdbm_nextkey(dbm, keystr)) {
-
-        rb_yield(rb_gdbm_fetch2(dbm, keystr));
+    for (key = gdbm_firstkey(dbm); key.dptr; key = gdbm_nextkey(dbm, key)) {
+        VALUE v = Qnil;
+        val = gdbm_fetch(dbm, key);
+        if (val.dptr) {
+            v = rb_tainted_str_new(val.dptr, val.dsize);
+            free(val.dptr);
+        }
+        rb_yield(v);
         GetDBM2(obj, dbmp, dbm);
     }
     return obj;
@@ -992,7 +998,7 @@ fgdbm_has_key(VALUE obj, VALUE keystr)
     long len;
 
     ExportStringValue(keystr);
-    len = RSTRING_LENINT(keystr);
+    len = RSTRING_LEN(keystr);
     if (TOO_LONG(len)) return Qfalse;
     key.dptr = RSTRING_PTR(keystr);
     key.dsize = (int)len;
@@ -1014,23 +1020,24 @@ fgdbm_has_key(VALUE obj, VALUE keystr)
 static VALUE
 fgdbm_has_value(VALUE obj, VALUE valstr)
 {
+    datum key, val;
     struct dbmdata *dbmp;
     GDBM_FILE dbm;
-    VALUE keystr, valstr2;
+    long len;
 
     ExportStringValue(valstr);
+    len = RSTRING_LEN(valstr);
     GetDBM2(obj, dbmp, dbm);
-    for (keystr = rb_gdbm_firstkey(dbm); RTEST(keystr);
-         keystr = rb_gdbm_nextkey(dbm, keystr)) {
-
-        valstr2 = rb_gdbm_fetch2(dbm, keystr);
-
-        if (!NIL_P(valstr2) &&
-            (int)RSTRING_LEN(valstr) == (int)RSTRING_LEN(valstr2) &&
-            memcmp(RSTRING_PTR(valstr), RSTRING_PTR(valstr2),
-                   (int)RSTRING_LEN(valstr)) == 0) {
+    if (TOO_LONG(len)) return Qnil;
+    for (key = gdbm_firstkey(dbm); key.dptr; key = gdbm_nextkey(dbm, key)) {
+        val = gdbm_fetch(dbm, key);
+        if (!val.dptr) continue;
+        if ((long)val.dsize == RSTRING_LEN(valstr) &&
+            memcmp(RSTRING_PTR(valstr), val.dptr, val.dsize) == 0) {
+            free(val.dptr);
             return Qtrue;
         }
+        free(val.dptr);
     }
     return Qfalse;
 }
