@@ -1928,36 +1928,36 @@ undef_list	: fitem
 		    }
 		;
 
-op		: '|'		{ $$ = TOKEN2EID('|'); }
-		| '^'		{ $$ = TOKEN2EID('^'); }
-		| '&'		{ $$ = TOKEN2EID('&'); }
-		| tCMP		{ $$ = TOKEN2EID(tCMP); }
-		| tEQ		{ $$ = TOKEN2EID(tEQ); }
-		| tEQQ		{ $$ = TOKEN2EID(tEQQ); }
-		| tMATCH	{ $$ = TOKEN2EID(tMATCH); }
-		| tNMATCH	{ $$ = TOKEN2EID(tNMATCH); }
-		| '>'		{ $$ = TOKEN2EID('>'); }
-		| tGEQ		{ $$ = TOKEN2EID(tGEQ); }
-		| '<'		{ $$ = TOKEN2EID('<'); }
-		| tLEQ		{ $$ = TOKEN2EID(tLEQ); }
-		| tNEQ		{ $$ = TOKEN2EID(tNEQ); }
-		| tLSHFT	{ $$ = TOKEN2EID(tLSHFT); }
-		| tRSHFT	{ $$ = TOKEN2EID(tRSHFT); }
-		| '+'		{ $$ = TOKEN2EID('+'); }
-		| '-'		{ $$ = TOKEN2EID('-'); }
-		| '*'		{ $$ = TOKEN2EID('*'); }
-		| tSTAR		{ $$ = TOKEN2EID('*'); }
-		| '/'		{ $$ = TOKEN2EID('/'); }
-		| '%'		{ $$ = TOKEN2EID('%'); }
-		| tPOW		{ $$ = TOKEN2EID(tPOW); }
-		| tDSTAR	{ $$ = TOKEN2EID(tDSTAR); }
-		| '!'		{ $$ = TOKEN2EID('!'); }
-		| '~'		{ $$ = TOKEN2EID('~'); }
-		| tUPLUS	{ $$ = TOKEN2EID(tUPLUS); }
-		| tUMINUS	{ $$ = TOKEN2EID(tUMINUS); }
-		| tAREF		{ $$ = TOKEN2EID(tAREF); }
-		| tASET		{ $$ = TOKEN2EID(tASET); }
-		| '`'		{ $$ = TOKEN2EID('`'); }
+op		: '|'		{ ifndef_ripper($$ = '|'); }
+		| '^'		{ ifndef_ripper($$ = '^'); }
+		| '&'		{ ifndef_ripper($$ = '&'); }
+		| tCMP		{ ifndef_ripper($$ = tCMP); }
+		| tEQ		{ ifndef_ripper($$ = tEQ); }
+		| tEQQ		{ ifndef_ripper($$ = tEQQ); }
+		| tMATCH	{ ifndef_ripper($$ = tMATCH); }
+		| tNMATCH	{ ifndef_ripper($$ = tNMATCH); }
+		| '>'		{ ifndef_ripper($$ = '>'); }
+		| tGEQ		{ ifndef_ripper($$ = tGEQ); }
+		| '<'		{ ifndef_ripper($$ = '<'); }
+		| tLEQ		{ ifndef_ripper($$ = tLEQ); }
+		| tNEQ		{ ifndef_ripper($$ = tNEQ); }
+		| tLSHFT	{ ifndef_ripper($$ = tLSHFT); }
+		| tRSHFT	{ ifndef_ripper($$ = tRSHFT); }
+		| '+'		{ ifndef_ripper($$ = '+'); }
+		| '-'		{ ifndef_ripper($$ = '-'); }
+		| '*'		{ ifndef_ripper($$ = '*'); }
+		| tSTAR		{ ifndef_ripper($$ = '*'); }
+		| '/'		{ ifndef_ripper($$ = '/'); }
+		| '%'		{ ifndef_ripper($$ = '%'); }
+		| tPOW		{ ifndef_ripper($$ = tPOW); }
+		| tDSTAR	{ ifndef_ripper($$ = tDSTAR); }
+		| '!'		{ ifndef_ripper($$ = '!'); }
+		| '~'		{ ifndef_ripper($$ = '~'); }
+		| tUPLUS	{ ifndef_ripper($$ = tUPLUS); }
+		| tUMINUS	{ ifndef_ripper($$ = tUMINUS); }
+		| tAREF		{ ifndef_ripper($$ = tAREF); }
+		| tASET		{ ifndef_ripper($$ = tASET); }
+		| '`'		{ ifndef_ripper($$ = '`'); }
 		;
 
 reswords	: keyword__LINE__ | keyword__FILE__ | keyword__ENCODING__
