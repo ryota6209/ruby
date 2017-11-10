@@ -853,13 +853,6 @@ test_ok($x[-1] == 20 && $x.pop == 20)
 test_ok(([1,2,3]&[2,4,6]) == [2])
 test_ok(([1,2,3]|[2,4,6]) == [1,2,3,4,6])
 
-# array union
-$x = [1,2,3]
-test_ok($x.union == [1,2,3])
-test_ok($x.union([2,4,6]) == [1,2,3,4,6,9])
-test_ok($x.union([2,4,6], [5,7,2]) == [1,2,3,4,6,5,7])
-test_ok($x == [1,2,3])
-
 # compact
 $x = [nil, 1, nil, nil, 5, nil, nil]
 $x.compact!

@@ -1881,6 +1881,18 @@ class TestArray < Test::Unit::TestCase
     assert_equal((1..128).to_a, b)
   end
 
+  def test_union
+    x = @cls[1,2,3]
+    assert_equal([1,2,3], x.union)
+    assert_equal([1,2,3,4,6], x.union([2,4,6]))
+    assert_equal([1,2,3,4,6,5,7], x.union([2,4,6], [5,7,2]))
+    assert_equal([1,2,3], x)
+    c = Struct.new(:to_ary)
+    obj = c.new([2,4,6])
+    assert_equal([1,2,3,4,6], x.union(obj))
+    assert_equal([1,2,3,4,6,5,7], x.union(obj, c.new([5,7,2])))
+  end
+
   def test_combination
     a = @cls[]
     assert_equal(1, a.combination(0).size)

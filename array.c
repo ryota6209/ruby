@@ -4291,7 +4291,6 @@ rb_ary_or(VALUE ary1, VALUE ary2)
     return ary3;
 }
 
-
 /*
  *  call-seq:
  *     ary.union(other_ary1, other_ary2,...)   -> ary
@@ -4312,12 +4311,29 @@ static VALUE
 rb_ary_union_multi(int argc, VALUE *argv, VALUE ary)
 {
     int i;
+    VALUE hash;
 
-    rb_ary_modify_check(ary);
-
-    for (i = 0; i < argc; i++) {
-        ary = rb_ary_or(ary, argv[i]);
+    switch (argc) {
+      case 0:
+	return rb_ary_new_from_values(RARRAY_LEN(ary), RARRAY_CONST_PTR(ary));
+      case 1:
+	return rb_ary_or(ary, argv[0]);
     }
+
+    hash = ary_make_hash(ary);
+    for (i = 0; i < argc; i++) {
+	long j;
+	VALUE ary2 = to_ary(argv[i]);
+	for (j = 0; j < RARRAY_LEN(ary2); j++) {
+	    st_data_t elt = (st_data_t)RARRAY_AREF(ary2, j);
+	    if (!st_update(RHASH_TBL_RAW(hash), elt, ary_hash_orset, elt)) {
+		RB_OBJ_WRITTEN(hash, Qundef, (VALUE)elt);
+	    }
+	}
+    }
+
+    ary = rb_hash_values(hash);
+    ary_recycle_hash(hash);
 
     return ary;
 }
