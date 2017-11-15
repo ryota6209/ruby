@@ -72,8 +72,39 @@ error_print(rb_execution_context_t *ec)
     rb_ec_error_print(ec, ec->errinfo);
 }
 
+static VALUE
+stderr_print_str(VALUE io, VALUE str)
+{
+    rb_write_error_str(str);
+    return INT2FIX(0);
+}
+
+static VALUE
+stderr_print_cstr(VALUE io, const char *mesg, long len)
+{
+    rb_write_error2(mesg, len);
+    return INT2FIX(0);
+}
+
+static VALUE
+rb_io_write_cstr(VALUE io, const char *mesg, long len)
+{
+    return rb_io_write(io, rb_str_new(mesg, len));
+}
+
+struct print_error_funcs {
+    VALUE (*str)(VALUE, VALUE);
+    VALUE (*cstr)(VALUE, const char *, long);
+};
+
+static const struct print_error_funcs print_errors[] = {
+    {stderr_print_str, stderr_print_cstr},
+    {rb_io_write, rb_io_write_cstr},
+};
+
 static void
-print_errinfo(const VALUE eclass, const VALUE errat, const VALUE emesg, int colored)
+print_errinfo(const struct print_error_funcs *f, VALUE to,
+	      const VALUE eclass, const VALUE errat, const VALUE emesg, int colored)
 {
     static const char underline[] = "\033[4;1m";
     static const char bold[] = "\033[1m";
@@ -85,33 +116,35 @@ print_errinfo(const VALUE eclass, const VALUE errat, const VALUE emesg, int colo
     if (emesg != Qundef) {
 	if (NIL_P(errat) || RARRAY_LEN(errat) == 0 ||
 	    NIL_P(mesg = RARRAY_AREF(errat, 0))) {
-	    error_pos();
+	    mesg = error_pos_str();
+	    if (!NIL_P(mesg)) f->str(to, mesg);
 	}
 	else {
-	    warn_print_str(mesg);
-	    warn_print(": ");
+	    f->str(to, mesg);
+	    f->cstr(to, ": ", 2);
 	}
 
         if (colored) warn_print(bold);
 
 	if (!NIL_P(emesg)) {
 	    einfo = RSTRING_PTR(emesg);
-            elen = RSTRING_LEN(emesg);
+	    elen = RSTRING_LEN(emesg);
 	}
     }
 
     if (eclass == rb_eRuntimeError && elen == 0) {
-        if (colored) warn_print(underline);
-	warn_print("unhandled exception\n");
+	const char unhandled[] = "unhandled exception\n";
+	if (colored) f->cstr(to, underline, sizeof(underline)-1);
+	f->cstr(to, unhandled, sizeof(unhandled)-1);
     }
     else {
 	VALUE epath;
 
 	epath = rb_class_name(eclass);
 	if (elen == 0) {
-            if (colored) warn_print(underline);
-	    warn_print_str(epath);
-	    warn_print("\n");
+	    if (colored) f->cstr(to, underline, sizeof(underline)-1);
+	    f->str(to, epath);
+	    f->cstr(to, "\n", 1);
 	}
 	else {
 	    const char *tail = 0;
@@ -123,26 +156,27 @@ print_errinfo(const VALUE eclass, const VALUE errat, const VALUE emesg, int colo
 		len = tail - einfo;
 		tail++;		/* skip newline */
 	    }
-	    warn_print_str(tail ? rb_str_subseq(emesg, 0, len) : emesg);
+	    f->str(to, tail ? rb_str_subseq(emesg, 0, len) : emesg);
 	    if (epath) {
-		warn_print(" (");
-                if (colored) warn_print(underline);
-                warn_print_str(epath);
-                if (colored) warn_print(reset);
-                if (colored) warn_print(bold);
-		warn_print(")\n");
+		f->cstr(to, " (", 2);
+		if (colored) f->cstr(to, underline, sizeof(underline)-1);
+		f->str(to, epath);
+		if (colored) f->cstr(to, reset, sizeof(underline)-1);
+		if (colored) f->cstr(to, bold, sizeof(bold)-1);
+		f->cstr(to, ")\n", 2);
 	    }
 	    if (tail) {
-		warn_print_str(rb_str_subseq(emesg, tail - einfo, elen - len - 1));
+		f->str(to, rb_str_subseq(emesg, tail - einfo, elen - len - 1));
 	    }
-	    if (tail ? einfo[elen-1] != '\n' : !epath) warn_print2("\n", 1);
+	    if (tail ? einfo[elen-1] != '\n' : !epath) f->cstr(to, "\n", 1);
 	}
     }
     if (colored) warn_print(reset);
 }
 
 static void
-print_backtrace(const VALUE eclass, const VALUE errat, int reverse)
+print_backtrace(const struct print_error_funcs *f, VALUE to,
+		const VALUE eclass, const VALUE errat, int reverse)
 {
     if (!NIL_P(errat)) {
 	long i;
@@ -163,27 +197,24 @@ print_backtrace(const VALUE eclass, const VALUE errat, int reverse)
 	    if (RB_TYPE_P(line, T_STRING)) {
 		VALUE str = rb_str_new_cstr("\t");
 		if (reverse) rb_str_catf(str, "%*ld: ", width, len - i);
-		warn_print_str(rb_str_catf(str, "from %"PRIsVALUE"\n", line));
+		f->str(to, rb_str_catf(str, "from %"PRIsVALUE"\n", line));
 	    }
 	    if (skip && i == TRACE_HEAD && len > TRACE_MAX) {
-		warn_print_str(rb_sprintf("\t ... %ld levels...\n",
-					  len - TRACE_HEAD - TRACE_TAIL));
+		f->str(to, rb_sprintf("\t ... %ld levels...\n",
+				      len - TRACE_HEAD - TRACE_TAIL));
 		i = len - TRACE_TAIL;
 	    }
 	}
     }
 }
 
-void
-rb_ec_error_print(rb_execution_context_t * volatile ec, volatile VALUE errinfo)
+static void
+exc_error_print(rb_execution_context_t *volatile ec, volatile VALUE errinfo, VALUE to)
 {
     volatile VALUE errat = Qundef;
-    volatile int raised_flag = ec->raised_flag;
     volatile VALUE eclass = Qundef, emesg = Qundef;
-
-    if (NIL_P(errinfo))
-	return;
-    rb_ec_raised_clear(ec);
+    int generic = to != rb_stderr;
+    const struct print_error_funcs *f = &print_errors[generic];
 
     EC_PUSH_TAG(ec);
     if (EC_EXEC_TAG() == TAG_NONE) {
@@ -202,19 +233,36 @@ rb_ec_error_print(rb_execution_context_t * volatile ec, volatile VALUE errinfo)
 	    emesg = e;
 	}
     }
-    if (rb_stderr_tty_p()) {
-	warn_print("\033[1mTraceback \033[m(most recent call last):\n");
-	print_backtrace(eclass, errat, TRUE);
-	print_errinfo(eclass, errat, emesg, TRUE);
+    if (!generic && rb_stderr_tty_p()) {
+	const char traceback[] = "\033[1mTraceback \033[m(most recent call last):\n";
+	f->cstr(to, traceback, sizeof(traceback)-1);
+	print_backtrace(f, to, eclass, errat, TRUE);
+	print_errinfo(f, to, eclass, errat, emesg, TRUE);
     }
     else {
-	print_errinfo(eclass, errat, emesg, FALSE);
-	print_backtrace(eclass, errat, FALSE);
+	print_errinfo(f, to, eclass, errat, emesg, FALSE);
+	print_backtrace(f, to, eclass, errat, FALSE);
     }
   error:
     EC_POP_TAG();
+}
+
+void
+rb_ec_error_print(rb_execution_context_t *volatile ec, volatile VALUE errinfo)
+{
+    volatile int raised_flag = ec->raised_flag;
+    if (NIL_P(errinfo))
+	return;
+    rb_ec_raised_clear(ec);
+    exc_error_print(ec, errinfo, rb_stderr);
     ec->errinfo = errinfo;
     rb_ec_raised_set(ec, raised_flag);
+}
+
+void
+rb_exc_display(VALUE errinfo, VALUE to)
+{
+    exc_error_print(GET_EC(), errinfo, to == Qundef ? rb_stderr : to);
 }
 
 #define undef_mesg_for(v, k) rb_fstring_cstr("undefined"v" method `%1$s' for "k" `%2$s'")

@@ -1154,6 +1154,18 @@ exc_equal(VALUE exc, VALUE obj)
     return Qtrue;
 }
 
+void rb_exc_display(VALUE errinfo, VALUE to);
+
+static VALUE
+exc_display(int argc, VALUE *argv, VALUE exc)
+{
+    VALUE to;
+    rb_scan_args(argc, argv, "01", &to);
+    if (NIL_P(to)) to = rb_stdout;
+    rb_exc_display(exc, to);
+    return Qnil;
+}
+
 /*
  * call-seq:
  *   SystemExit.new              -> system_exit
@@ -1788,7 +1800,6 @@ syserr_eqq(VALUE self, VALUE exc)
     return Qfalse;
 }
 
-
 /*
  *  Document-class: StandardError
  *
@@ -2188,6 +2199,7 @@ Init_Exception(void)
     rb_define_method(rb_eException, "backtrace_locations", exc_backtrace_locations, 0);
     rb_define_method(rb_eException, "set_backtrace", exc_set_backtrace, 1);
     rb_define_method(rb_eException, "cause", exc_cause, 0);
+    rb_define_method(rb_eException, "display", exc_display, -1);
 
     rb_eSystemExit  = rb_define_class("SystemExit", rb_eException);
     rb_define_method(rb_eSystemExit, "initialize", exit_initialize, -1);
