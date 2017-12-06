@@ -7935,6 +7935,51 @@ rb_method_for_self_aset(VALUE name, VALUE arg, rb_insn_func_t func)
     return method_for_self(name, arg, func, for_self_aset);
 }
 
+typedef struct {
+    ID mid;
+    VALUE feature;
+    int line;
+} autoload_args;
+
+rb_control_frame_t *
+FUNC_FASTCALL(rb_vm_opt_autoload_method)(rb_execution_context_t *ec, rb_control_frame_t *reg_cfp);
+static VALUE
+for_autoload_method(rb_iseq_t *iseq, LINK_ANCHOR *const ret, VALUE a)
+{
+    const accessor_args *const args = (void *)a;
+    const int line = args->line;
+    static const ID vars[] = {1, idUScore};
+
+    iseq_set_local_table(iseq, vars);
+    iseq->body->param.flags.has_rest = 1;
+    iseq->body->param.rest_start = 0;
+    iseq->body->param.post_start = 1;
+    iseq->body->param.size = 1;
+
+    ADD_INSN1(ret, line, putobject, args->arg);
+    ADD_INSN1(ret, line, opt_call_c_function, rb_vm_opt_autoload_method);
+    ADD_INSN(ret, line, pop);
+    ADD_INSN(ret, line, putself);
+    ADD_GETLOCAL(ret, line, numberof(vars)-1, 0);
+    ADD_SEND_WITH_FLAG(ret, line, (ID)args->func, INT2FIX(1),
+		       INT2FIX(VM_CALL_ARGS_SPLAT|VM_CALL_FCALL|VM_CALL_TAILCALL));
+    return Qnil;
+}
+
+VALUE
+rb_mod_autoload_method(VALUE klass, VALUE name, VALUE feat)
+{
+    ID mid;
+    const rb_iseq_t *iseq;
+
+    StringValueCStr(feat);
+    mid = rb_to_id(name);
+    name = ID2SYM(mid);
+    iseq = method_for_self(name, feat, (rb_insn_func_t)mid, for_autoload_method);
+    rb_add_method_iseq(klass, mid, iseq, NULL, METHOD_VISI_PUBLIC);
+    return name;
+}
+
 /* ISeq binary format */
 
 typedef unsigned int ibf_offset_t;

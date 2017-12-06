@@ -136,24 +136,9 @@ class IO
 end
 
 class Binding
-  def irb
-    require 'irb'
-    irb
-  end
-
-  # suppress redefinition warning
-  alias irb irb # :nodoc:
+  autoload_method :irb, 'irb'
 end
 
 module Kernel
-  # prints arguments in pretty form.
-  #
-  # pp returns argument(s).
-  def pp(*objs)
-    require 'pp'
-    pp(*objs)
-  end
-
-  # suppress redefinition warning
-  alias pp pp # :nodoc:
+  autoload_method :pp, 'pp'
 end

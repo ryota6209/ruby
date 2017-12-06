@@ -1869,6 +1869,33 @@ rb_mod_modfunc(int argc, VALUE *argv, VALUE module)
     return module;
 }
 
+static VALUE
+autoload_require(VALUE feat)
+{
+    return rb_funcallv(rb_vm_top_self(), rb_intern("require"), 1, &feat);
+}
+
+static VALUE
+autoload_reset(VALUE m)
+{
+    const rb_callable_method_entry_t *me = (const rb_callable_method_entry_t *)m;
+    me->def->alias_count--;
+    return Qnil;
+}
+
+rb_control_frame_t *
+FUNC_FASTCALL(rb_vm_opt_autoload_method)(rb_execution_context_t *ec, rb_control_frame_t *reg_cfp)
+{
+    const rb_callable_method_entry_t *me = rb_vm_frame_method_entry(reg_cfp);
+
+    if (!me) rb_raise(rb_eRuntimeError, "no method entry");
+    me->def->alias_count++;
+    rb_ensure(autoload_require, TOPN(0), autoload_reset, (VALUE)me);
+    return reg_cfp;
+}
+
+VALUE rb_mod_autoload_method(VALUE klass, VALUE name, VALUE feat);
+
 int
 rb_method_basic_definition_p(VALUE klass, ID id)
 {
@@ -2088,6 +2115,7 @@ Init_eval_method(void)
     rb_define_method(rb_cModule, "remove_method", rb_mod_remove_method, -1);
     rb_define_method(rb_cModule, "undef_method", rb_mod_undef_method, -1);
     rb_define_method(rb_cModule, "alias_method", rb_mod_alias_method, 2);
+    rb_define_method(rb_cModule, "autoload_method", rb_mod_autoload_method, 2); /* in compile.c */
     rb_define_private_method(rb_cModule, "public", rb_mod_public, -1);
     rb_define_private_method(rb_cModule, "protected", rb_mod_protected, -1);
     rb_define_private_method(rb_cModule, "private", rb_mod_private, -1);
