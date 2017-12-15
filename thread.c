@@ -90,9 +90,13 @@ static VALUE sym_on_blocking;
 static VALUE sym_never;
 static ID id_locals;
 
-static void sleep_timeval(rb_thread_t *th, struct timeval time, int spurious_check);
-static void sleep_wait_for_interrupt(rb_thread_t *th, double sleepsec, int spurious_check);
-static void sleep_forever(rb_thread_t *th, int nodeadlock, int spurious_check);
+typedef int (*wakeup_cond_func)(void *);
+static void sleep_timeval(rb_thread_t *th, struct timeval time, int spurious_check,
+			  wakeup_cond_func wake, void *warg);
+static void sleep_wait_for_interrupt(rb_thread_t *th, double sleepsec, int spurious_check,
+				     wakeup_cond_func wake, void *warg);
+static void sleep_forever(rb_thread_t *th, int nodeadlock, int spurious_check,
+			  wakeup_cond_func wake, void *warg);
 static void rb_thread_sleep_deadly_allow_spurious_wakeup(void);
 static double timeofday(void);
 static int rb_threadptr_dead(rb_thread_t *th);
@@ -873,6 +877,13 @@ remove_from_join_list(VALUE arg)
     return Qnil;
 }
 
+static int
+wake_join(void *arg)
+{
+    rb_thread_t *target_th = arg;
+    return target_th->status == THREAD_KILLED;
+}
+
 static VALUE
 thread_join_sleep(VALUE arg)
 {
@@ -883,13 +894,7 @@ thread_join_sleep(VALUE arg)
 
     while (target_th->status != THREAD_KILLED) {
 	if (forever) {
-	    th->status = THREAD_STOPPED_FOREVER;
-	    th->vm->sleeper++;
-	    rb_check_deadlock(th->vm);
-	    native_sleep(th, 0);
-	    th->vm->sleeper--;
-	    RUBY_VM_CHECK_INTS_BLOCKING(th->ec);
-	    th->status = THREAD_RUNNABLE;
+	    sleep_forever(th, TRUE, FALSE, wake_join, target_th);
 	}
 	else {
 	    double now = timeofday();
@@ -898,7 +903,7 @@ thread_join_sleep(VALUE arg)
 			     thread_id_str(target_th));
 		return Qfalse;
 	    }
-	    sleep_wait_for_interrupt(th, limit - now, 0);
+	    sleep_wait_for_interrupt(th, limit - now, 0, wake_join, target_th);
 	}
 	thread_debug("thread_join: interrupted (thid: %"PRI_THREAD_ID", status: %s)\n",
 		     thread_id_str(target_th), thread_status_name(target_th, TRUE));
@@ -1094,14 +1099,15 @@ double2timeval(double d)
 }
 
 static void
-sleep_forever(rb_thread_t *th, int deadlockable, int spurious_check)
+sleep_forever(rb_thread_t *th, int deadlockable, int spurious_check,
+	      wakeup_cond_func wake, void *warg)
 {
     enum rb_thread_status prev_status = th->status;
     enum rb_thread_status status = deadlockable ? THREAD_STOPPED_FOREVER : THREAD_STOPPED;
 
     th->status = status;
     RUBY_VM_CHECK_INTS_BLOCKING(th->ec);
-    while (th->status == status) {
+    while (!(wake && wake(warg)) && th->status == status) {
 	if (deadlockable) {
 	    th->vm->sleeper++;
 	    rb_check_deadlock(th->vm);
@@ -1135,7 +1141,8 @@ getclockofday(struct timeval *tp)
 }
 
 static void
-sleep_timeval(rb_thread_t *th, struct timeval tv, int spurious_check)
+sleep_timeval(rb_thread_t *th, struct timeval tv, int spurious_check,
+	      wakeup_cond_func wake, void *warg)
 {
     struct timeval to, tvn;
     enum rb_thread_status prev_status = th->status;
@@ -1156,7 +1163,7 @@ sleep_timeval(rb_thread_t *th, struct timeval tv, int spurious_check)
 
     th->status = THREAD_STOPPED;
     RUBY_VM_CHECK_INTS_BLOCKING(th->ec);
-    while (th->status == THREAD_STOPPED) {
+    while (!(wake && wake(warg)) && th->status == THREAD_STOPPED) {
 	native_sleep(th, &tv);
 	RUBY_VM_CHECK_INTS_BLOCKING(th->ec);
 	getclockofday(&tvn);
@@ -1180,21 +1187,21 @@ void
 rb_thread_sleep_forever(void)
 {
     thread_debug("rb_thread_sleep_forever\n");
-    sleep_forever(GET_THREAD(), FALSE, TRUE);
+    sleep_forever(GET_THREAD(), FALSE, TRUE, NULL, NULL);
 }
 
 void
 rb_thread_sleep_deadly(void)
 {
     thread_debug("rb_thread_sleep_deadly\n");
-    sleep_forever(GET_THREAD(), TRUE, TRUE);
+    sleep_forever(GET_THREAD(), TRUE, TRUE, NULL, NULL);
 }
 
 static void
 rb_thread_sleep_deadly_allow_spurious_wakeup(void)
 {
     thread_debug("rb_thread_sleep_deadly_allow_spurious_wakeup\n");
-    sleep_forever(GET_THREAD(), TRUE, FALSE);
+    sleep_forever(GET_THREAD(), TRUE, FALSE, NULL, NULL);
 }
 
 static double
@@ -1216,16 +1223,17 @@ timeofday(void)
 }
 
 static void
-sleep_wait_for_interrupt(rb_thread_t *th, double sleepsec, int spurious_check)
+sleep_wait_for_interrupt(rb_thread_t *th, double sleepsec, int spurious_check,
+			 wakeup_cond_func wake, void *warg)
 {
-    sleep_timeval(th, double2timeval(sleepsec), spurious_check);
+    sleep_timeval(th, double2timeval(sleepsec), spurious_check, wake, warg);
 }
 
 void
 rb_thread_wait_for(struct timeval time)
 {
     rb_thread_t *th = GET_THREAD();
-    sleep_timeval(th, time, 1);
+    sleep_timeval(th, time, 1, NULL, NULL);
 }
 
 /*

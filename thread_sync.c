@@ -428,7 +428,7 @@ static VALUE
 rb_mutex_wait_for(VALUE time)
 {
     struct timeval *t = (struct timeval *)time;
-    sleep_timeval(GET_THREAD(), *t, 0); /* permit spurious check */
+    sleep_timeval(GET_THREAD(), *t, 0, NULL, NULL); /* permit spurious check */
     return Qnil;
 }
 
