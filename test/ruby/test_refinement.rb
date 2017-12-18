@@ -1694,9 +1694,10 @@ class TestRefinement < Test::Unit::TestCase
   end
 
   def test_method_missing
-    assert_raise(NoMethodError) do
+    result = assert_nothing_raised(NoMethodError) do
       MethodMissing.call_undefined_method
     end
+    assert_equal("method_missing refined", result)
   end
 
   module VisibleRefinements

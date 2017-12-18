@@ -1898,7 +1898,7 @@ basic_obj_respond_to_missing(rb_execution_context_t *ec, VALUE klass, VALUE obj,
     VALUE defined_class, args[2];
     const ID rtmid = idRespond_to_missing;
     const rb_method_entry_t *const me =
-	method_entry_get(klass, rtmid, &defined_class);
+	method_entry_resolve_refinement(klass, rtmid, TRUE, &defined_class);
 
     if (!me || METHOD_ENTRY_BASIC(me)) return Qundef;
     args[0] = mid;
