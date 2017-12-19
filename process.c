@@ -92,6 +92,9 @@ int initgroups(const char *, rb_gid_t);
 #define open	rb_w32_uopen
 #endif
 
+void rb_register_child_process(rb_pid_t pid);
+void rb_unregister_child_process(rb_pid_t pid);
+
 #if defined(HAVE_TIMES) || defined(_WIN32)
 static VALUE rb_cProcessTms;
 #endif
@@ -925,6 +928,7 @@ rb_waitpid(rb_pid_t pid, int *st, int flags)
 	}
     }
     if (result > 0) {
+	rb_unregister_child_process(result);
 	rb_last_status_set(*st, result);
     }
     return result;
@@ -4045,17 +4049,9 @@ rb_f_system(int argc, VALUE *argv)
     rb_pid_t pid;
     int status;
 
-#if defined(SIGCLD) && !defined(SIGCHLD)
-# define SIGCHLD SIGCLD
-#endif
-
-#ifdef SIGCHLD
-    RETSIGTYPE (*chfunc)(int);
-
     rb_last_status_clear();
-    chfunc = signal(SIGCHLD, SIG_DFL);
-#endif
     pid = rb_spawn_internal(argc, argv, NULL, 0);
+    rb_register_child_process(pid);
 #if defined(HAVE_WORKING_FORK) || defined(HAVE_SPAWNV)
     if (pid > 0) {
         int ret, status;
@@ -4063,9 +4059,6 @@ rb_f_system(int argc, VALUE *argv)
         if (ret == (rb_pid_t)-1)
             rb_sys_fail("Another thread waited the process started by system().");
     }
-#endif
-#ifdef SIGCHLD
-    signal(SIGCHLD, chfunc);
 #endif
     if (pid < 0) {
 	return Qnil;
