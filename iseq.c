@@ -1434,7 +1434,8 @@ rb_insn_operand_intern(const rb_iseq_t *iseq,
       case TS_LINDEX:{
 	int level;
 	if (insn == BIN(getlocal) || insn == BIN(setlocal) ||
-	    insn == BIN(getblockparam) || insn == BIN(setblockparam)) {
+	    insn == BIN(getblockparam) || insn == BIN(setblockparam) ||
+	    insn == BIN(opt_blockparam_yield)) {
 	    if (pnop) {
 		ret = local_var_name(iseq, *pnop, op);
 	    }

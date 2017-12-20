@@ -294,6 +294,8 @@ static void vm_collect_usage_register(int reg, int isset);
 static VALUE vm_make_env_object(const rb_execution_context_t *ec, rb_control_frame_t *cfp);
 static VALUE vm_invoke_bmethod(rb_execution_context_t *ec, rb_proc_t *proc, VALUE self, int argc, const VALUE *argv, VALUE block_handler);
 static VALUE vm_invoke_proc(rb_execution_context_t *ec, rb_proc_t *proc, VALUE self, int argc, const VALUE *argv, VALUE block_handler);
+static VALUE vm_yield_with_block(rb_execution_context_t *ec, int argc, const VALUE *argv, VALUE block_handler);
+static rb_method_entry_t *method_entry_get(VALUE klass, ID id, VALUE *defined_class_ptr);
 
 #include "vm_insnhelper.h"
 #include "vm_exec.h"

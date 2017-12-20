@@ -3846,3 +3846,51 @@ vm_trace(rb_execution_context_t *ec, rb_control_frame_t *reg_cfp, const VALUE *p
 	}
     }
 }
+
+static VALUE
+vm_opt_getblockparam(lindex_t idx, rb_num_t level,
+		     rb_execution_context_t *ec, const VALUE *ep)
+{
+    VALUE val;
+
+    if (!VM_ENV_FLAGS(ep, VM_FRAME_FLAG_MODIFIED_BLOCK_PARAM)) {
+	val = rb_vm_bh_to_procval(ec, VM_ENV_BLOCK_HANDLER(ep));
+	vm_env_write(ep, -(int)idx, val);
+	VM_ENV_FLAGS_SET(ep, VM_FRAME_FLAG_MODIFIED_BLOCK_PARAM);
+    }
+    else {
+	val = *(ep - idx);
+	RB_DEBUG_COUNTER_INC(lvar_get);
+	(void)RB_DEBUG_COUNTER_INC_IF(lvar_get_dynamic, level > 0);
+    }
+    return val;
+}
+
+static int
+vm_opt_blockparam_yield_p(CALL_INFO ci, const VALUE *ep)
+{
+    if (!VM_ENV_FLAGS(ep, VM_FRAME_FLAG_MODIFIED_BLOCK_PARAM)) {
+	const rb_method_entry_t *me;
+	VALUE klass, bh = VM_ENV_BLOCK_HANDLER(ep);
+	if (bh == VM_BLOCK_HANDLER_NONE) {
+	    klass = rb_cNilClass;
+	}
+	else if (vm_block_handler_type(bh) == block_handler_type_proc) {
+#if 0
+	    klass = CLASS_OF(VM_BH_TO_PROC(bh));
+#else
+	    /* may need to set safe level */
+	    return FALSE;
+#endif
+	}
+	else {
+	    klass = rb_cProc;
+	}
+	me = method_entry_get(klass, ci->mid, &klass);
+	if (me && me->def->type == VM_METHOD_TYPE_OPTIMIZED &&
+	    me->def->body.optimize_type == OPTIMIZED_METHOD_TYPE_CALL) {
+	    return TRUE;
+	}
+    }
+    return FALSE;
+}

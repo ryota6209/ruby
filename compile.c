@@ -6011,6 +6011,7 @@ iseq_compile_each0(rb_iseq_t *iseq, LINK_ANCHOR *const ret, const NODE *node, in
 	ID mid = node->nd_mid;
 	VALUE argc;
 	unsigned int flag = 0;
+	int idx = -1, level = -1;
 	struct rb_call_info_kw_arg *keywords = NULL;
 	const rb_iseq_t *parent_block = ISEQ_COMPILE_DATA(iseq)->current_block;
 	ISEQ_COMPILE_DATA(iseq)->current_block = NULL;
@@ -6082,15 +6083,29 @@ iseq_compile_each0(rb_iseq_t *iseq, LINK_ANCHOR *const ret, const NODE *node, in
 	    }
 	}
 #endif
+	if ((type == NODE_CALL || type == NODE_OPCALL || type == NODE_QCALL) &&
+	    (mid == idCall || mid == idAREF) &&
+	    node->nd_recv && nd_type(node->nd_recv) == NODE_LVAR) {
+	    idx = iseq->body->local_iseq->body->local_table_size
+		- get_local_var_idx(iseq, node->nd_recv->nd_vid);
+	    level = get_lvar_level(iseq);
+	    if (!iseq_local_block_param_p(iseq, idx, level)) level = -1;
+	}
+
 	/* receiver */
 	if (type == NODE_CALL || type == NODE_OPCALL || type == NODE_QCALL) {
-	    CHECK(COMPILE(recv, "recv", node->nd_recv));
+	    if (level < 0) {
+		CHECK(COMPILE(recv, "recv", node->nd_recv));
+	    }
+	    else if (type == NODE_QCALL) {
+		compile_defined_yield(iseq, recv, nd_line(node->nd_recv), Qfalse);
+	    }
 	    if (type == NODE_QCALL) {
 		else_label = NEW_LABEL(line);
 		end_label = NEW_LABEL(line);
 
 		DECL_BRANCH_BASE(branches, nd_first_lineno(node), nd_first_column(node), nd_last_lineno(node), nd_last_column(node), "&.");
-		ADD_INSN(recv, line, dup);
+		if (level < 0) ADD_INSN(recv, line, dup);
 		ADD_INSNL(recv, line, branchnil, else_label);
 		ADD_TRACE_BRANCH_COVERAGE(recv, nd_first_lineno(node), nd_first_column(node), nd_last_lineno(node), nd_last_column(node), "then", branches);
 	    }
@@ -6122,7 +6137,19 @@ iseq_compile_each0(rb_iseq_t *iseq, LINK_ANCHOR *const ret, const NODE *node, in
 	    flag |= VM_CALL_FCALL;
 	}
 
-	ADD_SEND_R(ret, line, mid, argc, parent_block, INT2FIX(flag), keywords);
+	if (level >= 0) {
+	    VALUE *operands = (VALUE *)compile_data_alloc(iseq, sizeof(VALUE) * 5);
+	    if (type == NODE_QCALL) flag |= VM_CALL_FCALL;
+	    operands[0] = INT2FIX((idx) + VM_ENV_DATA_SIZE - 1);
+	    operands[1] = INT2FIX(level);
+	    operands[2] = (VALUE)new_callinfo(iseq, mid, FIX2INT(argc), flag, keywords, 0);
+	    operands[3] = Qfalse; /* cache */
+	    operands[4] = (VALUE)parent_block;
+	    ADD_ELEM(ret, (LINK_ELEMENT *)new_insn_core(iseq, line, BIN(opt_blockparam_yield), 5, operands));
+	}
+	else {
+	    ADD_SEND_R(ret, line, mid, argc, parent_block, INT2FIX(flag), keywords);
+	}
 
 	if (else_label && end_label) {
 	    ADD_INSNL(ret, line, jump, end_label);
