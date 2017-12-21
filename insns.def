@@ -926,21 +926,12 @@ opt_blockparam_yield
     calling.argc = ci->orig_argc;
     proc = vm_opt_blockparam_yield_p(ci, ep);
     if (proc) {
-	int argc;
-	volatile int safe = ec->safe_level;
-	enum ruby_tag_type state;
 	vm_caller_setup_arg_block(ec, reg_cfp, &calling, ci, blockiseq, FALSE);
 	CALLER_SETUP_ARG(ec->cfp, &calling, ci);
-	argc = calling.argc;
-	EC_PUSH_TAG(ec);
-	if ((state = EC_EXEC_TAG()) == TAG_NONE) {
-	    val = vm_yield_with_block(ec, argc, STACK_ADDR_FROM_TOP(argc),
+	val = vm_opt_blockparam_yield(ec, calling.argc,
+				      STACK_ADDR_FROM_TOP(calling.argc),
 				      calling.block_handler);
-	}
-	EC_POP_TAG();
-	ec->safe_level = safe;
-	if (state) EC_JUMP_TAG(ec, state);
-	POPN(argc);
+	POPN(calling.argc);
 	if (val == Qundef) {
 	    RESTORE_REGS();
 	    NEXT_INSN();

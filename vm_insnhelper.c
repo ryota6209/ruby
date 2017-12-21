@@ -3889,3 +3889,20 @@ vm_opt_blockparam_yield_p(CALL_INFO ci, const VALUE *ep)
     }
     return FALSE;
 }
+
+static VALUE
+vm_opt_blockparam_yield(rb_execution_context_t *ec, int argc, const VALUE *argv, VALUE block_handler)
+{
+    VALUE val;
+    volatile int safe = ec->safe_level;
+    enum ruby_tag_type state;
+
+    EC_PUSH_TAG(ec);
+    if ((state = EC_EXEC_TAG()) == TAG_NONE) {
+	val = vm_yield_with_block(ec, argc, argv, block_handler);
+    }
+    EC_POP_TAG();
+    ec->safe_level = safe;
+    if (state) EC_JUMP_TAG(ec, state);
+    return val;
+}
