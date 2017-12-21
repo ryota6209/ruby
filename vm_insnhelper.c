@@ -3876,12 +3876,7 @@ vm_opt_blockparam_yield_p(CALL_INFO ci, const VALUE *ep)
 	    klass = rb_cNilClass;
 	}
 	else if (vm_block_handler_type(bh) == block_handler_type_proc) {
-#if 0
 	    klass = CLASS_OF(VM_BH_TO_PROC(bh));
-#else
-	    /* may need to set safe level */
-	    return FALSE;
-#endif
 	}
 	else {
 	    klass = rb_cProc;
