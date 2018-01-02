@@ -3996,18 +3996,30 @@ rb_ary_includes(VALUE ary, VALUE item)
 }
 
 static VALUE
-rb_ary_includes_by_eql(VALUE ary, VALUE item)
+rb_ary_push_unique(VALUE result, VALUE ary, VALUE hashes, VALUE item)
 {
     long i;
-    VALUE e;
+    VALUE e, h, h2;
 
+    h = rb_hash(item);
     for (i=0; i<RARRAY_LEN(ary); i++) {
+	h2 = rb_ary_entry(hashes, i);
+	if (!NIL_P(h2) && h != h2) continue;
 	e = RARRAY_AREF(ary, i);
+	if (NIL_P(h2)) {
+	    h2 = rb_hash(e);
+	    RARRAY_ASET(hashes, i, h2);
+	    if (h != h2) continue;
+	}
 	if (rb_eql(item, e)) {
-	    return Qtrue;
+	    return Qfalse;
 	}
     }
-    return Qfalse;
+    if (!NIL_P(result)) {
+	if (result == ary) rb_ary_push(hashes, h);
+	rb_ary_push(result, item);
+    }
+    return Qtrue;
 }
 
 static VALUE
@@ -4164,10 +4176,10 @@ rb_ary_diff(VALUE ary1, VALUE ary2)
     ary3 = rb_ary_new();
 
     if (RARRAY_LEN(ary1) <= SMALL_ARRAY_LEN || RARRAY_LEN(ary2) <= SMALL_ARRAY_LEN) {
+	VALUE hashes = rb_ary_tmp_new(RARRAY_LEN(ary2));
 	for (i=0; i<RARRAY_LEN(ary1); i++) {
 	    VALUE elt = rb_ary_elt(ary1, i);
-	    if (rb_ary_includes_by_eql(ary2, elt)) continue;
-	    rb_ary_push(ary3, elt);
+	    rb_ary_push_unique(ary3, ary2, hashes, elt);
 	}
 	return ary3;
     }
@@ -4210,11 +4222,12 @@ rb_ary_and(VALUE ary1, VALUE ary2)
     if (RARRAY_LEN(ary2) == 0) return ary3;
 
     if (RARRAY_LEN(ary1) <= SMALL_ARRAY_LEN && RARRAY_LEN(ary2) <= SMALL_ARRAY_LEN) {
+	VALUE hashes2 = rb_ary_tmp_new(RARRAY_LEN(ary2));
+	VALUE hashes3 = rb_ary_tmp_new(RARRAY_LEN(ary3));
 	for (i=0; i<RARRAY_LEN(ary1); i++) {
 	    v = RARRAY_AREF(ary1, i);
-	    if (!rb_ary_includes_by_eql(ary2, v)) continue;
-	    if (rb_ary_includes_by_eql(ary3, v)) continue;
-	    rb_ary_push(ary3, v);
+	    if (rb_ary_push_unique(Qnil, ary2, hashes2, v)) continue;
+	    rb_ary_push_unique(ary3, ary3, hashes3, v);
 	}
 	return ary3;
     }
@@ -4265,16 +4278,15 @@ rb_ary_or(VALUE ary1, VALUE ary2)
 
     ary2 = to_ary(ary2);
     if (RARRAY_LEN(ary1) + RARRAY_LEN(ary2) <= SMALL_ARRAY_LEN) {
+	VALUE hashes = rb_ary_tmp_new(SMALL_ARRAY_LEN);
 	ary3 = rb_ary_new();
 	for (i=0; i<RARRAY_LEN(ary1); i++) {
 	    VALUE elt = rb_ary_elt(ary1, i);
-	    if (rb_ary_includes_by_eql(ary3, elt)) continue;
-	    rb_ary_push(ary3, elt);
+	    rb_ary_push_unique(ary3, ary3, hashes, elt);
 	}
 	for (i=0; i<RARRAY_LEN(ary2); i++) {
 	    VALUE elt = rb_ary_elt(ary2, i);
-	    if (rb_ary_includes_by_eql(ary3, elt)) continue;
-	    rb_ary_push(ary3, elt);
+	    rb_ary_push_unique(ary3, ary3, hashes, elt);
 	}
 	return ary3;
     }
