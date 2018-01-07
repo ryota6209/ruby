@@ -1124,5 +1124,8 @@ $stderr = $stdout; raise "\x82\xa0"') do |outs, errs, status|
 
     _, err2, status1 = EnvUtil.invoke_ruby(['-e', "#{test_method}; begin; foo; end"], '', true, true)
     assert_equal(err2, out1)
+
+    e = RuntimeError.new("testerror")
+    assert_not_match(/\e/, e.full_message(highlight: false))
   end
 end

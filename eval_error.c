@@ -79,12 +79,13 @@ error_print(rb_execution_context_t *ec)
     rb_ec_error_print(ec, ec->errinfo);
 }
 
+static const char underline[] = "\033[4;1m";
+static const char bold[] = "\033[1m";
+static const char reset[] = "\033[m";
+
 static void
 print_errinfo(const VALUE eclass, const VALUE errat, const VALUE emesg, const VALUE str, int highlight)
 {
-    static const char underline[] = "\033[4;1m";
-    static const char bold[] = "\033[1m";
-    static const char reset[] = "\033[m";
     const char *einfo = "";
     long elen = 0;
     VALUE mesg;
@@ -199,7 +200,7 @@ print_backtrace(const VALUE eclass, const VALUE errat, const VALUE str, int reve
 }
 
 void
-rb_error_write(VALUE errinfo, VALUE errat, VALUE str)
+rb_error_write(VALUE errinfo, VALUE errat, VALUE str, int highlight, int reverse)
 {
     volatile VALUE eclass = Qundef, emesg = Qundef;
 
@@ -216,13 +217,28 @@ rb_error_write(VALUE errinfo, VALUE errat, VALUE str)
 	    emesg = e;
 	}
     }
-    if (rb_stderr_tty_p()) {
-	write_warn(str, "\033[1mTraceback \033[m(most recent call last):\n");
+    if (reverse) {
+	static const char traceback[] = "Traceback "
+	    "(most recent call last):\n";
+	const int bold_size = rb_strlen_lit("Traceback ");
+	char buff[sizeof(traceback)+sizeof(bold)+sizeof(reset)-2], *p = buff;
+	const char *msg = traceback;
+	long len = sizeof(traceback) - 1;
+	if (highlight) {
+#define APPEND(s, l) (memcpy(p, s, l), p += (l))
+	    APPEND(bold, sizeof(bold)-1);
+	    APPEND(traceback, bold_size);
+	    APPEND(reset, sizeof(reset)-1);
+	    APPEND(traceback + bold_size, sizeof(traceback)-bold_size-1);
+#undef APPEND
+	    len = p - (msg = buff);
+	}
+	write_warn2(str, msg, len);
 	print_backtrace(eclass, errat, str, TRUE);
-	print_errinfo(eclass, errat, emesg, str, TRUE);
+	print_errinfo(eclass, errat, emesg, str, highlight);
     }
     else {
-	print_errinfo(eclass, errat, emesg, str, FALSE);
+	print_errinfo(eclass, errat, emesg, str, highlight);
 	print_backtrace(eclass, errat, str, FALSE);
     }
 }
@@ -232,6 +248,7 @@ rb_ec_error_print(rb_execution_context_t * volatile ec, volatile VALUE errinfo)
 {
     volatile int raised_flag = ec->raised_flag;
     volatile VALUE errat = Qundef;
+    int tty;
 
     if (NIL_P(errinfo))
 	return;
@@ -242,7 +259,8 @@ rb_ec_error_print(rb_execution_context_t * volatile ec, volatile VALUE errinfo)
 	errat = rb_get_backtrace(errinfo);
     }
 
-    rb_error_write(errinfo, errat, Qnil);
+    tty = rb_stderr_tty_p();
+    rb_error_write(errinfo, errat, Qnil, tty, tty);
 
     EC_POP_TAG();
     ec->errinfo = errinfo;

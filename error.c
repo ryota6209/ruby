@@ -957,24 +957,69 @@ exc_to_s(VALUE exc)
 }
 
 /* FIXME: Include eval_error.c */
-void rb_error_write(VALUE errinfo, VALUE errat, VALUE str);
+void rb_error_write(VALUE errinfo, VALUE errat, VALUE str, int highlight, int reverse);
+
+/*
+ * :nodoc:
+ *    Exception.to_tty?   ->  true or false
+ */
+static VALUE
+exc_s_to_tty_p(VALUE self)
+{
+    return rb_stderr_tty_p() ? Qtrue : Qfalse;
+}
 
 /*
  * call-seq:
- *   exception.full_message  ->  string
+ *   exception.full_message(highlight: to-tty?, reverse: to-tty?) ->  string
  *
  * Returns formatted string of <i>exception</i>.
  * The returned string is formatted using the same format that Ruby uses
- * when printing an uncaught exceptions to stderr. So it may differ by
- * <code>$stderr.tty?</code> at the timing of a call.
+ * when printing an uncaught exceptions to stderr.
+ * <code>to-tty?</code> is true if the default error handler will send
+ * the messages to a tty.  So it may differ by <code>$stderr.tty?</code>
+ * at the timing of a call.
  */
 
 static VALUE
-exc_full_message(VALUE exc)
+exc_full_message(int argc, VALUE *argv, VALUE exc)
 {
-    VALUE str = rb_str_new2("");
-    VALUE errat = rb_get_backtrace(exc);
-    rb_error_write(exc, errat, str);
+    VALUE opt, str, errat;
+    int highlight = -1, reverse = -1;
+
+    rb_scan_args(argc, argv, "0:", &opt);
+    if (!NIL_P(opt)) {
+	enum {kw_highlight, kw_reverse, kw_max_};
+	static ID kw[kw_max_];
+	VALUE args[kw_max_];
+	if (!kw[0]) {
+#define INIT_KW(n) kw[kw_##n] = rb_intern_const(#n)
+	    INIT_KW(highlight);
+	    INIT_KW(reverse);
+#undef INIT_KW
+	}
+	rb_get_kwargs(opt, kw, 0, kw_max_, args);
+#define CHECK_BOOL(n) \
+	switch (args[kw_##n]) { \
+	  case Qtrue: n = TRUE; break; \
+	  case Qfalse: n = FALSE; break; \
+	  case Qundef: break; \
+	  default: rb_raise(rb_eArgError, "expected true or false as " \
+			    "%s: %+"PRIsVALUE, #n, args[kw_##n]); \
+	}
+	CHECK_BOOL(highlight);
+	CHECK_BOOL(reverse);
+#undef CHECK_BOOL
+    }
+    if (highlight == -1 || reverse == -1) {
+	int tty = rb_stderr_tty_p();
+	if (highlight == -1) highlight = tty;
+	if (reverse == -1) reverse = tty;
+    }
+    str = rb_str_new2("");
+    errat = rb_get_backtrace(exc);
+
+    rb_error_write(exc, errat, str, highlight, reverse);
     return str;
 }
 
@@ -2255,12 +2300,13 @@ Init_Exception(void)
 {
     rb_eException   = rb_define_class("Exception", rb_cObject);
     rb_define_singleton_method(rb_eException, "exception", rb_class_new_instance, -1);
+    rb_define_singleton_method(rb_eException, "to_tty?", exc_s_to_tty_p, 0);
     rb_define_method(rb_eException, "exception", exc_exception, -1);
     rb_define_method(rb_eException, "initialize", exc_initialize, -1);
     rb_define_method(rb_eException, "==", exc_equal, 1);
     rb_define_method(rb_eException, "to_s", exc_to_s, 0);
     rb_define_method(rb_eException, "message", exc_message, 0);
-    rb_define_method(rb_eException, "full_message", exc_full_message, 0);
+    rb_define_method(rb_eException, "full_message", exc_full_message, -1);
     rb_define_method(rb_eException, "inspect", exc_inspect, 0);
     rb_define_method(rb_eException, "backtrace", exc_backtrace, 0);
     rb_define_method(rb_eException, "backtrace_locations", exc_backtrace_locations, 0);
