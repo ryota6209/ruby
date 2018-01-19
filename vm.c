@@ -85,6 +85,12 @@ rb_vm_frame_block_handler(const rb_control_frame_t *cfp)
     return VM_CF_BLOCK_HANDLER(cfp);
 }
 
+VALUE
+rb_frame_block_handler(void)
+{
+    return rb_vm_frame_block_handler(GET_EC()->cfp);
+}
+
 #if VM_CHECK_MODE > 0
 static int
 VM_CFP_IN_HEAP_P(const rb_execution_context_t *ec, const rb_control_frame_t *cfp)
