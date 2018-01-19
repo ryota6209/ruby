@@ -306,11 +306,22 @@ struct rescue_funcall_args {
     unsigned int respond_to_missing: 1;
     int argc;
     const VALUE *argv;
+    VALUE block_handler;
 };
+
+static void
+pass_block_handler(rb_execution_context_t *ec, VALUE block_handler)
+{
+    if (block_handler != VM_BLOCK_HANDLER_NONE) {
+	vm_passed_block_handler_set(ec, block_handler);
+	VM_ENV_FLAGS_SET(ec->cfp->ep, VM_FRAME_FLAG_PASSED);
+    }
+}
 
 static VALUE
 check_funcall_exec(struct rescue_funcall_args *args)
 {
+    pass_block_handler(args->ec, args->block_handler);
     return call_method_entry(args->ec, args->defined_class,
 			     args->recv, idMethodMissing,
 			     args->me, args->argc, args->argv);
@@ -353,7 +364,9 @@ check_funcall_callable(rb_execution_context_t *ec, const rb_callable_method_entr
 }
 
 static VALUE
-check_funcall_missing(rb_execution_context_t *ec, VALUE klass, VALUE recv, ID mid, int argc, const VALUE *argv, int respond, VALUE def)
+check_funcall_missing(rb_execution_context_t *ec, VALUE klass, VALUE recv, ID mid,
+		      int argc, const VALUE *argv, int respond, VALUE def,
+		      VALUE block_handler)
 {
     struct rescue_funcall_args args;
     const rb_method_entry_t *me;
@@ -364,6 +377,7 @@ check_funcall_missing(rb_execution_context_t *ec, VALUE klass, VALUE recv, ID mi
     if (!RTEST(ret)) return def;
     args.respond = respond > 0;
     args.respond_to_missing = (ret != Qundef);
+    args.block_handler = block_handler;
     ret = def;
     me = method_entry_get(klass, idMethodMissing, &args.defined_class);
     if (me && !METHOD_ENTRY_BASIC(me)) {
@@ -395,6 +409,13 @@ rb_check_funcall(VALUE recv, ID mid, int argc, const VALUE *argv)
 VALUE
 rb_check_funcall_default(VALUE recv, ID mid, int argc, const VALUE *argv, VALUE def)
 {
+    return rb_check_funcall_with_block_handler(recv, mid, argc, argv, def, VM_BLOCK_HANDLER_NONE);
+}
+
+VALUE
+rb_check_funcall_with_block_handler(VALUE recv, ID mid, int argc, const VALUE *argv,
+				    VALUE def, VALUE block_handler)
+{
     VALUE klass = CLASS_OF(recv);
     const rb_callable_method_entry_t *me;
     rb_execution_context_t *ec = GET_EC();
@@ -406,11 +427,12 @@ rb_check_funcall_default(VALUE recv, ID mid, int argc, const VALUE *argv, VALUE 
     me = rb_search_method_entry(recv, mid);
     if (!check_funcall_callable(ec, me)) {
 	VALUE ret = check_funcall_missing(ec, klass, recv, mid, argc, argv,
-					  respond, def);
+					  respond, def, block_handler);
 	if (ret == Qundef) ret = def;
 	return ret;
     }
     stack_check(ec);
+    pass_block_handler(ec, block_handler);
     return vm_call0(ec, recv, mid, argc, argv, me);
 }
 
@@ -431,7 +453,7 @@ rb_check_funcall_with_hook(VALUE recv, ID mid, int argc, const VALUE *argv,
     me = rb_search_method_entry(recv, mid);
     if (!check_funcall_callable(ec, me)) {
 	VALUE ret = check_funcall_missing(ec, klass, recv, mid, argc, argv,
-					  respond, Qundef);
+					  respond, Qundef, VM_BLOCK_HANDLER_NONE);
 	(*hook)(ret != Qundef, recv, mid, argc, argv, arg);
 	return ret;
     }
