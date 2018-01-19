@@ -1878,18 +1878,77 @@ rb_hash_each_pair(VALUE hash)
     return hash;
 }
 
-static int
-transform_keys_i(VALUE key, VALUE value, VALUE result)
+static void
+transform_parse_keyword_args(VALUE opts, VALUE *recursive)
 {
+    static ID kwd[1];
+    if (NIL_P(opts)) return;
+    if (!kwd[0]) {
+	kwd[0] = rb_intern_const("recursive");
+    }
+    rb_get_kwargs(opts, kwd, 0, 1, recursive);
+    switch (*recursive) {
+      case Qundef:
+	*recursive = Qfalse;
+      case Qtrue:
+      case Qfalse:
+	break;
+      default:
+	rb_raise(rb_eArgError, "expected true or false as recursive: %"PRIsVALUE,
+		 *recursive);
+    }
+}
+
+struct transform_keyword_recursive_args {
+    VALUE opts;
+    VALUE block_handler;
+    VALUE result;
+    ID mid, each;
+};
+
+static VALUE transform_keys_recursive_i(RB_BLOCK_CALL_FUNC_ARGLIST(obj, callback_arg));
+
+static VALUE
+transform_keys_call(VALUE obj, const struct transform_keyword_recursive_args *arg)
+{
+    VALUE result = rb_check_funcall_with_block_handler(obj, arg->mid, 1, &arg->opts,
+						       Qundef, arg->block_handler);
+    if (result == Qundef)
+	result = rb_check_block_call(obj, arg->each, 0, 0,
+				     transform_keys_recursive_i, (VALUE)arg);
+
+    return result;
+}
+
+static VALUE
+transform_keys_recursive_i(RB_BLOCK_CALL_FUNC_ARGLIST(obj, callback_arg))
+{
+    struct transform_keyword_recursive_args *arg =
+	(struct transform_keyword_recursive_args *)callback_arg;
+    return transform_keys_call(obj, arg);
+}
+
+static int
+transform_keys_i(VALUE key, VALUE value, VALUE args)
+{
+    struct transform_keyword_recursive_args *arg =
+	(struct transform_keyword_recursive_args *)args;
     VALUE new_key = rb_yield(key);
-    rb_hash_aset(result, new_key, value);
+
+    if (!NIL_P(arg->opts)) {
+	VALUE new_val = transform_keys_call(value, arg);
+	if (new_val != Qundef) {
+	    value = new_val;
+	}
+    }
+    rb_hash_aset(arg->result, new_key, value);
     return ST_CONTINUE;
 }
 
 /*
  *  call-seq:
- *     hsh.transform_keys {|key| block } -> new_hash
- *     hsh.transform_keys                -> an_enumerator
+ *     hsh.transform_keys([recursive: false]) {|key| block } -> new_hash
+ *     hsh.transform_keys([recursive: false])                -> an_enumerator
  *
  *  Returns a new hash with the results of running the block once for
  *  every key.
@@ -1901,26 +1960,45 @@ transform_keys_i(VALUE key, VALUE value, VALUE result)
  *     h.transform_keys.with_index {|k, i| "#{k}.#{i}" }
  *                                     #=> { "a.0" => 1, "b.1" => 2, "c.2" => 3 }
  *
+ *  If optional +recursive+ keyword is true, traverses each values
+ *  recursively.
+ *
+ *     h = { "a" => {"b" => 2}, "c" => [{"d" => 4}] }
+ *     h.transform_keys(recursive: true, &:to_sym)
+ *                                      #=> { a: {b: 2}, c: [{d: 4}] }
+ *
  *  If no block is given, an enumerator is returned instead.
  */
 static VALUE
-rb_hash_transform_keys(VALUE hash)
+rb_hash_transform_keys(int argc, VALUE *argv, VALUE hash)
 {
-    VALUE result;
+    struct transform_keyword_recursive_args args;
+    VALUE recursive = Qfalse;
 
-    RETURN_SIZED_ENUMERATOR(hash, 0, 0, hash_enum_size);
-    result = rb_hash_new();
+    RETURN_SIZED_ENUMERATOR(hash, argc, argv, hash_enum_size);
+
+    rb_scan_args(argc, argv, "0:", &args.opts);
+    transform_parse_keyword_args(args.opts, &recursive);
+    args.result = rb_hash_new();
     if (!RHASH_EMPTY_P(hash)) {
-        rb_hash_foreach(hash, transform_keys_i, result);
+	if (recursive) {
+	    args.mid = rb_intern("transform_keys");
+	    args.each = rb_intern("map");
+	    args.block_handler = rb_frame_block_handler();
+	}
+	else {
+	    args.opts = Qnil;
+	}
+        rb_hash_foreach(hash, transform_keys_i, (VALUE)&args);
     }
 
-    return result;
+    return args.result;
 }
 
 /*
  *  call-seq:
- *     hsh.transform_keys! {|key| block } -> hsh
- *     hsh.transform_keys!                -> an_enumerator
+ *     hsh.transform_keys!([recursive: false]) {|key| block } -> hsh
+ *     hsh.transform_keys!([recursive: false])                -> an_enumerator
  *
  *  Invokes the given block once for each key in <i>hsh</i>, replacing it
  *  with the new key returned by the block, and then returns <i>hsh</i>.
@@ -1932,19 +2010,46 @@ rb_hash_transform_keys(VALUE hash)
  *     h.transform_keys!.with_index {|k, i| "#{k}.#{i}" }
  *                                      #=> { "a.0" => 1, "b.1" => 2, "c.2" => 3 }
  *
+ *  If optional +recursive+ keyword is true, traverses each values
+ *  recursively.
+ *
+ *     h = { "a" => {"b" => 2}, "c" => [{"d" => 4}] }
+ *     h.transform_keys!(recursive: true, &:to_sym)
+ *                                      #=> { a: {b: 2}, c: [{d: 4}] }
+ *
  *  If no block is given, an enumerator is returned instead.
  */
 static VALUE
-rb_hash_transform_keys_bang(VALUE hash)
+rb_hash_transform_keys_bang(int argc, VALUE *argv, VALUE hash)
 {
-    RETURN_SIZED_ENUMERATOR(hash, 0, 0, hash_enum_size);
+    struct transform_keyword_recursive_args args;
+    VALUE recursive = Qfalse;
+
+    RETURN_SIZED_ENUMERATOR(hash, argc, argv, hash_enum_size);
+
+    rb_scan_args(argc, argv, "0:", &args.opts);
+    transform_parse_keyword_args(args.opts, &recursive);
+
     rb_hash_modify_check(hash);
     if (RHASH(hash)->ntbl) {
 	long i;
 	VALUE keys = rb_hash_keys(hash);
+
+	if (recursive) {
+	    args.mid = rb_intern("transform_keys!");
+	    args.each = idEach;
+	    args.block_handler = rb_frame_block_handler();
+	}
+	else {
+	    args.opts = Qnil;
+	}
 	for (i = 0; i < RARRAY_LEN(keys); ++i) {
 	    VALUE key = RARRAY_AREF(keys, i), new_key = rb_yield(key);
-	    rb_hash_aset(hash, new_key, rb_hash_delete(hash, key));
+	    VALUE val = rb_hash_delete(hash, key);
+	    rb_hash_aset(hash, new_key, val);
+	    if (recursive) {
+		transform_keys_call(val, &args);
+	    }
 	}
     }
     return hash;
@@ -4657,8 +4762,8 @@ Init_Hash(void)
     rb_define_method(rb_cHash, "each_pair", rb_hash_each_pair, 0);
     rb_define_method(rb_cHash, "each", rb_hash_each_pair, 0);
 
-    rb_define_method(rb_cHash, "transform_keys", rb_hash_transform_keys, 0);
-    rb_define_method(rb_cHash, "transform_keys!", rb_hash_transform_keys_bang, 0);
+    rb_define_method(rb_cHash, "transform_keys", rb_hash_transform_keys, -1);
+    rb_define_method(rb_cHash, "transform_keys!", rb_hash_transform_keys_bang, -1);
     rb_define_method(rb_cHash, "transform_values", rb_hash_transform_values, 0);
     rb_define_method(rb_cHash, "transform_values!", rb_hash_transform_values_bang, 0);
 

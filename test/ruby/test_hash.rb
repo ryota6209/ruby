@@ -1564,6 +1564,11 @@ class TestHash < Test::Unit::TestCase
     assert_equal(%w(a.0 b.1 c.2), y.keys)
   end
 
+  def test_transform_keys_recursive
+    h = @cls["a" => @cls["b" => 2], "c" => [@cls["d" => 4]]].freeze
+    assert_equal({a: {b: 2}, c: [{d: 4}]}, h.transform_keys(recursive: true, &:to_sym))
+  end
+
   def test_transform_keys_bang
     x = @cls[a: 1, b: 2, c: 3]
     y = x.transform_keys! {|k| :"#{k}!" }
@@ -1576,6 +1581,12 @@ class TestHash < Test::Unit::TestCase
 
     x.transform_keys!.with_index {|k, i| "#{k}.#{i}" }
     assert_equal(%w(a!.0 b!.1 c!.2), x.keys)
+  end
+
+  def test_transform_keys_bang_recursive
+    h = @cls["a" => @cls["b" => 2], "c" => [@cls["d" => 4]]]
+    assert_same(h, h.transform_keys!(recursive: true, &:to_sym))
+    assert_equal({a: {b: 2}, c: [{d: 4}]}, h)
   end
 
   def test_transform_values
