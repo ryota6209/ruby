@@ -34,10 +34,12 @@ VALUE rb_cSOCKSSocket;
 
 int rsock_do_not_reverse_lookup = 1;
 static VALUE sym_wait_readable;
+static ID id_errno;
 
 void
 rsock_raise_socket_error(const char *reason, int error)
 {
+    VALUE exc, msg;
 #ifdef EAI_SYSTEM
     int e;
     if (error == EAI_SYSTEM && (e = errno) != 0)
@@ -45,13 +47,21 @@ rsock_raise_socket_error(const char *reason, int error)
 #endif
 #ifdef _WIN32
     rb_encoding *enc = rb_default_internal_encoding();
-    VALUE msg = rb_sprintf("%s: ", reason);
+    msg = rb_sprintf("%s: ", reason);
     if (!enc) enc = rb_default_internal_encoding();
     rb_str_concat(msg, rb_w32_conv_from_wchar(gai_strerrorW(error), enc));
-    rb_exc_raise(rb_exc_new_str(rb_eSocket, msg));
 #else
-    rb_raise(rb_eSocket, "%s: %s", reason, gai_strerror(error));
+    msg = rb_sprintf("%s: %s", reason, gai_strerror(error));
 #endif
+    exc = rb_exc_new_str(rb_eSocket, msg);
+    rb_ivar_set(exc, id_errno, INT2NUM(error));
+    rb_exc_raise(exc);
+}
+
+static VALUE
+esock_errno(VALUE exc)
+{
+    return rb_attr_get(exc, id_errno);
 }
 
 #ifdef _WIN32
@@ -779,6 +789,7 @@ rsock_init_socket_init(void)
      * SocketError is the error class for socket.
      */
     rb_eSocket = rb_define_class("SocketError", rb_eStandardError);
+    rb_define_method(rb_eSocket, "errno", esock_errno, 0);
     rsock_init_ipsocket();
     rsock_init_tcpsocket();
     rsock_init_tcpserver();
@@ -798,4 +809,6 @@ rsock_init_socket_init(void)
 #if MSG_DONTWAIT_RELIABLE
     sym_wait_writable = ID2SYM(rb_intern("wait_writable"));
 #endif
+
+    id_errno = rb_intern_const("errno");
 }
